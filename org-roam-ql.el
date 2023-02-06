@@ -17,6 +17,8 @@
 
 (require 'org-ql)
 (require 'org-ql-view)
+(require 'org-roam-utils)
+(require 'org-roam-node)
 
 (defun org-roam-ql-view--get-nodes-from-query (source-or-query)
   "Convert SOURCE-OR-QUERY to org-roam-nodes.
@@ -45,7 +47,6 @@ SOURCE-OR-QUERY can be one of the following:
                (vconcat [:select id :from nodes :where] query))
              args))))
    ((functionp source-or-query) (funcall source-or-query))))
-
 
 ;;;###autoload
 (defun org-roam-ql-view (source-or-query title &optional query super-groups)
@@ -155,8 +156,6 @@ See `org-roam-search' for details on SUPER-GROUPS."
 
 ;; modified org-ql-view--format-element to work with org-roam nodes
 (defun org-roam-ql-view--format-node (node)
-  ;; This essentially needs to do what `org-agenda-format-item' does,
-  ;; which is a lot.  We are a long way from that, but it's a start.
   "Return NODE as a string with text-properties set by its property list.
 If NODE is nil, return an empty string."
   (if (not node)
@@ -204,11 +203,10 @@ If NODE is nil, return an empty string."
     (point-marker)))
 
 ;;;###autoload
-(defun org-roam-ql-from-roam-buffer ()
+(defun org-roam-ql-to-roam-buffer ()
   "Convert a roam buffer to org-ql buffer."
   (interactive)
   (when (derived-mode-p 'org-roam-mode)
-    ;;(if org-roam-buffer-current-node
     (let (nodes)
       (goto-char 0)
       (while (condition-case err
@@ -229,12 +227,72 @@ If NODE is nil, return an empty string."
                         `(member (org-id-get) (list ,@(-map #'org-roam-node-id nodes)))))))
       ;;(error "`org-roam-buffer-current-node' is nil"))))
 
+(defun org-roam-ql--refresh-buffer (fn &rest args)
+  (when (equal (buffer-name) org-roam-buffer)
+    (apply fn args)))
 
-(org-ql-defpred org-roam-backlink (&rest nodes) "Return if current node has bacnklink to any of NODES."
-  :body
-  (let* ((backlink-destinations (apply #'vector (-map #'org-roam-node-id nodes)))
-         (id (org-id-get)))
-    (org-roam-db-query [:select * :from links :where (in dest $v1) :and (= source $s2)] backlink-destinations id)))
+(define-derived-mode org-roam-ql-mode org-roam-mode "Org-roam-ql"
+  "A major mode to display a list of nodes. Similar to org-roam-mode, but doesn't default to the org-roam-current-node."
+  :group 'org-roam-ql
+  (advice-add 'org-roam-buffer-refresh :around #'org-roam-ql--refresh-buffer))
+
+;;;###autoload
+(defun org-roam-ql-roam-buffer-from-ql-buffer ()
+  "Convert a org-ql reusult to a roam-buffer."
+  (interactive)
+  (unless org-ql-view-buffers-files
+    (user-error "Not an Org QL View buffer"))
+  ;; Copied from `org-agenda-finalize'
+  (let (mrk nodes)
+    (save-excursion
+      (goto-char (point-min))
+      (while (equal (forward-line) 0)
+	(when (setq mrk (get-text-property (point) 'org-hd-marker))
+          (org-with-point-at mrk
+            ;; pick only nodes
+            (-if-let (id (org-id-get))
+                (push (org-roam-node-from-id id) nodes)
+              (user-error "Non roam-node headings in query."))))))
+    (org-roam-ql--buffer-for-nodes nodes
+                                   org-ql-view-title
+                                   (format "*From ql: %s*" org-ql-view-title))))
+
+(defun org-roam-ql--render-buffer (sections title buffer-name)
+  "Render SECTIONS (list of functions) in an org-roam-ql buffer."
+  ;; copied  from `org-roam-buffer-render-contents'
+  (with-current-buffer (get-buffer-create buffer-name)
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (org-roam-ql-mode)
+      (org-roam-buffer-set-header-line-format title)
+      (insert ?\n)
+      (dolist (section sections)
+        (funcall section))
+      (goto-char 0))
+    (display-buffer (current-buffer))))
+
+(defmacro org-roam-ql--nodes-section (nodes &optional heading)
+  "Returns a function that can be passed as a section for `okm-render-org-roam-buffer' with the NODES.
+Nodes should be a list of org-roam nodes."
+  `(lambda ()
+     (magit-insert-section (org-roam)
+       (magit-insert-heading)
+       (dolist (entry
+                ;;(seq-uniq  ;; removing duplicates as the whole subtree will be getting displayed
+                ,nodes)
+         (let ((pos (org-roam-node-point entry))
+               (properties (org-roam-node-properties entry)))
+           (org-roam-node-insert-section :source-node entry :point pos :properties properties))
+         (insert ?\n))
+       (run-hooks 'org-roam-buffer-postrender-functions))))
+
+(defun org-roam-ql--buffer-for-nodes (nodes title buffer-name)
+  "View nodes in org-roam-ql buffer"
+  (org-roam-ql--render-buffer
+   (list
+    (org-roam-ql--nodes-section nodes))
+   title buffer-name))
+
 
 (provide 'org-roam-ql)
 
