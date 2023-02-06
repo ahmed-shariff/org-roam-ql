@@ -18,7 +18,6 @@
 (require 'org-ql)
 (require 'org-ql-view)
 
-
 (defun org-roam-ql-view--get-nodes-from-query (source-or-query)
   "Convert SOURCE-OR-QUERY to org-roam-nodes.
 SOURCE-OR-QUERY can be one of the following:
@@ -46,8 +45,9 @@ SOURCE-OR-QUERY can be one of the following:
                (vconcat [:select id :from nodes :where] query))
              args))))
    ((functionp source-or-query) (funcall source-or-query))))
-    
 
+
+;;;###autoload
 (defun org-roam-ql-view (source-or-query title &optional query super-groups)
   "Basically what `org-ql-search does', but for org-roam-nodes.
 See `org-roam-ql-view--get-nodes-from-querySOURCE-OR-QUERY' for what
@@ -203,6 +203,7 @@ If NODE is nil, return an empty string."
     (goto-char (org-roam-node-point node))
     (point-marker)))
 
+;;;###autoload
 (defun org-roam-ql-from-roam-buffer ()
   "Convert a roam buffer to org-ql buffer."
   (interactive)
@@ -227,6 +228,7 @@ If NODE is nil, return an empty string."
                         ;;`(org-roam-backlink ,org-roam-buffer-current-node)))
                         `(member (org-id-get) (list ,@(-map #'org-roam-node-id nodes)))))))
       ;;(error "`org-roam-buffer-current-node' is nil"))))
+
 
 (org-ql-defpred org-roam-backlink (&rest nodes) "Return if current node has bacnklink to any of NODES."
   :body
