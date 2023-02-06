@@ -1,0 +1,9 @@
+#+title: org-roam-ql - An org-ql interface for org-roam
+#+author: Shariff AM Faleel
+#+language: en
+
+* org-roam-ql
+
+This package provides a org-ql interfaces for org-roam.
+
+This package is under active development.
