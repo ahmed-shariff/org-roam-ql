@@ -19,6 +19,12 @@
 (require 'org-ql-view)
 (require 'org-roam-utils)
 (require 'org-roam-node)
+(require 'dash)
+
+(defvar org-roam-ql-source-or-query nil
+  "Stores the current source-or-query used to populate the `org-ql-vew'")
+
+(defvar org-roam-ql--current-node-ids nil)
 
 (defun org-roam-ql-view--get-nodes-from-query (source-or-query)
   "Convert SOURCE-OR-QUERY to org-roam-nodes.
@@ -63,7 +69,9 @@ See `org-roam-search' for details on SUPER-GROUPS."
          (header (org-ql-view--header-line-format
                   :title title))
          (org-ql-view-buffers-files (-uniq (mapcar #'org-roam-node-file nodes)))
-         (org-ql-view-query (if query `(and (property "ID") ,query) '(property "ID")))
+         (org-ql-view-query (if query
+                                `(and (org-roam-ql-nodes) ,query)
+                              '(org-roam-ql-nodes)))
          (org-ql-view-sort nil)
          (org-ql-view-narrow nil)
          (org-ql-view-super-groups super-groups)
@@ -79,8 +87,31 @@ See `org-roam-search' for details on SUPER-GROUPS."
     (org-ql-view--display :buffer buffer :header header
       :string (s-join "\n" strings))
     (with-current-buffer buffer
+      (set (make-local-variable 'org-roam-ql-source-or-query) source-or-query)
+      ;; HACK - to make the buffer get rendered properly.
       (org-ql-view-refresh))))
 
+(org-ql-defpred org-roam-ql-nodes nil
+  "To be used with the org-roam-ql. Checks if a node is a result of a passed query."
+  :body
+  (-when-let (id (org-id-get (point) nil))
+    (member id org-roam-ql--current-node-ids)))
+
+(defun org-roam-ql--refresh (other-func &rest rest)
+  "When `org-ql-view' is refreshed, if this is created from a `org-roam-ql'
+function, update the variables accordingly."
+  (unless org-ql-view-buffers-files
+    (user-error "Not an Org QL View buffer"))
+  ;; FIXME: This is a super hacky way to pass values to a defpred function!?
+  (when org-roam-ql-source-or-query
+    (let* ((nodes (org-roam-ql-view--get-nodes-from-query org-roam-ql-source-or-query))
+           (node-ids (-map #'org-roam-node-id nodes)))
+      (setq org-roam-ql--current-node-ids node-ids)))
+  (apply other-func rest)
+  (when org-roam-ql-source-or-query
+    (setq org-roam-ql--current-node-ids nil)))
+
+(advice-add 'org-ql-view-refresh :around #'org-roam-ql--refresh)
 
 ;; ;; modified version of org-ql-view--display
 ;; ;; note needed.
