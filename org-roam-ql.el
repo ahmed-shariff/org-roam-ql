@@ -54,6 +54,8 @@ SOURCE-OR-QUERY can be one of the following:
 See `org-roam-ql-view--get-nodes-from-querySOURCE-OR-QUERY' for what
 SOURCE-OR-QUERY can be. TITLE is a title to associate with the view.
 See `org-roam-search' for details on SUPER-GROUPS."
+  (interactive (list (list (read-minibuffer "Query: "))
+                     (read-string "Title: ")))
   (let* ((nodes (org-roam-ql-view--get-nodes-from-query source-or-query))
          (strings '())
          (title (format "org-roam - %s" title))
