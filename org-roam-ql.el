@@ -113,54 +113,6 @@ function, update the variables accordingly."
 
 (advice-add 'org-ql-view-refresh :around #'org-roam-ql--refresh)
 
-;; ;; modified version of org-ql-view--display
-;; ;; note needed.
-;; (cl-defun org-roam-ql-view--display (&key (buffer org-ql-view-buffer) header string)
-;;   "Display STRING in `org-ql-view' BUFFER.
-
-;; BUFFER may be a buffer, or a string naming a buffer, which is
-;; reused if it already exists.  `org-ql-view-buffer' is used by
-;; default.
-
-;; HEADER is a string displayed in the buffer's header line.
-
-;; The following special variables, if non-nil, are set
-;; buffer-locally to preserve their value in the buffer for
-;; subsequent refreshing of the buffer: `org-ql-view-buffers-files',
-;; `org-ql-view-query', `org-ql-view-sort', `org-ql-view-narrow',
-;; `org-ql-view-super-groups', `org-ql-title.'"
-;;   (declare (indent defun))
-;;   (let* ((vars (list 'org-ql-view-buffers-files 'org-ql-view-query
-;;                      'org-ql-view-sort 'org-ql-view-narrow
-;;                      'org-ql-view-super-groups 'org-ql-view-title))
-;;          ;; Save the values of variables which are set buffer-locally in the
-;;          ;; results buffer, which we want to override and set buffer-locally again.
-;;          (vals (cl-loop for symbol in vars
-;;                         collect (cons symbol (symbol-value symbol))))
-;;          (buffer (if (bufferp buffer)
-;;                      buffer
-;;                    (with-current-buffer (get-buffer-create (or buffer "*org-roam-ql-buffer*"))
-;;                      (unless (eq major-mode 'org-agenda-mode)
-;;                        (org-agenda-mode)
-;;                        (setf buffer-read-only t))
-;;                      (current-buffer)))))
-;;     (with-current-buffer buffer
-;;       (setq-local bookmark-make-record-function #'org-ql-view-bookmark-make-record)
-;;       (use-local-map org-ql-view-map)
-;;       ;; Prepare buffer, saving data for refreshing.
-;;       (cl-loop for symbol in vars
-;;                do (progn
-;;                     (kill-local-variable symbol)
-;;                     (set (make-local-variable symbol) (alist-get symbol vals nil nil #'equal))))
-;;       (setf header-line-format header)
-;;       ;; Clear buffer, insert entries, etc.
-;;       (let ((inhibit-read-only t))
-;;         (erase-buffer)
-;;         (insert string)
-;;         (pop-to-buffer (current-buffer));;org-ql-view-display-buffer-action)
-;;         (org-agenda-finalize)
-;;         (goto-char (point-min))))))
-
 (defmacro with-plain-file (file keep-buf-p &rest body)
   "Same as `org-roam-with-file', but doesn't start `org-roam'."
   (declare (indent 2) (debug t))
@@ -213,9 +165,7 @@ If NODE is nil, return an empty string."
                          (--> tags
                            (s-join ":" it)
                            (s-wrap it ":")
-                           (org-add-props it nil 'face 'org-tag))))))
-                     ;;(org-roam-node--format-entry (org-roam-node--process-display-format org-roam-node-display-template) node)))
-                     ))
+                           (org-add-props it nil 'face 'org-tag))))))))
       (remove-list-of-text-properties 0 (length string) '(line-prefix) string)
       ;; Add all the necessary properties and faces to the whole string
       (--> string
@@ -325,7 +275,6 @@ Nodes should be a list of org-roam nodes."
    (list
     (org-roam-ql--nodes-section nodes))
    title buffer-name))
-
 
 (provide 'org-roam-ql)
 
