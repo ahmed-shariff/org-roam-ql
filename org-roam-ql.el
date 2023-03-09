@@ -89,9 +89,18 @@ See `org-roam-search' for details on SUPER-GROUPS."
 
 (org-ql-defpred org-roam-query (query)
   "To be used with the org-roam-ql. Checks if a node is a result of a passed query."
-  :normalizers ((`(,predicate-names . ,query)
-                 `(-when-let (id (org-id-get (point) nil))
-                    (member id (list ,@(-map #'org-roam-node-id org-roam-ql--current-nodes)))))))
+  ;; :normalizers ((`(,predicate-names . ,query)
+  ;;                `(-when-let (id (org-id-get (point) nil))
+  ;;                   (member id (list ,@(-map #'org-roam-node-id org-roam-ql--current-nodes)))))))
+  :preambles ((`(,predicate-names . ,query)
+               (list :regexp (rx-to-string
+                              `(seq bol (0+ space) ":ID:" (0+ space)
+                                    (or ,@(-map
+                                           #'org-roam-node-id
+                                           org-roam-ql--current-nodes))
+                                    eol))
+                     :query t))))
+
 
 ;; (org-ql-defpred org-roam-query (query)
 ;;   :normalizers ((`(,predicate-names . ,query)
