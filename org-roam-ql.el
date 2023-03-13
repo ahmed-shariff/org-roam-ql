@@ -196,7 +196,7 @@ If NODE is nil, return an empty string."
     (point-marker)))
 
 ;;;###autoload
-(defun org-roam-ql-to-roam-buffer ()
+(defun org-roam-ql-ql-buffer-from-roam-buffer ()
   "Convert a roam buffer to org-ql buffer."
   (interactive)
   (when (derived-mode-p 'org-roam-mode)
