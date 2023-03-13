@@ -23,9 +23,21 @@
 
 (defvar org-roam-ql--current-nodes nil)
 
-(defun org-roam-ql--get-nodes-from-query (source-or-query)
+(defun org-roam-ql-nodes (source-or-query)
   "Convert SOURCE-OR-QUERY to org-roam-nodes.
-For valid values of SOURCE-OR-QUERY see `org-roam-ql-select'."
+SOURCE-OR-QUERY can be one of the following:
+- A list of params that can be passed to `org-roam-db-query'. Expected
+  to have the form (QUERY ARG1 ARG2 ARG3...). `org-roam-db-query' will
+  called with the list or parameters as:
+  (org-roam-db-query QUERY ARG1 ARG2 ARG3...). The first element in each
+  row in the result from the query is expected to have the ID of a
+  corresponding node, which will be conerted to a org-roam-node. QUERY
+  can be a complete query. If the query is going to be of the form
+  [:select [id] :from nodes :where (= todo \"TODO\")], you can omit the
+  part till after :where. i.e., pass only [(= todo \"TODO\")] and the
+  rest will get appended in the front.
+- A list of org-roam-nodes
+- A function that returns a list of org-roam-nodes"
   (cond
    ((-all-p #'org-roam-node-p source-or-query) source-or-query)
    ((and (listp source-or-query) (vectorp (car source-or-query)))
@@ -37,17 +49,20 @@ For valid values of SOURCE-OR-QUERY see `org-roam-ql-select'."
                  query
                (vconcat [:select id :from nodes :where] query))
              args))))
+   ((org-roam-ql--check-if-valid-query source-or-query)
+    (-filter (lambda (it)
+               (org-roam-ql--expand-query source-or-query it)) (org-roam-node-list)))
    ((functionp source-or-query) (funcall source-or-query))))
 
 ;;;###autoload
 (defun org-roam-ql-view (source-or-query &optional title query super-groups)
   "Basically what `org-ql-search does', but for org-roam-nodes.
-See `org-roam-ql--get-nodes-from-query' for what
+See `org-roam-ql-nodes' for what
 SOURCE-OR-QUERY can be. TITLE is a title to associate with the view.
 See `org-roam-search' for details on SUPER-GROUPS."
   (interactive (list (list (read-minibuffer "Query: "))
                      (read-string "Title: ")))
-  (let* ((nodes (org-roam-ql--get-nodes-from-query source-or-query))
+  (let* ((nodes (org-roam-ql-nodes source-or-query))
          (strings '())
          ;; TODO: Think of a better way to get a default title
          (title (format "org-roam - %s" (or title (substring source-or-query 0 10))))
@@ -76,27 +91,18 @@ See `org-roam-search' for details on SUPER-GROUPS."
       ;; HACK - to make the buffer get rendered properly.
       (org-ql-view-refresh))))
 
+;; FIXME: To be performant this can be done by constructing the
+;; results instead of going through org-ql?
 (defun org-roam-ql-select (source-or-query &optional ql-query action narrow sort)
   "Process SOURCE-OR-QUERY with org-roam-db and pass it to org-ql to be filtered with QL-QUERY.
 ACTION NARROW and SORT are passed to `org-ql-select' as is.
 
-SOURCE-OR-QUERY can be one of the following:
-- A list of params that can be passed to `org-roam-db-query'. Expected
-  to have the form (QUERY ARG1 ARG2 ARG3...). `org-roam-db-query' will
-  called with the list or parameters as:
-  (org-roam-db-query QUERY ARG1 ARG2 ARG3...). The first element in each
-  row in the result from the query is expected to have the ID of a
-  corresponding node, which will be conerted to a org-roam-node. QUERY
-  can be a complete query. If the query is going to be of the form
-  [:select [id] :from nodes :where (= todo \"TODO\")], you can omit the
-  part till after :where. i.e., pass only [(= todo \"TODO\")] and the
-  rest will get appended in the front.
-- A list of org-roam-nodes
-- A function that returns a list of org-roam-nodes"
-  (let* ((nodes (org-roam-ql--get-nodes-from-query source-or-query))
+See `org-roam-ql-nodes' for the values that can be passed to SOURCE-OR-QUERY."
+  (let* ((nodes (org-roam-ql-nodes source-or-query))
          (buffers (org-roam-ql--nodes-files nodes))
          (query (append `(and (org-roam-query ,source-or-query)) ql-query)))
-    (org-ql-select buffers query :action action :narrow narrow :sort sort)))
+    (when buffers
+      (org-ql-select buffers query :action action :narrow narrow :sort sort))))
 
 (defun org-roam-ql--nodes-files (nodes)
   "Returns the list of files from the list of NODES."
@@ -129,7 +135,7 @@ SOURCE-OR-QUERY can be one of the following:
                                      (-when-let (prop-val (assoc prop props))
                                        (s-match val (cdr prop-val)))))
                      (tags . (lambda (values &rest tags)
-                               (--all-p 
+                               (--all-p
                                 (member it values) (-list tags))))
                      (refs . s-match)))
   (puthash (car slot-info) (cdr slot-info) org-roam-ql--query-comparison-functions))
@@ -178,10 +184,10 @@ SOURCE-OR-QUERY can be one of the following:
 
 ;; (org-ql-defpred org-roam-query (query)
 ;;   :normalizers ((`(,predicate-names . ,query)
-;;                  (let* ((nodes (org-roam-ql--get-nodes-from-query (car query)))
+;;                  (let* ((nodes (org-roam-ql-nodes (car query)))
 ;;                         (node-ids (-map #'org-roam-node-id nodes)))
 ;;                  `(-when-let (id (org-id-get (point) nil))
-;;                     (member id ,node-ids))))));;,(-map #'org-roam-node-id (org-roam-ql--get-nodes-from-query (car query))))))))
+;;                     (member id ,node-ids))))));;,(-map #'org-roam-node-id (org-roam-ql-nodes (car query))))))))
 
 (defun org-roam-ql--refresh (other-func &rest rest)
   "When `org-ql-view' is refreshed, if this is created from a `org-roam-ql'
@@ -190,7 +196,7 @@ function, update the variables accordingly."
     (user-error "Not an Org QL View buffer"))
   ;; FIXME: This is a super hacky way to extract the buffers-files from the query
   (-when-let (query (read (cadr (s-match "(org-roam-query \\(.*\\))" (format "%s" org-ql-view-query)))))
-    (let* ((nodes (org-roam-ql--get-nodes-from-query query)))
+    (let* ((nodes (org-roam-ql-nodes query)))
       (setq org-roam-ql--current-nodes nodes
             org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))))
   (apply other-func rest))
