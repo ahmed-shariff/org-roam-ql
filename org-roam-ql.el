@@ -102,6 +102,65 @@ SOURCE-OR-QUERY can be one of the following:
   "Returns the list of files from the list of NODES."
   (-uniq (mapcar #'org-roam-node-file nodes)))
 
+(defun org-roam-ql--check-if-valid-query (s-exp)
+  "Check if S-EXP can be expanded to a roam-query."
+  (if (listp s-exp)
+      (or (and (member (car s-exp) '(or and))
+               (--map (org-roam-ql--check-if-valid-query it) (cdr s-exp)))
+          (member (car s-exp) (hash-table-keys org-roam-ql--query-comparison-functions)))
+    t))
+
+;; FIXME: What is this docstring!
+(defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
+
+(dolist (slot-info '((file . s-match)
+                     (file-title . s-match)
+                     (file-atime . time-equal-p)
+                     (file-mtime . time-equal-p)
+                     (id . s-equals-p)
+                     (level . equal)
+                     (point . equal)
+                     (todo . s-match)
+                     (priority . s-match)
+                     (scheduled . time-less-p)
+                     (deadline . time-less-p)
+                     (title . s-match)
+                     (properties . (lambda (props prop val)
+                                     (-when-let (prop-val (assoc prop props))
+                                       (s-match val (cdr prop-val)))))
+                     (tags . (lambda (values &rest tags)
+                               (--all-p 
+                                (member it values) (-list tags))))
+                     (refs . s-match)))
+  (puthash (car slot-info) (cdr slot-info) org-roam-ql--query-comparison-functions))
+
+(defun org-roam-ql--expand-query (query it)
+  (if (member (car query) '(or and))
+      (apply (car query) (-map #'org-roam-ql--expand-query (cdr query))))
+    (-if-let* ((query-key (car query))
+               (query-comparison-function (gethash query-key org-roam-ql--query-comparison-functions)))
+        (let ((val (funcall (intern (format "org-roam-node-%s" query-key)) it)))
+          (and val
+               (apply query-comparison-function (append (list val) (cdr query)))))
+      (user-error (format "Invalid query %s" query))))
+
+;; (defmacro org-roam-ql--expand-query-function (query)
+;;   "Expand the whole roam-query."
+;;   (-when-let* ((query-key (car query))
+;;                (query-comparison-function (gethash query-key org-roam-ql--query-comparison-functions)))
+;;     `(let ((val (,(intern (format "org-roam-node-%s" query-key)) it)))
+;;        (and val
+;;             ,(if (symbolp query-comparison-function)
+;;                  `(,query-comparison-function ,@(cdr query) val)
+;;                `(funcall ,query-comparison-function val ,@(cdr query)))))))
+
+;; (defmacro org-roam-ql--expand-query (query)
+;;   "Expand a single roam-query."
+;;   (em query)
+;;   (if (member (car query) '(or and))
+;;       `(,(car query) ,@(--map `(org-roam-ql--expand-query it) (cdr query)))
+;;     `(org-roam-ql--expand-query-function ,query)))
+
 (org-ql-defpred org-roam-query (query)
   "To be used with the org-roam-ql. Checks if a node is a result of a passed query."
   ;; :normalizers ((`(,predicate-names . ,query)
