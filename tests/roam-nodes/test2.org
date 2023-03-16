@@ -1,0 +1,13 @@
+:PROPERTIES:
+:ID:       f490cbf2-17f7-4a5f-ae5c-c7bb9f22ee63
+:END:
+#+title: test2 file
+* Node c
+:PROPERTIES:
+:ID:       97e2931f-e80f-476d-9dc9-6f771ce661e4
+:TEST_PROP: c
+:END:
+* Node d                                                               :tagD:
+:PROPERTIES:
+:ID:       9026063b-45ef-49b1-b781-24a338e12c35
+:END:

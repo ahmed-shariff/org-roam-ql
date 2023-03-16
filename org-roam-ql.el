@@ -4,7 +4,7 @@
 
 ;; Author: Shariff AM Faleel
 ;; Version: 0.1
-;; Package-Requires: ((emacs "28") (org-ql "0.7-pre") (org "9.0") (org-roam "2.2.2"))
+;; Package-Requires: ((emacs "28") (org-ql "0.7-pre") (org "9.0") (org-roam "2.2.2") (s "1.13.1"))
 ;; Homepage: https://github.com/ahmed-shariff/org-roam-ql
 ;; Keywords: org-roam, query
 ;; SPDX-License-Identifier: MIT
@@ -20,6 +20,7 @@
 (require 'org-roam-utils)
 (require 'org-roam-node)
 (require 'dash)
+(require 's)
 
 (defvar org-roam-ql--current-nodes nil)
 
@@ -45,7 +46,7 @@ SOURCE-OR-QUERY can be one of the following:
           (args (cdr source-or-query)))
       (--map (org-roam-node-from-id (car it))
        (apply #'org-roam-db-query
-             (if (equalp :select (aref query 0))
+             (if (equal :select (aref query 0))
                  query
                (vconcat [:select id :from nodes :where] query))
              args))))
@@ -119,26 +120,37 @@ See `org-roam-ql-nodes' for the values that can be passed to SOURCE-OR-QUERY."
 ;; FIXME: What is this docstring!
 (defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
 
-(dolist (slot-info '((file . s-match)
-                     (file-title . s-match)
+(dolist (slot-info '((file . org-roam-ql--predicate-s-match)
+                     (file-title . org-roam-ql--predicate-s-match)
                      (file-atime . time-equal-p)
                      (file-mtime . time-equal-p)
-                     (id . s-equals-p)
+                     (id . org-roam-ql--predicate-s-equals-p)
                      (level . equal)
                      (point . equal)
-                     (todo . s-match)
-                     (priority . s-match)
+                     (todo . org-roam-ql--predicate-s-match)
+                     (priority . org-roam-ql--predicate-s-match)
                      (scheduled . time-less-p)
                      (deadline . time-less-p)
-                     (title . s-match)
-                     (properties . (lambda (props prop val)
-                                     (-when-let (prop-val (assoc prop props))
-                                       (s-match val (cdr prop-val)))))
-                     (tags . (lambda (values &rest tags)
-                               (--all-p
-                                (member it values) (-list tags))))
-                     (refs . s-match)))
+                     (title . org-roam-ql--predicate-s-match)
+                     (properties . org-roam-ql--predicate-property-match)
+                     (tags . org-roam-ql--predicate-tags-match)
+                     (refs . org-roam-ql--predicate-s-match)))
   (puthash (car slot-info) (cdr slot-info) org-roam-ql--query-comparison-functions))
+
+(defun org-roam-ql--predicate-s-match (value regexp)
+  (when (and value match)
+    (s-match regexp value)))
+
+(defun org-roam-ql--predicate-s-equals-p (value other)
+  (when (and value other)
+    (s-equals-p value other)))
+
+(defun org-roam-ql--predicate-property-match (value prop prop-val)
+  (-when-let (val (assoc prop value))
+    (s-match prop-val (cdr val)))))
+
+(defun org-roam-ql--predicate-tags-match (values &rest tags)
+  (--all-p (member it values) (-list tags)))
 
 (defun org-roam-ql--expand-query (query it)
   (if (member (car query) '(or and))
@@ -288,7 +300,7 @@ If NODE is nil, return an empty string."
                    t ;; keep the while loop going
                    )
                (user-error
-                (if (equalp (error-message-string err) "No next section")
+                (if (equal (error-message-string err) "No next section")
                     nil ;; end while loop
                   (signal (car err) (cdr err))))) ;; somthing else happened, re-throw
         (let ((magit-section (plist-get (text-properties-at (point)) 'magit-section)))

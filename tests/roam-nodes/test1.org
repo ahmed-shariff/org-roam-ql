@@ -1,0 +1,13 @@
+:PROPERTIES:
+:ID:       67a3bc01-6a9b-4c1b-9fc3-fd413badb8ba
+:END:
+#+title: test1 file
+* DONE Node a
+:PROPERTIES:
+:ID:       78fb2d53-4195-49b5-8699-7549d079859c
+:END:
+
+* INPROGRESS Node b
+:PROPERTIES:
+:ID:       15b0204a-0bcc-4ad9-b7c1-addd9119d23c
+:END:
