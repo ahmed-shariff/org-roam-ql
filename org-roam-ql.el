@@ -25,18 +25,18 @@
 (defvar org-roam-ql--current-nodes nil)
 
 (defun org-roam-ql-nodes (source-or-query)
-  "Convert SOURCE-OR-QUERY to org-roam-nodes.
-SOURCE-OR-QUERY can be one of the following:
+  "Convert SOURCE-OR-QUERY to org-roam-nodes.  SOURCE-OR-QUERY can be
+one of the following:
 - A list of params that can be passed to `org-roam-db-query'. Expected
   to have the form (QUERY ARG1 ARG2 ARG3...). `org-roam-db-query' will
-  called with the list or parameters as:
-  (org-roam-db-query QUERY ARG1 ARG2 ARG3...). The first element in each
-  row in the result from the query is expected to have the ID of a
-  corresponding node, which will be conerted to a org-roam-node. QUERY
-  can be a complete query. If the query is going to be of the form
-  [:select [id] :from nodes :where (= todo \"TODO\")], you can omit the
-  part till after :where. i.e., pass only [(= todo \"TODO\")] and the
-  rest will get appended in the front.
+  called with the list or parameters as: (org-roam-db-query QUERY ARG1
+  ARG2 ARG3...). The first element in each row in the result from the
+  query is expected to have the ID of a corresponding node, which will
+  be conerted to a org-roam-node. QUERY can be a complete query. If
+  the query is going to be of the form [:select [id] :from nodes
+  :where (= todo \"TODO\")], you can omit the part till after
+  :where. i.e., pass only [(= todo \"TODO\")] and the rest will get
+  appended in the front.
 - A list of org-roam-nodes
 - A function that returns a list of org-roam-nodes"
   (cond
@@ -57,10 +57,10 @@ SOURCE-OR-QUERY can be one of the following:
 
 ;;;###autoload
 (defun org-roam-ql-view (source-or-query &optional title query super-groups)
-  "Basically what `org-ql-search does', but for org-roam-nodes.
-See `org-roam-ql-nodes' for what
-SOURCE-OR-QUERY can be. TITLE is a title to associate with the view.
-See `org-roam-search' for details on SUPER-GROUPS."
+  "Basically what `org-ql-search does', but for org-roam-nodes.  See
+`org-roam-ql-nodes' for what SOURCE-OR-QUERY can be. TITLE is a title
+to associate with the view.  See `org-roam-search' for details on
+SUPER-GROUPS."
   (interactive (list (list (read-minibuffer "Query: "))
                      (read-string "Title: ")))
   (let* ((nodes (org-roam-ql-nodes source-or-query))
@@ -95,10 +95,12 @@ See `org-roam-search' for details on SUPER-GROUPS."
 ;; FIXME: To be performant this can be done by constructing the
 ;; results instead of going through org-ql?
 (defun org-roam-ql-select (source-or-query &optional ql-query action narrow sort)
-  "Process SOURCE-OR-QUERY with org-roam-db and pass it to org-ql to be filtered with QL-QUERY.
-ACTION NARROW and SORT are passed to `org-ql-select' as is.
+  "Process SOURCE-OR-QUERY with org-roam-db and pass it to org-ql to
+be filtered with QL-QUERY.  ACTION NARROW and SORT are passed to
+`org-ql-select' as is.
 
-See `org-roam-ql-nodes' for the values that can be passed to SOURCE-OR-QUERY."
+See `org-roam-ql-nodes' for the values that can be passed to
+SOURCE-OR-QUERY."
   (let* ((nodes (org-roam-ql-nodes source-or-query))
          (buffers (org-roam-ql--nodes-files nodes))
          (query (append `(and (org-roam-query ,source-or-query)) ql-query)))
@@ -202,8 +204,8 @@ See `org-roam-ql-nodes' for the values that can be passed to SOURCE-OR-QUERY."
 ;;                     (member id ,node-ids))))));;,(-map #'org-roam-node-id (org-roam-ql-nodes (car query))))))))
 
 (defun org-roam-ql--refresh (other-func &rest rest)
-  "When `org-ql-view' is refreshed, if this is created from a `org-roam-ql'
-function, update the variables accordingly."
+  "When `org-ql-view' is refreshed, if this is created from a
+`org-roam-ql' function, update the variables accordingly."
   (unless org-ql-view-buffers-files
     (user-error "Not an Org QL View buffer"))
   ;; FIXME: This is a super hacky way to extract the buffers-files from the query
@@ -243,8 +245,8 @@ function, update the variables accordingly."
 
 ;; modified org-ql-view--format-element to work with org-roam nodes
 (defun org-roam-ql-view--format-node (node)
-  "Return NODE as a string with text-properties set by its property list.
-If NODE is nil, return an empty string."
+  "Return NODE as a string with text-properties set by its property
+list.  If NODE is nil, return an empty string."
   (if (not node)
       ""
     (let* ((marker
@@ -357,8 +359,9 @@ If NODE is nil, return an empty string."
     (display-buffer (current-buffer))))
 
 (defmacro org-roam-ql--nodes-section (nodes &optional heading)
-  "Returns a function that can be passed as a section for `okm-render-org-roam-buffer' with the NODES.
-Nodes should be a list of org-roam nodes."
+  "Returns a function that can be passed as a section for
+`okm-render-org-roam-buffer' with the NODES.  Nodes should be a list
+of org-roam nodes."
   `(lambda ()
      (magit-insert-section (org-roam)
        (magit-insert-heading)
