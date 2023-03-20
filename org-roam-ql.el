@@ -41,9 +41,9 @@ one of the following:
 - A function that returns a list of org-roam-nodes"
   (cond
    ((-all-p #'org-roam-node-p source-or-query) source-or-query)
-   ((-when-let (buffer (if (stringp source-or-query)
-                           (get-buffer source-or-query)
-                         (when (bufferp source-or-query) source-or-query)))
+   ;; get-buffer returns a buffer if source-or-query is a buffer obj
+   ;; or the name of a buffer
+   ((-when-let (buffer (and (or (stringp source-or-query) (bufferp source-or-query)) (get-buffer source-or-query)))
       (with-current-buffer buffer (derived-mode-p 'org-roam-mode)))
     (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
    ((and (listp source-or-query) (vectorp (car source-or-query)))
@@ -96,7 +96,6 @@ SUPER-GROUPS."
       (org-ql-view--display :buffer buffer :header header
         :string (s-join "\n" strings))
       (with-current-buffer buffer
-        (em org-ql-view-buffers-files)
         ;; HACK - to make the buffer get rendered properly.
         (org-ql-view-refresh)))))
 
@@ -219,14 +218,21 @@ and the remainder of the arguments from the predicate itself."
 ;;                  `(-when-let (id (org-id-get (point) nil))
 ;;                     (member id ,node-ids))))));;,(-map #'org-roam-node-id (org-roam-ql-nodes (car query))))))))
 
+(defun org-roam-ql--get-queries (query)
+  "Recursively traverse and get the org-roam-query's from a org-ql query."
+  (if (listp query)
+      (if (equal (car query) 'org-roam-query)
+          (list query)
+        (apply #'append (-non-nil (--map (org-roam-ql--get-queries it) query))))
+    nil))
+
 (defun org-roam-ql--refresh (other-func &rest rest)
   "When `org-ql-view' is refreshed, if this is created from a
 `org-roam-ql' function, update the variables accordingly."
   (unless org-ql-view-buffers-files
     (user-error "Not an Org QL View buffer"))
-  ;; FIXME: This is a super hacky way to extract the buffers-files from the query
-  (-when-let (query (read (cadr (s-match "(org-roam-query \\(.*\\))" (format "%s" org-ql-view-query)))))
-    (let* ((nodes (org-roam-ql-nodes query)))
+  (-when-let (queries (org-roam-ql--get-queries org-ql-view-query))
+    (let* ((nodes (apply #'append (--map (apply #'org-roam-ql-nodes (cdr it)) queries))))
       (setq org-roam-ql--current-nodes nodes
             org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))))
   (apply other-func rest))
@@ -308,21 +314,22 @@ list.  If NODE is nil, return an empty string."
 (defun org-roam-ql--nodes-from-roam-buffer (org-roam-buffer)
   "Collect the org-roam-nodes from a ORG-ROAM-BUFFER."
   (with-current-buffer org-roam-buffer
-    (let (nodes)
-      (goto-char 0)
-      (while (condition-case err
-                 (progn
-                   (magit-section-forward)
-                   t ;; keep the while loop going
-                   )
-               (user-error
-                (if (equal (error-message-string err) "No next section")
-                    nil ;; end while loop
-                  (signal (car err) (cdr err))))) ;; somthing else happened, re-throw
-        (let ((magit-section (plist-get (text-properties-at (point)) 'magit-section)))
-          (when (org-roam-node-section-p magit-section)
-            (push (slot-value magit-section 'node) nodes))))
-      nodes)))
+    (when (derived-mode-p 'org-roam-mode)
+      (let (nodes)
+        (goto-char 0)
+        (while (condition-case err
+                   (progn
+                     (magit-section-forward)
+                     t ;; keep the while loop going
+                     )
+                 (user-error
+                  (if (equal (error-message-string err) "No next section")
+                      nil ;; end while loop
+                    (signal (car err) (cdr err))))) ;; somthing else happened, re-throw
+          (let ((magit-section (plist-get (text-properties-at (point)) 'magit-section)))
+            (when (org-roam-node-section-p magit-section)
+              (push (slot-value magit-section 'node) nodes))))
+        nodes))))
 
 ;;;###autoload
 (defun org-roam-ql-ql-buffer-from-roam-buffer ()

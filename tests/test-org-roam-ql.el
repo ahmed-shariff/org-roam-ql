@@ -20,6 +20,14 @@
     (it "fails when unexpected term in query"
       (expect (org-roam-ql--check-if-valid-query '(or (todo "DONE") (and (todo "TODO") (what-is-this "something")))))))
 
+  (describe "Test org-roam-ql--get-queries"
+    (it "without any ql-queries"
+      (expect (org-roam-ql--get-queries '(or (todo "TODO") (tags "tag1" "tag2") (and (title "a") (tags "tag3"))))
+              :to-equal nil))
+    (it "with multiple nested queries"
+      (expect (org-roam-ql--get-queries '(or (org-roam-query (todo "TODO")) (and (org-roam-query (tags "tag1" "tag2")) (scheduled "something"))))
+              :to-equal '((org-roam-query (todo "TODO")) (org-roam-query (tags "tag1" "tag2"))))))
+
   (describe "Test org-roam-ql-nodes"
     (it "with list of nodes"
       (let ((nodes (car (org-roam-node-list))))
