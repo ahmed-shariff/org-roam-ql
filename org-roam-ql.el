@@ -41,6 +41,11 @@ one of the following:
 - A function that returns a list of org-roam-nodes"
   (cond
    ((-all-p #'org-roam-node-p source-or-query) source-or-query)
+   ((-when-let (buffer (if (stringp source-or-query)
+                           (get-buffer source-or-query)
+                         (when (bufferp source-or-query) source-or-query)))
+      (with-current-buffer buffer (derived-mode-p 'org-roam-mode)))
+    (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
    ((and (listp source-or-query) (vectorp (car source-or-query)))
     (let ((query (car source-or-query))
           (args (cdr source-or-query)))
@@ -50,7 +55,7 @@ one of the following:
                  query
                (vconcat [:select id :from nodes :where] query))
              args))))
-   ((org-roam-ql--check-if-valid-query source-or-query)
+   ((and (listp source-or-query) (org-roam-ql--check-if-valid-query source-or-query))
     (-filter (lambda (it)
                (org-roam-ql--expand-query source-or-query it)) (org-roam-node-list)))
    ((functionp source-or-query) (funcall source-or-query))))
@@ -63,34 +68,37 @@ to associate with the view.  See `org-roam-search' for details on
 SUPER-GROUPS."
   (interactive (list (list (read-minibuffer "Query: "))
                      (read-string "Title: ")))
-  (let* ((nodes (org-roam-ql-nodes source-or-query))
-         (strings '())
-         ;; TODO: Think of a better way to get a default title
-         (title (format "org-roam - %s" (or title (substring source-or-query 0 10))))
-         (buffer (format "%s %s*" org-ql-view-buffer-name-prefix title))
-         (header (org-ql-view--header-line-format
-                  :title title))
-         (org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))
-         (org-ql-view-query (append
-                             `(and (org-roam-query ,source-or-query))
-                             query))
-         (org-ql-view-sort nil)
-         (org-ql-view-narrow nil)
-         (org-ql-view-super-groups super-groups)
-         (org-ql-view-title title))
-    (dolist-with-progress-reporter (node nodes)
-        (format "Processing %s nodes" (length nodes))
-      (push (org-roam-ql-view--format-node node) strings))
-    (when super-groups
-      (let ((org-super-agenda-groups (cl-etypecase super-groups
-                                       (symbol (symbol-value super-groups))
-                                       (list super-groups))))
-        (setf strings (org-super-agenda--group-items strings))))
-    (org-ql-view--display :buffer buffer :header header
-      :string (s-join "\n" strings))
-    (with-current-buffer buffer
-      ;; HACK - to make the buffer get rendered properly.
-      (org-ql-view-refresh))))
+
+  (with-temp-buffer
+    (let* ((nodes (org-roam-ql-nodes source-or-query))
+           (strings '())
+           ;; TODO: Think of a better way to get a default title
+           (title (format "org-roam - %s" (or title (substring source-or-query 0 10))))
+           (buffer (format "%s %s*" org-ql-view-buffer-name-prefix title))
+           (header (org-ql-view--header-line-format
+                    :title title))
+           (org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))
+           (org-ql-view-query (append
+                               `(and (org-roam-query ,source-or-query))
+                               query))
+           (org-ql-view-sort nil)
+           (org-ql-view-narrow nil)
+           (org-ql-view-super-groups super-groups)
+           (org-ql-view-title title))
+      (dolist-with-progress-reporter (node nodes)
+          (format "Processing %s nodes" (length nodes))
+        (push (org-roam-ql-view--format-node node) strings))
+      (when super-groups
+        (let ((org-super-agenda-groups (cl-etypecase super-groups
+                                         (symbol (symbol-value super-groups))
+                                         (list super-groups))))
+          (setf strings (org-super-agenda--group-items strings))))
+      (org-ql-view--display :buffer buffer :header header
+        :string (s-join "\n" strings))
+      (with-current-buffer buffer
+        (em org-ql-view-buffers-files)
+        ;; HACK - to make the buffer get rendered properly.
+        (org-ql-view-refresh)))))
 
 ;; FIXME: To be performant this can be done by constructing the
 ;; results instead of going through org-ql?
@@ -297,11 +305,9 @@ list.  If NODE is nil, return an empty string."
     (goto-char (org-roam-node-point node))
     (point-marker)))
 
-;;;###autoload
-(defun org-roam-ql-ql-buffer-from-roam-buffer ()
-  "Convert a roam buffer to org-ql buffer."
-  (interactive)
-  (when (derived-mode-p 'org-roam-mode)
+(defun org-roam-ql--nodes-from-roam-buffer (org-roam-buffer)
+  "Collect the org-roam-nodes from a ORG-ROAM-BUFFER."
+  (with-current-buffer org-roam-buffer
     (let (nodes)
       (goto-char 0)
       (while (condition-case err
@@ -316,11 +322,18 @@ list.  If NODE is nil, return an empty string."
         (let ((magit-section (plist-get (text-properties-at (point)) 'magit-section)))
           (when (org-roam-node-section-p magit-section)
             (push (slot-value magit-section 'node) nodes))))
-      ;; This allows any set of nodes to be displayed
-      (org-roam-ql-view nodes (--if-let header-line-format it "")
-                        ;;`(org-roam-backlink ,org-roam-buffer-current-node)))
-                        `(member (org-id-get) (list ,@(-map #'org-roam-node-id nodes)))))))
-      ;;(error "`org-roam-buffer-current-node' is nil"))))
+      nodes)))
+
+;;;###autoload
+(defun org-roam-ql-ql-buffer-from-roam-buffer ()
+  "Convert a roam buffer to org-ql buffer."
+  (interactive)
+  (when (derived-mode-p 'org-roam-mode)
+    ;; TODO: if the buffer is the *org-roam* buffer, this will change
+    ;; if the current-org-roam-node itself changes.  Because of the
+    ;; `org-roam-node-sections', I am not sure how to compute the
+    ;; nodes without re-rendering it a new buffer
+    (org-roam-ql-view (buffer-name (current-buffer)) (--if-let header-line-format it ""))))
 
 (defun org-roam-ql--refresh-buffer (fn &rest args)
   (when (equal (buffer-name) org-roam-buffer)
