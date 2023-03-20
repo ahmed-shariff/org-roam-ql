@@ -27,9 +27,9 @@
     (it "with sql-db query"
       (expect (org-roam-ql-nodes '([(like title "%Node a%")])) :to-equal (--filter (s-match "Node a" (org-roam-node-title it)) (org-roam-node-list))))
     (it "with roam-predicate"
-      (expect (org-roam-ql-nodes '(todo "DONE")) :to-equal (--filter (s-match "DONE" (org-roam-node-todo it)) (org-roam-node-list))))
+      (expect (org-roam-ql-nodes '(todo "DONE")) :to-equal (--filter (--when-let (org-roam-node-todo it) (s-match "DONE" it)) (org-roam-node-list))))
     (it "with function"
-      (expect (org-roam-ql-nodes (lambda (car (org-roam-node-list)))) :to-equal (car (org-roam-node-list)))))
+      (expect (org-roam-ql-nodes (lambda () (car (org-roam-node-list)))) :to-equal (car (org-roam-node-list)))))
 
   ;; (describe "Tets query expansion"
   ;;   (it "with only todo"

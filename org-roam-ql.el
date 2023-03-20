@@ -122,25 +122,33 @@ SOURCE-OR-QUERY."
 ;; FIXME: What is this docstring!
 (defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
 
-(dolist (slot-info '((file . org-roam-ql--predicate-s-match)
-                     (file-title . org-roam-ql--predicate-s-match)
-                     (file-atime . time-equal-p)
-                     (file-mtime . time-equal-p)
-                     (id . org-roam-ql--predicate-s-equals-p)
-                     (level . equal)
-                     (point . equal)
-                     (todo . org-roam-ql--predicate-s-match)
-                     (priority . org-roam-ql--predicate-s-match)
-                     (scheduled . time-less-p)
-                     (deadline . time-less-p)
-                     (title . org-roam-ql--predicate-s-match)
-                     (properties . org-roam-ql--predicate-property-match)
-                     (tags . org-roam-ql--predicate-tags-match)
-                     (refs . org-roam-ql--predicate-s-match)))
-  (puthash (car slot-info) (cdr slot-info) org-roam-ql--query-comparison-functions))
+(defmacro org-roam-ql-defpred (name extraction-function comparison-function)
+  "Creates a roam-predicate with the NAME.  The COMPARISON-FUNCTION is
+a function that returns non-nil if this predicate doesn't fail for a
+given org-roam-node. The first value passed to this function would be
+the value from calling the EXTRACT-FUNCTION with the respective node,
+and the remainder of the arguments from the predicate itself."
+  `(puthash ,name (cons ,extraction-function ,comparison-function) org-roam-ql--query-comparison-functions))
+
+(dolist (predicate '((file org-roam-node-file . org-roam-ql--predicate-s-match)
+                     (file-title org-roam-node-file-title . org-roam-ql--predicate-s-match)
+                     (file-atime org-roam-node-file-atime . time-equal-p)
+                     (file-mtime org-roam-node-file-mtime . time-equal-p)
+                     (id org-roam-node-id . org-roam-ql--predicate-s-equals-p)
+                     (level org-roam-node-level . equal)
+                     (point org-roam-node-point . equal)
+                     (todo org-roam-node-todo . org-roam-ql--predicate-s-match)
+                     (priority org-roam-node-priority . org-roam-ql--predicate-s-match)
+                     (scheduled org-roam-node-scheduled . time-less-p)
+                     (deadline org-roam-node-deadline . time-less-p)
+                     (title org-roam-node-title . org-roam-ql--predicate-s-match)
+                     (properties org-roam-node-properties . org-roam-ql--predicate-property-match)
+                     (tags org-roam-node-tags . org-roam-ql--predicate-tags-match)
+                     (refs org-roam-node-refs . org-roam-ql--predicate-s-match)))
+  (org-roam-ql-defpred (car predicate) (cadr predicate) (cddr predicate)))
 
 (defun org-roam-ql--predicate-s-match (value regexp)
-  (when (and value match)
+  (when (and value regexp)
     (s-match regexp value)))
 
 (defun org-roam-ql--predicate-s-equals-p (value other)
@@ -149,7 +157,7 @@ SOURCE-OR-QUERY."
 
 (defun org-roam-ql--predicate-property-match (value prop prop-val)
   (-when-let (val (assoc prop value))
-    (s-match prop-val (cdr val)))))
+    (s-match prop-val (cdr val))))
 
 (defun org-roam-ql--predicate-tags-match (values &rest tags)
   (--all-p (member it values) (-list tags)))
@@ -158,10 +166,10 @@ SOURCE-OR-QUERY."
   (if (member (car query) '(or and))
       (apply (car query) (-map #'org-roam-ql--expand-query (cdr query))))
     (-if-let* ((query-key (car query))
-               (query-comparison-function (gethash query-key org-roam-ql--query-comparison-functions)))
-        (let ((val (funcall (intern (format "org-roam-node-%s" query-key)) it)))
+               (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
+        (let ((val (funcall (car query-comparison-function-info) it)))
           (and val
-               (apply query-comparison-function (append (list val) (cdr query)))))
+               (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
       (user-error (format "Invalid query %s" query))))
 
 ;; (defmacro org-roam-ql--expand-query-function (query)
