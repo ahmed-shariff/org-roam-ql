@@ -117,7 +117,10 @@ and the remainder of the arguments from the predicate itself."
 `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be. TITLE is a title
 to associate with the view.  See `org-roam-search' for details on
 SUPER-GROUPS."
-  (interactive (list (list (read-minibuffer "Query: "))
+  (interactive (list (let ((query (read-minibuffer "Query: ")))
+                       (if (vectorp query)
+                           (list query)
+                         query))
                      (read-string "Title: ")))
 
   (with-temp-buffer
