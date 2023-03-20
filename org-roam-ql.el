@@ -23,7 +23,10 @@
 (require 's)
 
 (defvar org-roam-ql--current-nodes nil)
+;; FIXME: What is this docstring!
+(defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
 
+;;;###autoload
 (defun org-roam-ql-nodes (source-or-query)
   "Convert SOURCE-OR-QUERY to org-roam-nodes.  SOURCE-OR-QUERY can be
 one of the following:
@@ -40,6 +43,8 @@ one of the following:
 - A list of org-roam-nodes
 - A function that returns a list of org-roam-nodes"
   (cond
+   ;; TODO: think of a better way to display the nodes in the query
+   ;; without showing it all. Perhaps use only ids?
    ((-all-p #'org-roam-node-p source-or-query) source-or-query)
    ;; get-buffer returns a buffer if source-or-query is a buffer obj
    ;; or the name of a buffer
@@ -59,6 +64,52 @@ one of the following:
     (-filter (lambda (it)
                (org-roam-ql--expand-query source-or-query it)) (org-roam-node-list)))
    ((functionp source-or-query) (funcall source-or-query))))
+
+(defun org-roam-ql--nodes-files (nodes)
+  "Returns the list of files from the list of NODES."
+  (-uniq (mapcar #'org-roam-node-file nodes)))
+
+(defun org-roam-ql--check-if-valid-query (s-exp)
+  "Check if S-EXP can be expanded to a roam-query."
+  (if (listp s-exp)
+      (or (and (member (car s-exp) '(or and))
+               (--map (org-roam-ql--check-if-valid-query it) (cdr s-exp)))
+          (member (car s-exp) (hash-table-keys org-roam-ql--query-comparison-functions)))
+    t))
+
+;;;###autoload
+(defmacro org-roam-ql-defpred (name extraction-function comparison-function)
+  "Creates a roam-predicate with the NAME.  The COMPARISON-FUNCTION is
+a function that returns non-nil if this predicate doesn't fail for a
+given org-roam-node. The first value passed to this function would be
+the value from calling the EXTRACT-FUNCTION with the respective node,
+and the remainder of the arguments from the predicate itself."
+  `(puthash ,name (cons ,extraction-function ,comparison-function) org-roam-ql--query-comparison-functions))
+
+(defun org-roam-ql--predicate-s-match (value regexp)
+  (when (and value regexp)
+    (s-match regexp value)))
+
+(defun org-roam-ql--predicate-s-equals-p (value other)
+  (when (and value other)
+    (s-equals-p value other)))
+
+(defun org-roam-ql--predicate-property-match (value prop prop-val)
+  (-when-let (val (assoc prop value))
+    (s-match prop-val (cdr val))))
+
+(defun org-roam-ql--predicate-tags-match (values &rest tags)
+  (--all-p (member it values) (-list tags)))
+
+(defun org-roam-ql--expand-query (query it)
+  (if (member (car query) '(or and))
+      (apply (car query) (-map #'org-roam-ql--expand-query (cdr query))))
+    (-if-let* ((query-key (car query))
+               (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
+        (let ((val (funcall (car query-comparison-function-info) it)))
+          (and val
+               (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
+      (user-error (format "Invalid query %s" query))))
 
 ;;;###autoload
 (defun org-roam-ql-view (source-or-query &optional title query super-groups)
@@ -101,6 +152,7 @@ SUPER-GROUPS."
 
 ;; FIXME: To be performant this can be done by constructing the
 ;; results instead of going through org-ql?
+;;;###autoload
 (defun org-roam-ql-select (source-or-query &optional ql-query action narrow sort)
   "Process SOURCE-OR-QUERY with org-roam-db and pass it to org-ql to
 be filtered with QL-QUERY.  ACTION NARROW and SORT are passed to
@@ -114,93 +166,8 @@ SOURCE-OR-QUERY."
     (when buffers
       (org-ql-select buffers query :action action :narrow narrow :sort sort))))
 
-(defun org-roam-ql--nodes-files (nodes)
-  "Returns the list of files from the list of NODES."
-  (-uniq (mapcar #'org-roam-node-file nodes)))
-
-(defun org-roam-ql--check-if-valid-query (s-exp)
-  "Check if S-EXP can be expanded to a roam-query."
-  (if (listp s-exp)
-      (or (and (member (car s-exp) '(or and))
-               (--map (org-roam-ql--check-if-valid-query it) (cdr s-exp)))
-          (member (car s-exp) (hash-table-keys org-roam-ql--query-comparison-functions)))
-    t))
-
-;; FIXME: What is this docstring!
-(defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
-
-(defmacro org-roam-ql-defpred (name extraction-function comparison-function)
-  "Creates a roam-predicate with the NAME.  The COMPARISON-FUNCTION is
-a function that returns non-nil if this predicate doesn't fail for a
-given org-roam-node. The first value passed to this function would be
-the value from calling the EXTRACT-FUNCTION with the respective node,
-and the remainder of the arguments from the predicate itself."
-  `(puthash ,name (cons ,extraction-function ,comparison-function) org-roam-ql--query-comparison-functions))
-
-(dolist (predicate '((file org-roam-node-file . org-roam-ql--predicate-s-match)
-                     (file-title org-roam-node-file-title . org-roam-ql--predicate-s-match)
-                     (file-atime org-roam-node-file-atime . time-equal-p)
-                     (file-mtime org-roam-node-file-mtime . time-equal-p)
-                     (id org-roam-node-id . org-roam-ql--predicate-s-equals-p)
-                     (level org-roam-node-level . equal)
-                     (point org-roam-node-point . equal)
-                     (todo org-roam-node-todo . org-roam-ql--predicate-s-match)
-                     (priority org-roam-node-priority . org-roam-ql--predicate-s-match)
-                     (scheduled org-roam-node-scheduled . time-less-p)
-                     (deadline org-roam-node-deadline . time-less-p)
-                     (title org-roam-node-title . org-roam-ql--predicate-s-match)
-                     (properties org-roam-node-properties . org-roam-ql--predicate-property-match)
-                     (tags org-roam-node-tags . org-roam-ql--predicate-tags-match)
-                     (refs org-roam-node-refs . org-roam-ql--predicate-s-match)))
-  (org-roam-ql-defpred (car predicate) (cadr predicate) (cddr predicate)))
-
-(defun org-roam-ql--predicate-s-match (value regexp)
-  (when (and value regexp)
-    (s-match regexp value)))
-
-(defun org-roam-ql--predicate-s-equals-p (value other)
-  (when (and value other)
-    (s-equals-p value other)))
-
-(defun org-roam-ql--predicate-property-match (value prop prop-val)
-  (-when-let (val (assoc prop value))
-    (s-match prop-val (cdr val))))
-
-(defun org-roam-ql--predicate-tags-match (values &rest tags)
-  (--all-p (member it values) (-list tags)))
-
-(defun org-roam-ql--expand-query (query it)
-  (if (member (car query) '(or and))
-      (apply (car query) (-map #'org-roam-ql--expand-query (cdr query))))
-    (-if-let* ((query-key (car query))
-               (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
-        (let ((val (funcall (car query-comparison-function-info) it)))
-          (and val
-               (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
-      (user-error (format "Invalid query %s" query))))
-
-;; (defmacro org-roam-ql--expand-query-function (query)
-;;   "Expand the whole roam-query."
-;;   (-when-let* ((query-key (car query))
-;;                (query-comparison-function (gethash query-key org-roam-ql--query-comparison-functions)))
-;;     `(let ((val (,(intern (format "org-roam-node-%s" query-key)) it)))
-;;        (and val
-;;             ,(if (symbolp query-comparison-function)
-;;                  `(,query-comparison-function ,@(cdr query) val)
-;;                `(funcall ,query-comparison-function val ,@(cdr query)))))))
-
-;; (defmacro org-roam-ql--expand-query (query)
-;;   "Expand a single roam-query."
-;;   (em query)
-;;   (if (member (car query) '(or and))
-;;       `(,(car query) ,@(--map `(org-roam-ql--expand-query it) (cdr query)))
-;;     `(org-roam-ql--expand-query-function ,query)))
-
 (org-ql-defpred org-roam-query (query)
   "To be used with the org-roam-ql. Checks if a node is a result of a passed query."
-  ;; :normalizers ((`(,predicate-names . ,query)
-  ;;                `(-when-let (id (org-id-get (point) nil))
-  ;;                   (member id (list ,@(-map #'org-roam-node-id org-roam-ql--current-nodes)))))))
   :preambles ((`(,predicate-names . ,query)
                (list :regexp (rx-to-string
                               `(seq bol (0+ space) ":ID:" (0+ space)
@@ -209,14 +176,6 @@ and the remainder of the arguments from the predicate itself."
                                            org-roam-ql--current-nodes))
                                     eol))
                      :query t))))
-
-
-;; (org-ql-defpred org-roam-query (query)
-;;   :normalizers ((`(,predicate-names . ,query)
-;;                  (let* ((nodes (org-roam-ql-nodes (car query)))
-;;                         (node-ids (-map #'org-roam-node-id nodes)))
-;;                  `(-when-let (id (org-id-get (point) nil))
-;;                     (member id ,node-ids))))));;,(-map #'org-roam-node-id (org-roam-ql-nodes (car query))))))))
 
 (defun org-roam-ql--get-queries (query)
   "Recursively traverse and get the org-roam-query's from a org-ql query."
@@ -236,8 +195,6 @@ and the remainder of the arguments from the predicate itself."
       (setq org-roam-ql--current-nodes nodes
             org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))))
   (apply other-func rest))
-
-(advice-add 'org-ql-view-refresh :around #'org-roam-ql--refresh)
 
 (defmacro with-plain-file (file keep-buf-p &rest body)
   "Same as `org-roam-with-file', but doesn't start `org-roam'."
@@ -408,6 +365,25 @@ of org-roam nodes."
    (list
     (org-roam-ql--nodes-section nodes))
    title buffer-name))
+
+(advice-add 'org-ql-view-refresh :around #'org-roam-ql--refresh)
+
+(dolist (predicate '((file org-roam-node-file . org-roam-ql--predicate-s-match)
+                     (file-title org-roam-node-file-title . org-roam-ql--predicate-s-match)
+                     (file-atime org-roam-node-file-atime . time-equal-p)
+                     (file-mtime org-roam-node-file-mtime . time-equal-p)
+                     (id org-roam-node-id . org-roam-ql--predicate-s-equals-p)
+                     (level org-roam-node-level . equal)
+                     (point org-roam-node-point . equal)
+                     (todo org-roam-node-todo . org-roam-ql--predicate-s-match)
+                     (priority org-roam-node-priority . org-roam-ql--predicate-s-match)
+                     (scheduled org-roam-node-scheduled . time-less-p)
+                     (deadline org-roam-node-deadline . time-less-p)
+                     (title org-roam-node-title . org-roam-ql--predicate-s-match)
+                     (properties org-roam-node-properties . org-roam-ql--predicate-property-match)
+                     (tags org-roam-node-tags . org-roam-ql--predicate-tags-match)
+                     (refs org-roam-node-refs . org-roam-ql--predicate-s-match)))
+  (org-roam-ql-defpred (car predicate) (cadr predicate) (cddr predicate)))
 
 (provide 'org-roam-ql)
 
