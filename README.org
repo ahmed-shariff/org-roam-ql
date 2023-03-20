@@ -4,6 +4,64 @@
 
 * org-roam-ql
 
-This package provides a org-ql interfaces for org-roam.
+This package provides an org-ql interface for org-roam.
 
 This package is under active development.
+
+The ~org-roam~ buffer is good at providing context to the nodes I am looking at, while ~org-ql~ provides a very nice interface for querying org files and accompanying tools to work with the results, particularly, the use of the org-agenda view.
+
+This package provides an interface to query your org-roam database and view the results in either an org-roam buffer or an org-ql buffer.
+
+** Installation
+TBD (quelpa, straight?)
+
+** Usage
+*** Commands
+
+- ~(org-roam-ql-nodes SOURCE-OR-QUERY)~ - Given a SOURCE-OR-QUERY, return a list of nodes. SOURCE-OR-QUERY can be one of the following:
+  - A list of parameters that can be passed to ~org-roam-db-query~. Should be a list of the form ~(QUERY ARG1 ARG2...)~. The result of calling ~org-roam-db-query~ with these parameters should return a list of records where the first element is the ID of a corresponding node. For example:
+  #+begin_src emacs-lisp
+  (org-roam-ql-nodes '([:select [id] :from nodes :where (= todo \"TODO\")]))
+  #+end_src
+  - A buffer or buffer-name of a ~org-roam~ buffer or a ~org-roam-ql~ buffer.
+  - A function that returns a list of ~org-roam-nodes~
+  - A QUERY which can be passed to ~org-roam-query~, which is a ~org-ql~ predicate.
+    #+begin_src emacs-lisp
+    (org-roam-ql-nodes '(and (todo "TODO") (tags "tag1" "tag2")))
+    #+end_src
+    The QUERY passed above would test on all org-roam-nodes returned by ~(org-roam-nodes-list)~.
+    Currently, the query can have the following predicates:
+      - ~(or ARG1 ARG2 ...)~ 
+      - ~(and ARG1 ARG2 ...)~ :
+      - ~(file REGEXP)~ : 
+      - ~(file-title REGEXP)~ :
+      - ~(id ID)~ :
+      - ~(level LEVEL)~ :
+      - ~(todo REGEXP)~ :
+      - ~(priority REGEXP)~ :
+      - ~(scheduled)~ : TBD
+      - ~(deadline)~ : TBD
+      - ~(title REGRXP)~ :
+      - ~(properties PROP PROP-VAL)~ : 
+      - ~(tags TAG1 TAG2 ...)~ :
+      - ~(refs REGEXP)~ :
+- ~(org-roam-ql-defpred NAME EXTRACTION-FUNCTION COMPARISON-FUNCTION)~ - Creates a predicate that can be used in QUERY to ~org-roam-ql-nodes~. For example, a predicate defined as follows:
+  #+begin_src emacs-lisp
+  (org-roam-ql-defpred sample extraction-func comparison-func)
+  #+end_src
+
+  When the following predicate is used in the ~QUERY~:
+  #+begin_src emacs-lisp
+  (sample arg1 arg2)
+  #+end_src
+
+  It tests each ~node~ as follows:
+  #+begin_src emacs-lisp
+  (apply comparison-func (append (list (funcall extraction-func node)) arg1 arg2))
+  #+end_src
+
+  The ~EXTRACTION-FUNCTION~ is a function that takes a org-roam-node and returns a value that will be passed as the first parameter to ~COMPARISON-FUNCTION~. The   remainder of parameters when calling the predicate are passed as remaining parameters ~COMPARISON-FUNCTION~. If the ~COMPARITION-FUNCTION~ returns non-nil value, it will be included in the result. 
+- ~(org-roam-ql-view SOURCE-OR-QUERY &optional TITLE QUERY SUPER-GROUPS)~ - This creates a ~org-ql~ buffer with the nodes of the corresponding ~SOURCE-OR-QUERY~ with ~TITLE~. Additionally, this also take a ~org-ql~ query, which will be used to further filter the results from the ~SOURCE-OR-QUERY~. ~SOURCE-OR-QUERY~ is the same as ~org-roam-ql-node~. When called interactively. This can also be called interactively. 
+- ~org-roam-ql-select~ - Similar to ~org-ql-select~. The first parameter is same as ~SOURCE-OR-QUERY~.
+- ~org-roam-ql-ql-buffer-from-roam-buffer~ - Displays the nodes in a org-roam-like-buffer in a ~org-ql~ buffer
+- ~org-roam-ql-roam-buffer-from-ql-buffer~ - Displays a ~org-ql~ buffer, in a org-roam-like-buffer (uses the ~org-roam-ql-mode~).

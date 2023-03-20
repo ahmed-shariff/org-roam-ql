@@ -132,6 +132,7 @@ SUPER-GROUPS."
            (header (org-ql-view--header-line-format
                     :title title))
            (org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))
+           ;; TODO: When the query also has a org-roam-query
            (org-ql-view-query (append
                                `(and (org-roam-query ,source-or-query))
                                query))
