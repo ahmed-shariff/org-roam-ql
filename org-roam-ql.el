@@ -25,6 +25,7 @@
 (defvar org-roam-ql--current-nodes nil)
 ;; FIXME: What is this docstring!
 (defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
+(defvar org-roam-ql--cache (make-hash-table))
 
 ;;;###autoload
 (defun org-roam-ql-nodes (source-or-query)
@@ -42,28 +43,33 @@ one of the following:
   appended in the front.
 - A list of org-roam-nodes
 - A function that returns a list of org-roam-nodes"
-  (cond
-   ;; TODO: think of a better way to display the nodes in the query
-   ;; without showing it all. Perhaps use only ids?
-   ((-all-p #'org-roam-node-p source-or-query) source-or-query)
-   ;; get-buffer returns a buffer if source-or-query is a buffer obj
-   ;; or the name of a buffer
-   ((-when-let (buffer (and (or (stringp source-or-query) (bufferp source-or-query)) (get-buffer source-or-query)))
-      (with-current-buffer buffer (derived-mode-p 'org-roam-mode)))
-    (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
-   ((and (listp source-or-query) (vectorp (car source-or-query)))
-    (let ((query (car source-or-query))
-          (args (cdr source-or-query)))
-      (--map (org-roam-node-from-id (car it))
-       (apply #'org-roam-db-query
-             (if (equal :select (aref query 0))
-                 query
-               (vconcat [:select id :from nodes :where] query))
-             args))))
-   ((and (listp source-or-query) (org-roam-ql--check-if-valid-query source-or-query))
-    (-filter (lambda (it)
-               (org-roam-ql--expand-query source-or-query it)) (org-roam-node-list)))
-   ((functionp source-or-query) (funcall source-or-query))))
+  (let ((cached-value (gethash source-or-query org-roam-ql--cache)))
+    (if cached-value
+        cached-value
+      (puthash source-or-query
+               (cond
+                ;; TODO: think of a better way to display the nodes in the query
+                ;; without showing it all. Perhaps use only ids?
+                ((-all-p #'org-roam-node-p source-or-query) source-or-query)
+                ;; get-buffer returns a buffer if source-or-query is a buffer obj
+                ;; or the name of a buffer
+                ((-when-let (buffer (and (or (stringp source-or-query) (bufferp source-or-query)) (get-buffer source-or-query)))
+                   (with-current-buffer buffer (derived-mode-p 'org-roam-mode)))
+                 (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
+                ((and (listp source-or-query) (vectorp (car source-or-query)))
+                 (let ((query (car source-or-query))
+                       (args (cdr source-or-query)))
+                   (--map (org-roam-node-from-id (car it))
+                          (apply #'org-roam-db-query
+                                 (if (equal :select (aref query 0))
+                                     query
+                                   (vconcat [:select id :from nodes :where] query))
+                                 args))))
+                ((and (listp source-or-query) (org-roam-ql--check-if-valid-query source-or-query))
+                 (-filter (lambda (it)
+                            (org-roam-ql--expand-query source-or-query it)) (org-roam-node-list)))
+                ((functionp source-or-query) (funcall source-or-query)))
+               org-roam-ql--cache))))
 
 (defun org-roam-ql--nodes-files (nodes)
   "Returns the list of files from the list of NODES."
