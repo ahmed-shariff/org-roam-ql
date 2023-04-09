@@ -45,6 +45,8 @@ TBD (quelpa, straight?)
       - ~(properties PROP PROP-VAL)~ : 
       - ~(tags TAG1 TAG2 ...)~ :
       - ~(refs REGEXP)~ :
+      - ~(backlink-to)~ :
+      - ~(backlink-from)~ :
 - ~(org-roam-ql-defpred NAME EXTRACTION-FUNCTION COMPARISON-FUNCTION)~ - Creates a predicate that can be used in QUERY to ~org-roam-ql-nodes~. For example, a predicate defined as follows:
   #+begin_src emacs-lisp
   (org-roam-ql-defpred sample extraction-func comparison-func)

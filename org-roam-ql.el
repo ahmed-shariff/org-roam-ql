@@ -107,6 +107,31 @@ and the remainder of the arguments from the predicate itself."
 (defun org-roam-ql--predicate-tags-match (values &rest tags)
   (--all-p (member it values) (-list tags)))
 
+;; TODO: option of or/and
+;; TODO: Cache values
+(defun org-roam-ql--predicate-backlinked-to (value source-or-query)
+  "VALUE is the list if IDs of nodes backlinked from a given node. If
+any of the nodes from source-or-query are in that list, return
+non-nil."
+  (let ((target-node-ids (--map (org-roam-node-id it) (org-roam-ql-nodes source-or-query))))
+    (-intersection value target-node-ids)))
+
+(defun org-roam-ql--extract-forwardlink-ids (node)
+  (-map #'car (org-roam-db-query
+                [:select :distinct links:dest
+                         :from links
+                         :where (in links:source $v1)]
+                (vector (org-roam-node-id node)))))
+
+;; TODO: Cache values
+(defun org-roam-ql--predicatte-backlinked-from (value source-or-query)
+  "VALUE is the list of backlink destinations."
+  (let ((destination-nodes (org-roam-ql-nodes source-or-query)))
+    (-intersection value destination-nodes)))
+
+(defun org-roam-ql--extract-backlink-source (node)
+  (--map (org-roam-backlink-source-node it) (org-roam-backlinks-get node)))
+
 (defun org-roam-ql--expand-query (query it)
   (if (member (car query) '(or and))
       (apply (car query) (-map #'org-roam-ql--expand-query (cdr query))))
@@ -392,7 +417,9 @@ of org-roam nodes."
                      (title org-roam-node-title . org-roam-ql--predicate-s-match)
                      (properties org-roam-node-properties . org-roam-ql--predicate-property-match)
                      (tags org-roam-node-tags . org-roam-ql--predicate-tags-match)
-                     (refs org-roam-node-refs . org-roam-ql--predicate-s-match)))
+                     (refs org-roam-node-refs . org-roam-ql--predicate-s-match)
+                     (backlink-to org-roam-ql--extract-forwardlink-ids . org-roam-ql--predicate-backlinked-to)
+                     (backlink-from org-roam-ql--extract-backlink-source . org-roam-ql--predicatte-backlinked-from)))
   (org-roam-ql-defpred (car predicate) (cadr predicate) (cddr predicate)))
 
 (provide 'org-roam-ql)
