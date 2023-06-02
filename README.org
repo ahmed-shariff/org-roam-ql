@@ -33,20 +33,23 @@ TBD (quelpa, straight?)
     Currently, the query can have the following predicates:
       - ~(or ARG1 ARG2 ...)~ 
       - ~(and ARG1 ARG2 ...)~ :
-      - ~(file REGEXP)~ : 
-      - ~(file-title REGEXP)~ :
+      - ~(file REGEXP &optional EXACT)~ :
+      - ~(file-title REGEXP &optional EXACT)~ :
       - ~(id ID)~ :
       - ~(level LEVEL)~ :
-      - ~(todo REGEXP)~ :
-      - ~(priority REGEXP)~ :
+      - ~(todo REGEXP &optional EXACT)~ :
+      - ~(priority REGEXP &optional EXACT)~ :
       - ~(scheduled)~ : TBD
       - ~(deadline)~ : TBD
-      - ~(title REGRXP)~ :
+      - ~(title REGRXP &optional EXACT)~ :
       - ~(properties PROP PROP-VAL)~ : 
       - ~(tags TAG1 TAG2 ...)~ :
-      - ~(refs REGEXP)~ :
-      - ~(backlink-to)~ :
-      - ~(backlink-from)~ :
+      - ~(refs REGEXP &optional EXACT)~ :
+      - ~(backlink-to QUERY)~ :
+      - ~(backlink-from QUERY)~ :
+      - ~(in-buffer BUFFER-NAME)~ :
+      - ~(nodes-list NODES-LIST)~ :
+      - ~(function FUNC)~ :
 - ~(org-roam-ql-defpred NAME EXTRACTION-FUNCTION COMPARISON-FUNCTION)~ - Creates a predicate that can be used in QUERY to ~org-roam-ql-nodes~. For example, a predicate defined as follows:
   #+begin_src emacs-lisp
   (org-roam-ql-defpred sample extraction-func comparison-func)
