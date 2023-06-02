@@ -132,20 +132,29 @@ non-nil."
 (defun org-roam-ql--extract-backlink-source (node)
   (--map (org-roam-backlink-source-node it) (org-roam-backlinks-get node)))
 
+(defun org-roam-ql--predicate-in-query (value source-or-query)
+  (let* ((nodes (org-roam-ql-nodes source-or-query))
+         ;; FIXME: equalp directly on the nodes is not working?
+         (node-ids (-map #'org-roam-node-id nodes)))
+    (member (org-roam-node-id value) node-ids)))
+
 (defun org-roam-ql--expand-query (query it)
-  (if (member (car query) '(or and))
+  (if (and (listp query) (member (car query) '(or and)))
       (funcall
        (pcase (car query)
          (or #'-any-p)
          (and #'-all-p))
        'identity
        (-map (lambda (sub-query) (org-roam-ql--expand-query sub-query it)) (cdr query)))
-    (-if-let* ((query-key (car query))
+    (-if-let* ((query-key (and (listp query) (car query)))
                (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
         (let ((val (funcall (car query-comparison-function-info) it)))
           (and val
                (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
-      (user-error (format "Invalid query %s" query))))
+      (-if-let (nodes (org-roam-ql-nodes query))
+          (member (org-roam-node-id it) (-map #'org-roam-node-id nodes))
+        (user-error (format "Invalid query %s. %s not in org-roam-ql predicate list (See `org-roam-ql-defpred') or recognized by `org-roam-ql-nodes'."
+                            query (car query)))))))
 
 ;;;###autoload
 (defun org-roam-ql-view (source-or-query &optional title query super-groups)
@@ -425,6 +434,9 @@ of org-roam nodes."
                      (refs org-roam-node-refs . org-roam-ql--predicate-s-match)
                      (backlink-to org-roam-ql--extract-forwardlink-ids . org-roam-ql--predicate-backlinked-to)
                      (backlink-from org-roam-ql--extract-backlink-source . org-roam-ql--predicate-backlinked-from)
+                     (in-buffer identity . org-roam-ql--predicate-in-query)
+                     (nodes-list identity . org-roam-ql--predicate-in-query)
+                     (function identity . org-roam-ql--predicate-in-query)))
   (org-roam-ql-defpred (car predicate) (cadr predicate) (cddr predicate)))
 
 (provide 'org-roam-ql)
