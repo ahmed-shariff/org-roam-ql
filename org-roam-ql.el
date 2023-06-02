@@ -92,9 +92,11 @@ the value from calling the EXTRACT-FUNCTION with the respective node,
 and the remainder of the arguments from the predicate itself."
   `(puthash ,name (cons ,extraction-function ,comparison-function) org-roam-ql--query-comparison-functions))
 
-(defun org-roam-ql--predicate-s-match (value regexp)
+(defun org-roam-ql--predicate-s-match (value regexp &optional exact)
   (when (and value regexp)
-    (s-match regexp value)))
+    (if exact
+        (s-equals-p value regexp)
+      (s-match regexp value))))
 
 (defun org-roam-ql--predicate-s-equals-p (value other)
   (when (and value other)
