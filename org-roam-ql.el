@@ -124,7 +124,7 @@ non-nil."
                 (vector (org-roam-node-id node)))))
 
 ;; TODO: Cache values
-(defun org-roam-ql--predicatte-backlinked-from (value source-or-query)
+(defun org-roam-ql--predicate-backlinked-from (value source-or-query)
   "VALUE is the list of backlink destinations."
   (let ((destination-nodes (org-roam-ql-nodes source-or-query)))
     (-intersection value destination-nodes)))
@@ -134,7 +134,12 @@ non-nil."
 
 (defun org-roam-ql--expand-query (query it)
   (if (member (car query) '(or and))
-      (apply (car query) (-map #'org-roam-ql--expand-query (cdr query))))
+      (funcall
+       (pcase (car query)
+         (or #'-any-p)
+         (and #'-all-p))
+       'identity
+       (-map (lambda (sub-query) (org-roam-ql--expand-query sub-query it)) (cdr query)))
     (-if-let* ((query-key (car query))
                (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
         (let ((val (funcall (car query-comparison-function-info) it)))
@@ -419,7 +424,7 @@ of org-roam nodes."
                      (tags org-roam-node-tags . org-roam-ql--predicate-tags-match)
                      (refs org-roam-node-refs . org-roam-ql--predicate-s-match)
                      (backlink-to org-roam-ql--extract-forwardlink-ids . org-roam-ql--predicate-backlinked-to)
-                     (backlink-from org-roam-ql--extract-backlink-source . org-roam-ql--predicatte-backlinked-from)))
+                     (backlink-from org-roam-ql--extract-backlink-source . org-roam-ql--predicate-backlinked-from)
   (org-roam-ql-defpred (car predicate) (cadr predicate) (cddr predicate)))
 
 (provide 'org-roam-ql)
