@@ -144,8 +144,8 @@ non-nil."
   (if (and (listp query) (member (car query) '(or and)))
       (funcall
        (pcase (car query)
-         (or #'-any-p)
-         (and #'-all-p))
+         ('or #'-any-p)
+         ('and #'-all-p))
        'identity
        (-map (lambda (sub-query) (org-roam-ql--expand-query sub-query it)) (cdr query)))
     (-if-let* ((query-key (and (listp query) (car query)))
