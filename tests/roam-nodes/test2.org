@@ -7,7 +7,22 @@
 :ID:       97e2931f-e80f-476d-9dc9-6f771ce661e4
 :TEST_PROP: c
 :END:
-* Node d                                                               :tagD:
+- Link to [[id:15b0204a-0bcc-4ad9-b7c1-addd9119d23c][Node b]]
+
+* Node d                                                               :interesting:
 :PROPERTIES:
 :ID:       9026063b-45ef-49b1-b781-24a338e12c35
 :END:
+- Another link to [[id:15b0204a-0bcc-4ad9-b7c1-addd9119d23c][Node b]]
+
+* Node e                                                                :interesting:
+:PROPERTIES:
+:ID:       5127b4e5-10a0-430b-a448-0e05d173dfc1
+:END:
+- More links to [[id:15b0204a-0bcc-4ad9-b7c1-addd9119d23c][Node b]]
+
+* Node f
+:PROPERTIES:
+:ID:       8caba75f-5cde-470e-a4bf-0a4a14c6d8b7
+:END:
+- More links to [[id:15b0204a-0bcc-4ad9-b7c1-addd9119d23c][Node b]]

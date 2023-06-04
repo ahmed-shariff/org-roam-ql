@@ -31,6 +31,8 @@
 (defun org-roam-ql-nodes (source-or-query)
   "Convert SOURCE-OR-QUERY to org-roam-nodes.  SOURCE-OR-QUERY can be
 one of the following:
+- A org-roam-ql query.
+- A buffer-name of a org-roam-mode buffer.
 - A list of params that can be passed to `org-roam-db-query'. Expected
   to have the form (QUERY ARG1 ARG2 ARG3...). `org-roam-db-query' will
   called with the list or parameters as: (org-roam-db-query QUERY ARG1
@@ -102,6 +104,7 @@ and the remainder of the arguments from the predicate itself."
   (when (and value other)
     (s-equals-p value other)))
 
+;; TODO: Multivalue properties
 (defun org-roam-ql--predicate-property-match (value prop prop-val)
   (-when-let (val (assoc prop value))
     (s-match prop-val (cdr val))))
@@ -110,7 +113,6 @@ and the remainder of the arguments from the predicate itself."
   (--all-p (member it values) (-list tags)))
 
 ;; TODO: option of or/and
-;; TODO: Cache values
 (defun org-roam-ql--predicate-backlinked-to (value source-or-query)
   "VALUE is the list if IDs of nodes backlinked from a given node. If
 any of the nodes from source-or-query are in that list, return
@@ -125,7 +127,6 @@ non-nil."
                          :where (in links:source $v1)]
                 (vector (org-roam-node-id node)))))
 
-;; TODO: Cache values
 (defun org-roam-ql--predicate-backlinked-from (value source-or-query)
   "VALUE is the list of backlink destinations."
   (let ((destination-nodes (org-roam-ql-nodes source-or-query)))
