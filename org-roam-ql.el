@@ -366,16 +366,17 @@ list.  If NODE is nil, return an empty string."
   (unless org-ql-view-buffers-files
     (user-error "Not an Org QL View buffer"))
   ;; Copied from `org-agenda-finalize'
-  (let (mrk nodes)
+  (let (mrk nodes (line-output 0))
     (save-excursion
       (goto-char (point-min))
-      (while (equal (forward-line) 0)
+      (while (equal line-output 0)
 	(when (setq mrk (get-text-property (point) 'org-hd-marker))
           (org-with-point-at mrk
             ;; pick only nodes
             (-if-let (id (org-id-get))
                 (push (org-roam-node-from-id id) nodes)
-              (user-error "Non roam-node headings in query."))))))
+              (user-error "Non roam-node headings in query."))))
+        (setq line-output (forward-line))))
     (org-roam-ql--buffer-for-nodes nodes
                                    org-ql-view-title
                                    (format "*From ql: %s*" org-ql-view-title))))
