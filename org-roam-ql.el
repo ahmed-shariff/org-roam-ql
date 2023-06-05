@@ -43,7 +43,7 @@ one of the following:
   :where (= todo \"TODO\")], you can omit the part till after
   :where. i.e., pass only [(= todo \"TODO\")] and the rest will get
   appended in the front.
-- A list of org-roam-nodes
+- A list of org-roam-nodes or an org-roam-node.
 - A function that returns a list of org-roam-nodes.
 
 If called programmatically, some values may get cached, make sure to
@@ -51,7 +51,9 @@ call `org-roam-ql-clear-cache'."
   (cond
    ;; TODO: think of a better way to display the nodes in the query
    ;; without showing it all. Perhaps use only ids?
-   ((-all-p #'org-roam-node-p source-or-query) source-or-query)
+   ((or (org-roam-node-p source-or-query)
+        (-all-p #'org-roam-node-p source-or-query))
+    (-list source-or-query))
    ;; get-buffer returns a buffer if source-or-query is a buffer obj
    ;; or the name of a buffer
    ((-when-let (buffer (and (or (stringp source-or-query) (bufferp source-or-query)) (get-buffer source-or-query)))
