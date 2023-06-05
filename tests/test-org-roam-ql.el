@@ -30,14 +30,25 @@
 
   (describe "Test org-roam-ql-nodes"
     (it "with list of nodes"
-      (let ((nodes (car (org-roam-node-list))))
+      (let ((nodes (cl-subseq (org-roam-node-list) 0 3)))
         (expect (org-roam-ql-nodes nodes) :to-equal nodes)))
+    (it "with one node"
+      (let ((nodes (car (org-roam-node-list))))
+        (expect (org-roam-ql-nodes nodes) :to-equal (list nodes))))
     (it "with sql-db query"
       (expect (org-roam-ql-nodes '([(like title "%Node a%")])) :to-equal (--filter (s-match "Node a" (org-roam-node-title it)) (org-roam-node-list))))
     (it "with roam-predicate"
       (expect (org-roam-ql-nodes '(todo "DONE")) :to-equal (--filter (--when-let (org-roam-node-todo it) (s-match "DONE" it)) (org-roam-node-list))))
     (it "with function"
-      (expect (org-roam-ql-nodes (lambda () (car (org-roam-node-list)))) :to-equal (car (org-roam-node-list)))))
+      (expect (org-roam-ql-nodes (lambda () (car (org-roam-node-list)))) :to-equal (car (org-roam-node-list))))
+    (describe "with buffers"
+      (let* ((nodes (--filter (s-match "test2.org" (org-roam-node-file it)) (org-roam-node-list)))
+             (buffer-name "test-buffer"))
+        (org-roam-ql--render-buffer (list (org-roam-ql--nodes-section nodes)) "test buffer" buffer-name)
+        (it "as a string"
+          (expect (--map #'org-roam-node-id (org-roam-ql-nodes buffer-name)) :to-equal (--map #'org-roam-node-id nodes)))
+        (it "as a predicate"
+          (expect (--map #'org-roam-node-id (org-roam-ql-nodes `(in-buffer ,buffer-name))) :to-equal (--map #'org-roam-node-id nodes))))))
 
   ;; (describe "Tets query expansion"
   ;;   (it "with only todo"

@@ -4,7 +4,7 @@
 
 ;; Author: Shariff AM Faleel
 ;; Version: 0.1
-;; Package-Requires: ((emacs "28") (org-ql "0.7-pre") (org "9.0") (org-roam "2.2.2") (s "1.13.1"))
+;; Package-Requires: ((emacs "28") (org-ql "0.7-pre") (org "9.0") (org-roam "2.2.2") (s "1.13.1") (magit-section "3.3.0"))
 ;; Homepage: https://github.com/ahmed-shariff/org-roam-ql
 ;; Keywords: org-roam, query
 ;; SPDX-License-Identifier: MIT
