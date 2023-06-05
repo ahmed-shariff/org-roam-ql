@@ -44,34 +44,49 @@ one of the following:
   :where. i.e., pass only [(= todo \"TODO\")] and the rest will get
   appended in the front.
 - A list of org-roam-nodes
-- A function that returns a list of org-roam-nodes"
+- A function that returns a list of org-roam-nodes.
+
+If called programmatically, some values may get cached, make sure to
+call `org-roam-ql-clear-cache'."
+  (cond
+   ;; TODO: think of a better way to display the nodes in the query
+   ;; without showing it all. Perhaps use only ids?
+   ((-all-p #'org-roam-node-p source-or-query) source-or-query)
+   ;; get-buffer returns a buffer if source-or-query is a buffer obj
+   ;; or the name of a buffer
+   ((-when-let (buffer (and (or (stringp source-or-query) (bufferp source-or-query)) (get-buffer source-or-query)))
+      (with-current-buffer buffer (derived-mode-p 'org-roam-mode)))
+    (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
+   ((and (listp source-or-query) (vectorp (car source-or-query)))
+    (let ((query (car source-or-query))
+          (args (cdr source-or-query)))
+      (--map (org-roam-node-from-id (car it))
+             (apply #'org-roam-db-query
+                    (if (equal :select (aref query 0))
+                        query
+                      (vconcat [:select id :from nodes :where] query))
+                    args))))
+   ((and (listp source-or-query) (org-roam-ql--check-if-valid-query source-or-query))
+    (-filter (lambda (it)
+               (org-roam-ql--expand-query source-or-query it)) (org-roam-node-list)))
+   ((functionp source-or-query) (funcall source-or-query))))
+
+;; Can we make org-roam-ql aware of any changes that can happen?
+(defun org-roam-ql--nodes-cached (source-or-query)
+  "Cache results of org-roam-ql-nodes.
+  Not caching or invalidating in the top level function as the
+database/buffers can change. currently this is only used by the
+internal functions"
   (let ((cached-value (gethash source-or-query org-roam-ql--cache)))
     (if cached-value
         cached-value
       (puthash source-or-query
-               (cond
-                ;; TODO: think of a better way to display the nodes in the query
-                ;; without showing it all. Perhaps use only ids?
-                ((-all-p #'org-roam-node-p source-or-query) source-or-query)
-                ;; get-buffer returns a buffer if source-or-query is a buffer obj
-                ;; or the name of a buffer
-                ((-when-let (buffer (and (or (stringp source-or-query) (bufferp source-or-query)) (get-buffer source-or-query)))
-                   (with-current-buffer buffer (derived-mode-p 'org-roam-mode)))
-                 (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
-                ((and (listp source-or-query) (vectorp (car source-or-query)))
-                 (let ((query (car source-or-query))
-                       (args (cdr source-or-query)))
-                   (--map (org-roam-node-from-id (car it))
-                          (apply #'org-roam-db-query
-                                 (if (equal :select (aref query 0))
-                                     query
-                                   (vconcat [:select id :from nodes :where] query))
-                                 args))))
-                ((and (listp source-or-query) (org-roam-ql--check-if-valid-query source-or-query))
-                 (-filter (lambda (it)
-                            (org-roam-ql--expand-query source-or-query it)) (org-roam-node-list)))
-                ((functionp source-or-query) (funcall source-or-query)))
+               (org-roam-ql-nodes source-or-query)
                org-roam-ql--cache))))
+
+(defun org-roam-ql-clear-cache ()
+  "Clear the org-roam-ql cache."
+  (setq org-roam-ql--cache (make-hash-table)))
 
 (defun org-roam-ql--nodes-files (nodes)
   "Returns the list of files from the list of NODES."
@@ -117,7 +132,7 @@ and the remainder of the arguments from the predicate itself."
   "VALUE is the list if IDs of nodes backlinked from a given node. If
 any of the nodes from source-or-query are in that list, return
 non-nil."
-  (let ((target-node-ids (--map (org-roam-node-id it) (org-roam-ql-nodes source-or-query))))
+  (let ((target-node-ids (--map (org-roam-node-id it) (org-roam-ql--nodes-cached source-or-query))))
     (-intersection value target-node-ids)))
 
 (defun org-roam-ql--extract-forwardlink-ids (node)
@@ -129,14 +144,14 @@ non-nil."
 
 (defun org-roam-ql--predicate-backlinked-from (value source-or-query)
   "VALUE is the list of backlink destinations."
-  (let ((destination-nodes (org-roam-ql-nodes source-or-query)))
+  (let ((destination-nodes (org-roam-ql--nodes-cached source-or-query)))
     (-intersection value destination-nodes)))
 
 (defun org-roam-ql--extract-backlink-source (node)
   (--map (org-roam-backlink-source-node it) (org-roam-backlinks-get node)))
 
 (defun org-roam-ql--predicate-in-query (value source-or-query)
-  (let* ((nodes (org-roam-ql-nodes source-or-query))
+  (let* ((nodes (org-roam-ql--nodes-cached source-or-query))
          ;; FIXME: equalp directly on the nodes is not working?
          (node-ids (-map #'org-roam-node-id nodes)))
     (member (org-roam-node-id value) node-ids)))
@@ -154,7 +169,7 @@ non-nil."
         (let ((val (funcall (car query-comparison-function-info) it)))
           (and val
                (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
-      (-if-let (nodes (org-roam-ql-nodes query))
+      (-if-let (nodes (org-roam-ql--nodes-cached query))
           (member (org-roam-node-id it) (-map #'org-roam-node-id nodes))
         (user-error (format "Invalid query %s. %s not in org-roam-ql predicate list (See `org-roam-ql-defpred') or recognized by `org-roam-ql-nodes'."
                             query (car query)))))))
@@ -188,6 +203,8 @@ SUPER-GROUPS."
            (org-ql-view-narrow nil)
            (org-ql-view-super-groups super-groups)
            (org-ql-view-title title))
+      ;; Invalidating cache to allow detecting changes.
+      (org-roam-ql-clear-cache)
       (dolist-with-progress-reporter (node nodes)
           (format "Processing %s nodes" (length nodes))
         (push (org-roam-ql-view--format-node node) strings))
@@ -215,6 +232,7 @@ SOURCE-OR-QUERY."
   (let* ((nodes (org-roam-ql-nodes source-or-query))
          (buffers (org-roam-ql--nodes-files nodes))
          (query (append `(and (org-roam-query ,source-or-query)) ql-query)))
+    (org-roam-ql-clear-cache)
     (when buffers
       (org-ql-select buffers query :action action :narrow narrow :sort sort))))
 
@@ -243,7 +261,8 @@ SOURCE-OR-QUERY."
   (unless org-ql-view-buffers-files
     (user-error "Not an Org QL View buffer"))
   (-when-let (queries (org-roam-ql--get-queries org-ql-view-query))
-    (let* ((nodes (apply #'append (--map (apply #'org-roam-ql-nodes (cdr it)) queries))))
+    (let* ((nodes (apply #'append (--map (apply #'org-roam-ql--nodes-cached (cdr it)) queries))))
+      (org-roam-ql-clear-cache)
       (setq org-roam-ql--current-nodes nodes
             org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))))
   (apply other-func rest))
