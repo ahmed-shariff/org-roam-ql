@@ -210,19 +210,21 @@ SUPER-GROUPS."
            (org-ql-view-title title))
       ;; Invalidating cache to allow detecting changes.
       (org-roam-ql-clear-cache)
-      (dolist-with-progress-reporter (node nodes)
-          (format "Processing %s nodes" (length nodes))
-        (push (org-roam-ql-view--format-node node) strings))
-      (when super-groups
-        (let ((org-super-agenda-groups (cl-etypecase super-groups
-                                         (symbol (symbol-value super-groups))
-                                         (list super-groups))))
-          (setf strings (org-super-agenda--group-items strings))))
-      (org-ql-view--display :buffer buffer :header header
-        :string (s-join "\n" strings))
-      (with-current-buffer buffer
-        ;; HACK - to make the buffer get rendered properly.
-        (org-ql-view-refresh)))))
+      (if (not nodes)
+          (user-error "Empty result for query.")
+        (dolist-with-progress-reporter (node nodes)
+            (format "Processing %s nodes" (length nodes))
+          (push (org-roam-ql-view--format-node node) strings))
+        (when super-groups
+          (let ((org-super-agenda-groups (cl-etypecase super-groups
+                                           (symbol (symbol-value super-groups))
+                                           (list super-groups))))
+            (setf strings (org-super-agenda--group-items strings))))
+        (org-ql-view--display :buffer buffer :header header
+          :string (s-join "\n" strings))
+        (with-current-buffer buffer
+          ;; HACK - to make the buffer get rendered properly.
+          (org-ql-view-refresh))))))
 
 ;; FIXME: To be performant this can be done by constructing the
 ;; results instead of going through org-ql?
@@ -268,8 +270,12 @@ SOURCE-OR-QUERY."
   (-when-let (queries (org-roam-ql--get-queries org-ql-view-query))
     (let* ((nodes (apply #'append (--map (apply #'org-roam-ql--nodes-cached (cdr it)) queries))))
       (org-roam-ql-clear-cache)
-      (setq org-roam-ql--current-nodes nodes
-            org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))))
+      (setq org-roam-ql--current-nodes nodes)
+      ;; If results are empty buffer gets empty
+      ;; `org-ql-view-buffers-files' is left alone to avoid org-ql
+      ;; erroring with "Not an Org QL View buffer"
+      (when nodes
+        (setq org-ql-view-buffers-files (org-roam-ql--nodes-files nodes)))))
   (apply other-func rest))
 
 (defmacro with-plain-file (file keep-buf-p &rest body)
@@ -400,7 +406,7 @@ list.  If NODE is nil, return an empty string."
             ;; pick only nodes
             (-if-let (id (org-id-get))
                 (push (org-roam-node-from-id id) nodes)
-              (user-error "Non roam-node headings in query."))))
+              (user-error (format "Non roam-node headings in query (in buffer %s)." (buffer-name))))))
         (setq line-output (forward-line))))
     (org-roam-ql--buffer-for-nodes nodes
                                    org-ql-view-title
