@@ -426,7 +426,7 @@ list.  If NODE is nil, return an empty string."
 of org-roam nodes."
   `(lambda ()
      (magit-insert-section (org-roam)
-       (magit-insert-heading)
+       (magit-insert-heading ,heading)
        (dolist (entry
                 ;;(seq-uniq  ;; removing duplicates as the whole subtree will be getting displayed
                 ,nodes)
