@@ -56,6 +56,7 @@ TBD (quelpa, straight?)
       - ~(in-buffer BUFFER-NAME)~ : This is similar to passing a buffer-name to ~org-roam-ql-nodes~. Tests if a node is in the org-roam buffer named BUFFER-NAME.
       - ~(nodes-list NODES-LIST)~ : This is similar to passing a list of nodes to ~org-roam-ql-nodes~. Tests if a node is in the NODES-LIST.
       - ~(function FUNC)~ : This is similar to passing a function to ~org-roam-ql-nodes~. Tests if the node is in the result of executing the function FUNC.
+      - ~(funcall FUNC)~ : Tests a node with the function FUNC, which takes on parameter, a org-roam node. Test passes if the function returns non-nil.
 - ~(org-roam-ql-defpred NAME EXTRACTION-FUNCTION COMPARISON-FUNCTION)~ - Creates a predicate that can be used in QUERY to ~org-roam-ql-nodes~. For example, for a predicate defined as follows:
   #+begin_src emacs-lisp
   (org-roam-ql-defpred sample extraction-func comparison-func)

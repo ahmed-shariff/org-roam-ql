@@ -158,6 +158,9 @@ non-nil."
          (node-ids (-map #'org-roam-node-id nodes)))
     (member (org-roam-node-id value) node-ids)))
 
+(defun org-roam-ql--predicate-funcall (value f)
+  (funcall f value))
+
 (defun org-roam-ql--expand-query (query it)
   (if (and (listp query) (member (car query) '(or and)))
       (funcall
@@ -461,7 +464,8 @@ of org-roam nodes."
                      (backlink-from org-roam-ql--extract-backlink-source . org-roam-ql--predicate-backlinked-from)
                      (in-buffer identity . org-roam-ql--predicate-in-query)
                      (nodes-list identity . org-roam-ql--predicate-in-query)
-                     (function identity . org-roam-ql--predicate-in-query)))
+                     (function identity . org-roam-ql--predicate-in-query)
+                     (funcall identity . org-roam-ql--predicate-funcall)))
   (org-roam-ql-defpred (car predicate) (cadr predicate) (cddr predicate)))
 
 (provide 'org-roam-ql)
