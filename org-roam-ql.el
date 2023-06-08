@@ -180,51 +180,59 @@ non-nil."
                             query (car query)))))))
 
 ;;;###autoload
-(defun org-roam-ql-view (source-or-query &optional title query super-groups)
+(defun org-roam-ql-search (source-or-query display-in &optional title query super-groups)
   "Basically what `org-ql-search does', but for org-roam-nodes.  See
 `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be. TITLE is a title
-to associate with the view.  See `org-roam-search' for details on
-SUPER-GROUPS."
+to associate with the view. DISPLAY-IN is expected to be a symbol,
+either `'org-ql' or `'org-roam'. If its `org-ql', the results from the
+SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
+`org-roam', will be displayed in a org-roam-ql buffer. See
+`org-roam-search' for details on SUPER-GROUPS."
   (interactive (list (let ((query (read-minibuffer "Query: ")))
                        (if (vectorp query)
                            (list query)
                          query))
+                     (intern-soft (completing-read "Display in: " '(org-roam org-ql) nil t))
                      (read-string "Title: ")))
-
-  (with-temp-buffer
     (let* ((nodes (org-roam-ql-nodes source-or-query))
-           (strings '())
            ;; TODO: Think of a better way to get a default title
-           (title (format "org-roam - %s" (or title (substring source-or-query 0 10))))
-           (buffer (format "%s %s*" org-ql-view-buffer-name-prefix title))
-           (header (org-ql-view--header-line-format
-                    :title title))
-           (org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))
-           ;; TODO: When the query also has a org-roam-query
-           (org-ql-view-query (append
-                               `(and (org-roam-query ,source-or-query))
-                               query))
-           (org-ql-view-sort nil)
-           (org-ql-view-narrow nil)
-           (org-ql-view-super-groups super-groups)
-           (org-ql-view-title title))
-      ;; Invalidating cache to allow detecting changes.
-      (org-roam-ql-clear-cache)
-      (if (not nodes)
-          (user-error "Empty result for query.")
-        (dolist-with-progress-reporter (node nodes)
-            (format "Processing %s nodes" (length nodes))
-          (push (org-roam-ql-view--format-node node) strings))
-        (when super-groups
-          (let ((org-super-agenda-groups (cl-etypecase super-groups
-                                           (symbol (symbol-value super-groups))
-                                           (list super-groups))))
-            (setf strings (org-super-agenda--group-items strings))))
-        (org-ql-view--display :buffer buffer :header header
-          :string (s-join "\n" strings))
-        (with-current-buffer buffer
-          ;; HACK - to make the buffer get rendered properly.
-          (org-ql-view-refresh))))))
+           (title (format "org-roam - %s" (or title (substring source-or-query 0 10)))))
+      (pcase display-in
+       ('org-ql
+        (with-temp-buffer
+          (let* ((strings '())
+                 (buffer (format "%s %s*" org-ql-view-buffer-name-prefix title))
+                 (header (org-ql-view--header-line-format
+                          :title title))
+                 (org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))
+                 ;; TODO: When the query also has a org-roam-query
+                 (org-ql-view-query ;;(append
+                                     `(org-roam-query1 ,source-or-query)
+                                     ;;query))
+                                     )
+                 (org-ql-view-sort nil)
+                 (org-ql-view-narrow nil)
+                 (org-ql-view-super-groups super-groups)
+                 (org-ql-view-title title))
+            ;; Invalidating cache to allow detecting changes.
+            (org-roam-ql-clear-cache)
+            (if (not nodes)
+                (user-error "Empty result for query.")
+              (dolist-with-progress-reporter (node nodes)
+                  (format "Processing %s nodes" (length nodes))
+                (push (org-roam-ql-view--format-node node) strings))
+              (when super-groups
+                (let ((org-super-agenda-groups (cl-etypecase super-groups
+                                                 (symbol (symbol-value super-groups))
+                                                 (list super-groups))))
+                  (setf strings (org-super-agenda--group-items strings))))
+              (org-ql-view--display :buffer buffer :header header
+                :string (s-join "\n" strings))
+              ;; (with-current-buffer buffer
+              ;;   ;; HACK - to make the buffer get rendered properly.
+              ;;   (org-ql-view-refresh))))))
+              ))))
+       ('org-roam (org-roam-ql--buffer-for-nodes nodes title (format "*Org-roam-ql %s*" title))))))
 
 ;; FIXME: To be performant this can be done by constructing the
 ;; results instead of going through org-ql?
@@ -446,7 +454,7 @@ of org-roam nodes."
   "View nodes in org-roam-ql buffer"
   (org-roam-ql--render-buffer
    (list
-    (org-roam-ql--nodes-section nodes))
+    (org-roam-ql--nodes-section nodes "Nodes:"))
    title buffer-name))
 
 (advice-add 'org-ql-view-refresh :around #'org-roam-ql--refresh)
