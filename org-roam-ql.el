@@ -262,6 +262,12 @@ SOURCE-OR-QUERY."
                                     eol))
                      :query t))))
 
+(defun org-roam-ql-insert-node-title ()
+  "Select a node and insert only its title. Can be used in the
+minibuffer or when writting querries."
+  (interactive)
+  (insert (format "\"%s\"" (org-roam-node-title (org-roam-node-read nil nil nil t)))))
+
 (defun org-roam-ql--get-queries (query)
   "Recursively traverse and get the org-roam-query's from a org-ql query."
   (if (listp query)
