@@ -21,6 +21,11 @@ This package provides an interface to query your org-roam database and view the 
 ** Installation
 TBD (quelpa, straight?)
 
+** Caveats
+As mentioned above, the package is still in active development. If you have any feedback, it is most welcome. I listing out some of the bigger issues I am trying to solve:
+- Performance
+- Currently, org-ql works only with entries (i.e., headline nodes)
+
 ** Usage
 *** Commands/functions
 
