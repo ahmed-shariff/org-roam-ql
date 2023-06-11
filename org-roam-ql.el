@@ -56,7 +56,9 @@ call `org-roam-ql-clear-cache'."
     (-list source-or-query))
    ;; get-buffer returns a buffer if source-or-query is a buffer obj
    ;; or the name of a buffer
-   ((-when-let (buffer (and (or (stringp source-or-query) (bufferp source-or-query)) (get-buffer source-or-query)))
+   ((-when-let (buffer (and (or (stringp source-or-query)
+                                (bufferp source-or-query))
+                            (get-buffer source-or-query)))
       (with-current-buffer buffer (derived-mode-p 'org-roam-mode)))
     (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
    ((and (listp source-or-query) (vectorp (car source-or-query)))
@@ -109,7 +111,9 @@ a function that returns non-nil if this predicate doesn't fail for a
 given org-roam-node. The first value passed to this function would be
 the value from calling the EXTRACT-FUNCTION with the respective node,
 and the remainder of the arguments from the predicate itself."
-  `(puthash ,name (cons ,extraction-function ,comparison-function) org-roam-ql--query-comparison-functions))
+  `(puthash ,name
+            (cons ,extraction-function ,comparison-function)
+            org-roam-ql--query-comparison-functions))
 
 (defun org-roam-ql--predicate-s-match (value regexp &optional exact)
   (when (and value regexp)
@@ -162,6 +166,7 @@ non-nil."
   (funcall f value))
 
 (defun org-roam-ql--expand-query (query it)
+  "Used to expand a QUERY."
   (if (and (listp query) (member (car query) '(or and)))
       (funcall
        (pcase (car query)
@@ -176,7 +181,8 @@ non-nil."
                (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
       (-if-let (nodes (org-roam-ql--nodes-cached query))
           (member (org-roam-node-id it) (-map #'org-roam-node-id nodes))
-        (user-error (format "Invalid query %s. %s not in org-roam-ql predicate list (See `org-roam-ql-defpred') or recognized by `org-roam-ql-nodes'."
+        (user-error
+         (format "Invalid query %s. %s not in org-roam-ql predicate list (See `org-roam-ql-defpred') or recognized by `org-roam-ql-nodes'."
                             query (car query)))))))
 
 ;;;###autoload
@@ -232,7 +238,15 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
               ;;   ;; HACK - to make the buffer get rendered properly.
               ;;   (org-ql-view-refresh))))))
               ))))
-       ('org-roam (org-roam-ql--buffer-for-nodes nodes title (format "*Org-roam-ql %s*" title))))))
+       ('org-roam
+        (org-roam-ql--buffer-for-nodes
+         nodes
+         title
+         (format "*Org-roam-ql %s*" title))))))
+
+;; *****************************************************************************
+;; Functions to work with org-ql-view
+;; *****************************************************************************
 
 ;; FIXME: To be performant this can be done by constructing the
 ;; results instead of going through org-ql?
@@ -262,12 +276,6 @@ SOURCE-OR-QUERY."
                                     eol))
                      :query t))))
 
-(defun org-roam-ql-insert-node-title ()
-  "Select a node and insert only its title. Can be used in the
-minibuffer or when writting querries."
-  (interactive)
-  (insert (format "\"%s\"" (org-roam-node-title (org-roam-node-read nil nil nil t)))))
-
 (defun org-roam-ql--get-queries (query)
   "Recursively traverse and get the org-roam-query's from a org-ql query."
   (if (listp query)
@@ -282,7 +290,10 @@ minibuffer or when writting querries."
   (unless org-ql-view-buffers-files
     (user-error "Not an Org QL View buffer"))
   (-when-let (queries (org-roam-ql--get-queries org-ql-view-query))
-    (let* ((nodes (apply #'append (--map (apply #'org-roam-ql--nodes-cached (cdr it)) queries))))
+    (let* ((nodes (apply #'append
+                         (--map (apply #'org-roam-ql--nodes-cached
+                                       (cdr it))
+                                queries))))
       (org-roam-ql-clear-cache)
       (setq org-roam-ql--current-nodes nodes)
       ;; If results are empty buffer gets empty
@@ -291,32 +302,6 @@ minibuffer or when writting querries."
       (when nodes
         (setq org-ql-view-buffers-files (org-roam-ql--nodes-files nodes)))))
   (apply other-func rest))
-
-(defmacro with-plain-file (file keep-buf-p &rest body)
-  "Same as `org-roam-with-file', but doesn't start `org-roam'."
-  (declare (indent 2) (debug t))
-  `(let* (new-buf
-          (delay-mode-hooks t)
-          (auto-mode-alist nil)
-          (find-file-hook nil)
-          (change-major-mode-after-body-hook nil)
-          (after-change-major-mode-hook nil)
-          (buf (or
-                (and (not ,file)
-                     (current-buffer)) ;If FILE is nil, use current buffer
-                (find-buffer-visiting ,file) ; If FILE is already visited, find buffer
-                (progn
-                  (setq new-buf t)
-                  (find-file-noselect ,file)))) ; Else, visit FILE and return buffer
-          res)
-     (with-current-buffer buf
-       (setq res (progn ,@body))
-       (unless (and new-buf (not ,keep-buf-p))
-         (save-buffer)))
-     (if (and new-buf (not ,keep-buf-p))
-         (when (find-buffer-visiting ,file)
-           (kill-buffer (find-buffer-visiting ,file))))
-     res))
 
 ;; modified org-ql-view--format-element to work with org-roam nodes
 (defun org-roam-ql-view--format-node (node)
@@ -364,6 +349,10 @@ list.  If NODE is nil, return an empty string."
     (goto-char (org-roam-node-point node))
     (point-marker)))
 
+;; *****************************************************************************
+;; Functions to switch between org-roam/org-roam-ql buffers and
+;; org-ql-view buffers
+;; *****************************************************************************
 (defun org-roam-ql--nodes-from-roam-buffer (org-roam-buffer)
   "Collect the org-roam-nodes from a ORG-ROAM-BUFFER."
   (with-current-buffer org-roam-buffer
@@ -379,7 +368,9 @@ list.  If NODE is nil, return an empty string."
                   (if (equal (error-message-string err) "No next section")
                       nil ;; end while loop
                     (signal (car err) (cdr err))))) ;; somthing else happened, re-throw
-          (let ((magit-section (plist-get (text-properties-at (point)) 'magit-section)))
+          (let ((magit-section (plist-get
+                                (text-properties-at (point))
+                                'magit-section)))
             (when (org-roam-node-section-p magit-section)
               (push (slot-value magit-section 'node) nodes))))
         nodes))))
@@ -393,16 +384,8 @@ list.  If NODE is nil, return an empty string."
     ;; if the current-org-roam-node itself changes.  Because of the
     ;; `org-roam-node-sections', I am not sure how to compute the
     ;; nodes without re-rendering it a new buffer
-    (org-roam-ql-view (buffer-name (current-buffer)) (--if-let header-line-format it ""))))
-
-(defun org-roam-ql--refresh-buffer (fn &rest args)
-  (when (equal (buffer-name) org-roam-buffer)
-    (apply fn args)))
-
-(define-derived-mode org-roam-ql-mode org-roam-mode "Org-roam-ql"
-  "A major mode to display a list of nodes. Similar to org-roam-mode, but doesn't default to the org-roam-current-node."
-  :group 'org-roam-ql
-  (advice-add 'org-roam-buffer-refresh :around #'org-roam-ql--refresh-buffer))
+    (org-roam-ql-view (buffer-name (current-buffer))
+                      (--if-let header-line-format it ""))))
 
 ;;;###autoload
 (defun org-roam-ql-roam-buffer-from-ql-buffer ()
@@ -420,11 +403,25 @@ list.  If NODE is nil, return an empty string."
             ;; pick only nodes
             (-if-let (id (org-id-get))
                 (push (org-roam-node-from-id id) nodes)
-              (user-error (format "Non roam-node headings in query (in buffer %s)." (buffer-name))))))
+              (user-error (format "Non roam-node headings in query (in buffer %s)."
+                                  (buffer-name))))))
         (setq line-output (forward-line))))
     (org-roam-ql--buffer-for-nodes nodes
                                    org-ql-view-title
                                    (format "*From ql: %s*" org-ql-view-title))))
+
+;; *****************************************************************************
+;; org-roam-ql mode and functions to build them
+;; *****************************************************************************
+(define-derived-mode org-roam-ql-mode org-roam-mode "Org-roam-ql"
+  "A major mode to display a list of nodes. Similar to org-roam-mode,
+but doesn't default to the org-roam-current-node."
+  :group 'org-roam-ql
+  (advice-add 'org-roam-buffer-refresh :around #'org-roam-ql--refresh-buffer))
+
+(defun org-roam-ql--refresh-buffer (fn &rest args)
+  (when (equal (buffer-name) org-roam-buffer)
+    (apply fn args)))
 
 (defun org-roam-ql--render-buffer (sections title buffer-name)
   "Render SECTIONS (list of functions) in an org-roam-ql buffer."
@@ -452,7 +449,10 @@ of org-roam nodes."
                 ,nodes)
          (let ((pos (org-roam-node-point entry))
                (properties (org-roam-node-properties entry)))
-           (org-roam-node-insert-section :source-node entry :point pos :properties properties))
+           (org-roam-node-insert-section
+            :source-node entry
+            :point pos
+            :properties properties))
          (insert ?\n))
        (run-hooks 'org-roam-buffer-postrender-functions))))
 
@@ -463,28 +463,42 @@ of org-roam nodes."
     (org-roam-ql--nodes-section nodes "Nodes:"))
    title buffer-name))
 
+;; Useful helper functions
+(defun org-roam-ql-insert-node-title ()
+  "Select a node and insert only its title. Can be used in the
+minibuffer or when writting querries."
+  (interactive)
+  (insert (format "\"%s\"" (org-roam-node-title (org-roam-node-read nil nil nil t)))))
+
+;; setup of org-roam-ql
 (advice-add 'org-ql-view-refresh :around #'org-roam-ql--refresh)
 
-(dolist (predicate '((file org-roam-node-file . org-roam-ql--predicate-s-match)
-                     (file-title org-roam-node-file-title . org-roam-ql--predicate-s-match)
-                     (file-atime org-roam-node-file-atime . time-equal-p)
-                     (file-mtime org-roam-node-file-mtime . time-equal-p)
-                     (id org-roam-node-id . org-roam-ql--predicate-s-equals-p)
-                     (level org-roam-node-level . equal)
-                     (point org-roam-node-point . equal)
-                     (todo org-roam-node-todo . org-roam-ql--predicate-s-match)
-                     (priority org-roam-node-priority . org-roam-ql--predicate-s-match)
-                     (scheduled org-roam-node-scheduled . time-less-p)
-                     (deadline org-roam-node-deadline . time-less-p)
-                     (title org-roam-node-title . org-roam-ql--predicate-s-match)
-                     (properties org-roam-node-properties . org-roam-ql--predicate-property-match)
-                     (tags org-roam-node-tags . org-roam-ql--predicate-tags-match)
-                     (refs org-roam-node-refs . org-roam-ql--predicate-s-match)
-                     (backlink-to org-roam-ql--extract-forwardlink-ids . org-roam-ql--predicate-backlinked-to)
-                     (backlink-from org-roam-ql--extract-backlink-source . org-roam-ql--predicate-backlinked-from)
-                     (in-buffer identity . org-roam-ql--predicate-in-query)
-                     (nodes-list identity . org-roam-ql--predicate-in-query)
-                     (function identity . org-roam-ql--predicate-in-query)
+(dolist (predicate
+         '((file org-roam-node-file . org-roam-ql--predicate-s-match)
+           (file-title org-roam-node-file-title . org-roam-ql--predicate-s-match)
+           (file-atime org-roam-node-file-atime . time-equal-p)
+           (file-mtime org-roam-node-file-mtime . time-equal-p)
+           (id org-roam-node-id . org-roam-ql--predicate-s-equals-p)
+           (level org-roam-node-level . equal)
+           (point org-roam-node-point . equal)
+           (todo org-roam-node-todo . org-roam-ql--predicate-s-match)
+           (priority org-roam-node-priority . org-roam-ql--predicate-s-match)
+           (scheduled org-roam-node-scheduled . time-less-p)
+           (deadline org-roam-node-deadline . time-less-p)
+           (title org-roam-node-title . org-roam-ql--predicate-s-match)
+           (properties
+            org-roam-node-properties . org-roam-ql--predicate-property-match)
+           (tags org-roam-node-tags . org-roam-ql--predicate-tags-match)
+           (refs org-roam-node-refs . org-roam-ql--predicate-s-match)
+           (backlink-to
+            org-roam-ql--extract-forwardlink-ids .
+            org-roam-ql--predicate-backlinked-to)
+           (backlink-from
+            org-roam-ql--extract-backlink-source .
+            org-roam-ql--predicate-backlinked-from)
+           (in-buffer identity . org-roam-ql--predicate-in-query)
+           (nodes-list identity . org-roam-ql--predicate-in-query)
+           (function identity . org-roam-ql--predicate-in-query)
                      (funcall identity . org-roam-ql--predicate-funcall)))
   (org-roam-ql-defpred (car predicate) (cadr predicate) (cddr predicate)))
 
