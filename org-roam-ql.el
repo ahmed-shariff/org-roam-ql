@@ -413,15 +413,22 @@ list.  If NODE is nil, return an empty string."
 ;; *****************************************************************************
 ;; org-roam-ql mode and functions to build them
 ;; *****************************************************************************
+(defvar org-roam-ql-mode-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map org-roam-mode-map)
+    (define-key map "v" #'org-roam-ql-buffer-dispatch)
+    (define-key map [remap revert-buffer] #'org-roam-ql-refresh-buffer)
+    map))
+
 (define-derived-mode org-roam-ql-mode org-roam-mode "Org-roam-ql"
   "A major mode to display a list of nodes. Similar to org-roam-mode,
 but doesn't default to the org-roam-current-node."
-  :group 'org-roam-ql
-  (advice-add 'org-roam-buffer-refresh :around #'org-roam-ql--refresh-buffer))
+  :group 'org-roam-ql)
 
-(defun org-roam-ql--refresh-buffer (fn &rest args)
+(defun org-roam-ql-refresh-buffer ()
+  (interactive)
   (when (equal (buffer-name) org-roam-buffer)
-    (apply fn args)))
+    (org-roam-buffer-refresh)))
 
 (defun org-roam-ql--render-buffer (sections title buffer-name)
   "Render SECTIONS (list of functions) in an org-roam-ql buffer."
@@ -463,6 +470,95 @@ of org-roam nodes."
     (org-roam-ql--nodes-section nodes "Nodes:"))
    title buffer-name))
 
+;; org-roam-ql transient
+;; Copying from org-ql-view
+(defclass org-roam-ql--variable (transient-variable)
+  ;; FIXME: We don't need :scope, but maybe a slot has to be defined.
+  ((scope         :initarg :scope)
+   (default-value :initarg :default-value)))
+
+;; copy from transient-reset-value's transient-default-value
+(cl-defmethod transient-reset-value ((obj org-roam-ql--variable))
+  (let ((value (and (slot-boundp obj 'default-value)
+                    (oref obj default-value))))
+    (oset obj value value)
+    (oset (oref obj prototype) value value)
+    (setf (alist-get (oref obj command) transient-values nil 'remove) nil)
+    (transient-save-values))
+  (transient--history-push obj)
+  (mapc #'transient-init-value transient--suffixes))
+
+(cl-defmethod transient-init-value ((obj org-roam-ql--variable))
+  ;; init value with the given default
+  (oset obj value (and (slot-boundp obj 'default-value)
+                       (oref obj default-value))))
+
+(cl-defmethod transient-infix-set ((obj org-roam-ql--variable) value)
+  "Set org-roam-ql mode variable defined by OBJ to VALUE."
+  (let ((variable (oref obj variable)))
+    (oset obj value value)
+    (set (make-local-variable (oref obj variable)) value)
+    (unless (or value transient--prefix)
+      (message "Unset %s" variable))))
+
+(make-variable-buffer-local (defvar org-roam-ql-buffer-title nil "The current title of the buffer."))
+(make-variable-buffer-local (defvar org-roam-ql-buffer-query nil "The current query of the buffer."))
+(make-variable-buffer-local (defvar org-roam-ql-buffer-in nil
+                              "Define which option to use - 'in-buffer' or 'org-roam-db'."))
+
+(transient-define-prefix org-roam-ql-buffer-dispatch ()
+  "Show Org QL View dispatcher."
+  [["Edit"
+    ("t" org-roam-ql-view--transient-title)
+    ("q" org-roam-ql-view--transient-query)
+    ("i" org-roam-ql-view--transient-in)]]
+  [["View"
+    ("r" "Refresh" org-roam-ql-refresh-buffer)]])
+
+;; Copied from org-ql-view; I have no idea whats happening here!
+(defun org-roam-ql--format-transient-key-value (key value)
+  "Return KEY and VALUE formatted for display in Transient."
+  ;; `window-width' minus 15 is about right.  I think there's no way
+  ;; to determine it automatically, because we can't know which column
+  ;; Transient is starting at.
+  (let ((max-width (- (window-width) 15)))
+    (format "%s: %s" (propertize key 'face 'transient-argument)
+            (s-truncate max-width (format "%s" value)))))
+
+(transient-define-infix org-roam-ql-view--transient-title ()
+  :description (lambda () (org-roam-ql--format-transient-key-value "title" org-roam-ql-buffer-title))
+  :class 'org-roam-ql--variable
+  :argument ""
+  :variable 'org-roam-ql-buffer-title
+  :prompt "Title: "
+  :reader (lambda (prompt _initial-input history)
+            ;; FIXME: Figure out how to integrate initial-input.
+            (read-string prompt (when org-roam-ql-buffer-title
+                                  (format "%s" org-roam-ql-buffer-title))
+                         history)))
+
+(transient-define-infix org-roam-ql-view--transient-query ()
+  :description (lambda () (org-roam-ql--format-transient-key-value "query" org-roam-ql-buffer-query))
+  :class 'org-roam-ql--variable
+  :argument ""
+  :variable 'org-roam-ql-buffer-query
+  :prompt "Query: "
+  :reader (lambda (prompt _initial-input history)
+            ;; fixme: figure out how to integrate initial-input.
+            (read (read-string prompt (when org-roam-ql-buffer-query
+                                        (format "%s" org-roam-ql-buffer-query))
+                               history))))
+
+;; FIXME: Make the default value work
+(transient-define-infix org-roam-ql-view--transient-in ()
+  :description (lambda () (org-roam-ql--format-transient-key-value "in" org-roam-ql-buffer-in))
+  :class 'org-roam-ql--variable
+  :argument ""
+  :variable 'org-roam-ql-buffer-in 
+  :default-value "in-buffer"
+  :choices '("in-buffer" "org-roam-db"))
+
+
 ;; Useful helper functions
 (defun org-roam-ql-insert-node-title ()
   "Select a node and insert only its title. Can be used in the
@@ -472,6 +568,8 @@ minibuffer or when writting querries."
 
 ;; setup of org-roam-ql
 (advice-add 'org-ql-view-refresh :around #'org-roam-ql--refresh)
+
+(define-key org-roam-mode-map "v" #'org-roam-ql-buffer-dispatch)
 
 (dolist (predicate
          '((file org-roam-node-file . org-roam-ql--predicate-s-match)
