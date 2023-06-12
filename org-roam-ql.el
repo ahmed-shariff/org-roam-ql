@@ -201,13 +201,12 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
                      (intern-soft (completing-read "Display in: " '(org-roam org-ql) nil t))
                      (read-string "Title: ")))
     (let* ((nodes (org-roam-ql-nodes source-or-query))
-           ;; TODO: Think of a better way to get a default title
-           (title (format "org-roam - %s" (or title (substring source-or-query 0 10)))))
+           (title (org-roam-ql--get-formatted-title title source-or-query)))
       (pcase display-in
        ('org-ql
         (with-temp-buffer
           (let* ((strings '())
-                 (buffer (format "%s %s*" org-ql-view-buffer-name-prefix title))
+                 (buffer (org-roam-ql--get-formatted-buffer-name title source-or-query))
                  (header (org-ql-view--header-line-format
                           :title title))
                  (org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))
@@ -242,7 +241,17 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
         (org-roam-ql--buffer-for-nodes
          nodes
          title
-         (format "*Org-roam-ql %s*" title))))))
+         (format "*Org-roam-ql %s*" title)
+         source-or-query)))))
+
+(defun org-roam-ql--get-formatted-title (title source-or-query)
+  "Return the formatted title."
+  ;; TODO: Think of a better way to get a default title
+  (format "org-roam - %s" (or title (substring (fromat "%s" source-or-query) 0 10))))
+
+(defun org-roam-ql--get-formatted-buffer-name (title source-or-query)
+  "Return the formatted buffer name."
+  (format "%s %s*" org-ql-view-buffer-name-prefix (org-roam-ql--get-formatted-title title source-or-query)))
 
 ;; *****************************************************************************
 ;; Functions to work with org-ql-view
@@ -427,10 +436,34 @@ but doesn't default to the org-roam-current-node."
 
 (defun org-roam-ql-refresh-buffer ()
   (interactive)
-  (when (equal (buffer-name) org-roam-buffer)
-    (org-roam-buffer-refresh)))
+  (if (equal (buffer-name) org-roam-buffer)
+      (if (em (not (or org-roam-ql-buffer-query org-roam-ql-buffer-title org-roam-ql-buffer-in)))
+          (org-roam-buffer-refresh)
+        ;; the org-roam-ql-buffer-query should get set automagically.
+        ;; FIXME: This part doesn't get triggered at all?
+        (setq org-roam-ql-buffer-title (foramt "%s - extended" (org-roam-node-title org-roam-current-node))
+              org-roam-ql-buffer-in "in-buffer")
+        (org-roam-ql--refresh-buffer))
+    (org-roam-ql--refresh-buffer)) ;; TODO: Render in a new buffer with the node of the org-roam buffer
 
-(defun org-roam-ql--render-buffer (sections title buffer-name)
+(defun org-roam-ql--refresh-buffer ()
+    (let* ((query (pcase org-roam-ql-buffer-in
+                    ("in-buffer" `(and ,(if (equal (buffer-name) org-roam-buffer)
+                                            `(title ,(org-roam-node-title org-roam-current-node))
+                                          `(in-buffer ,(buffer-name)))
+                                       ,org-roam-ql-buffer-query))
+                    ("org-roam-db" org-roam-ql-buffer-query)
+                    (_ (user-error "Invalid value for `org-roam-ql-buffer-in'")))))
+      (org-roam-ql--buffer-for-nodes (org-roam-ql-nodes query)
+                                     (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
+                                         (org-roam-ql--get-formatted-title (format "%s - extended" org-roam-ql-buffer-title) org-roam-ql-buffer-query)
+                                       org-roam-ql-buffer-title)
+                                     (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
+                                         (org-roam-ql--get-formatted-buffer-name (format "%s - extended" org-roam-ql-buffer-title) org-roam-ql-buffer-query)
+                                       (buffer-name))
+                                     query))))
+
+(defun org-roam-ql--render-buffer (sections title buffer-name source-or-query)
   "Render SECTIONS (list of functions) in an org-roam-ql buffer."
   ;; copied  from `org-roam-buffer-render-contents'
   (with-current-buffer (get-buffer-create buffer-name)
@@ -438,6 +471,9 @@ but doesn't default to the org-roam-current-node."
       (erase-buffer)
       (org-roam-ql-mode)
       (org-roam-buffer-set-header-line-format title)
+      (setq org-roam-ql-buffer-query source-or-query
+            org-roam-ql-buffer-title title
+            org-roam-ql-buffer-in "org-roam-db")
       (insert ?\n)
       (dolist (section sections)
         (funcall section))
@@ -463,12 +499,12 @@ of org-roam nodes."
          (insert ?\n))
        (run-hooks 'org-roam-buffer-postrender-functions))))
 
-(defun org-roam-ql--buffer-for-nodes (nodes title buffer-name)
+(defun org-roam-ql--buffer-for-nodes (nodes title buffer-name &optional source-or-query)
   "View nodes in org-roam-ql buffer"
   (org-roam-ql--render-buffer
    (list
     (org-roam-ql--nodes-section nodes "Nodes:"))
-   title buffer-name))
+   title buffer-name (or source-or-query nodes)))
 
 ;; org-roam-ql transient
 ;; Copying from org-ql-view
