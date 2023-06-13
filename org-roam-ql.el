@@ -180,7 +180,7 @@ non-nil."
                             query (car query)))))))
 
 ;;;###autoload
-(defun org-roam-ql-search (source-or-query display-in &optional title query super-groups)
+(defun org-roam-ql-search (source-or-query display-in &optional title super-groups)
   "Basically what `org-ql-search does', but for org-roam-nodes.  See
 `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be. TITLE is a title
 to associate with the view. DISPLAY-IN is expected to be a symbol,
@@ -206,10 +206,7 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
                           :title title))
                  (org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))
                  ;; TODO: When the query also has a org-roam-query
-                 (org-ql-view-query ;;(append
-                                     `(org-roam-query1 ,source-or-query)
-                                     ;;query))
-                                     )
+                 (org-ql-view-query `(org-roam-query ,source-or-query))
                  (org-ql-view-sort nil)
                  (org-ql-view-narrow nil)
                  (org-ql-view-super-groups super-groups)
