@@ -212,7 +212,7 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
                  (org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))
                  ;; TODO: When the query also has a org-roam-query
                  (org-ql-view-query ;;(append
-                                     `(org-roam-query1 ,source-or-query)
+                                     `(org-roam-query ,source-or-query)
                                      ;;query))
                                      )
                  (org-ql-view-sort nil)
@@ -247,7 +247,7 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
 (defun org-roam-ql--get-formatted-title (title source-or-query)
   "Return the formatted title."
   ;; TODO: Think of a better way to get a default title
-  (format "org-roam - %s" (or title (substring (fromat "%s" source-or-query) 0 10))))
+  (format "org-roam - %s" (or title (substring (format "%s" source-or-query) 0 10))))
 
 (defun org-roam-ql--get-formatted-buffer-name (title source-or-query)
   "Return the formatted buffer name."
