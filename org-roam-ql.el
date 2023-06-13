@@ -241,7 +241,7 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
         (org-roam-ql--buffer-for-nodes
          nodes
          title
-         (format "*Org-roam-ql %s*" title)
+         (org-roam-ql--get-formatted-buffer-name title nil)
          source-or-query)))))
 
 (defun org-roam-ql--get-formatted-title (title source-or-query)
@@ -251,7 +251,7 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
 
 (defun org-roam-ql--get-formatted-buffer-name (title source-or-query)
   "Return the formatted buffer name."
-  (format "%s %s*" org-ql-view-buffer-name-prefix (org-roam-ql--get-formatted-title title source-or-query)))
+  (format "*%s*" (org-roam-ql--get-formatted-title title source-or-query)))
 
 ;; *****************************************************************************
 ;; Functions to work with org-ql-view
@@ -393,8 +393,9 @@ list.  If NODE is nil, return an empty string."
     ;; if the current-org-roam-node itself changes.  Because of the
     ;; `org-roam-node-sections', I am not sure how to compute the
     ;; nodes without re-rendering it a new buffer
-    (org-roam-ql-view (buffer-name (current-buffer))
-                      (--if-let header-line-format it ""))))
+    (org-roam-ql-search (buffer-name (current-buffer))
+                        'org-ql
+                        (--if-let header-line-format it ""))))
 
 ;;;###autoload
 (defun org-roam-ql-roam-buffer-from-ql-buffer ()
