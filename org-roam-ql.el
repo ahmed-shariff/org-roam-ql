@@ -26,6 +26,11 @@
 ;; FIXME: What is this docstring!
 (defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
 (defvar org-roam-ql--cache (make-hash-table))
+(make-variable-buffer-local (defvar org-roam-ql-buffer-title nil "The current title of the buffer."))
+(make-variable-buffer-local (defvar org-roam-ql-buffer-query nil "The current query of the buffer."))
+(make-variable-buffer-local (defvar org-roam-ql-buffer-in nil
+                              "Define which option to use - 'in-buffer' or 'org-roam-db'."))
+
 
 ;;;###autoload
 (defun org-roam-ql-nodes (source-or-query)
@@ -359,9 +364,9 @@ list.  If NODE is nil, return an empty string."
 ;; Functions to switch between org-roam/org-roam-ql buffers and
 ;; org-ql-view buffers
 ;; *****************************************************************************
-(defun org-roam-ql--nodes-from-roam-buffer (org-roam-buffer)
+(defun org-roam-ql--nodes-from-roam-buffer (buffer)
   "Collect the org-roam-nodes from a ORG-ROAM-BUFFER."
-  (with-current-buffer org-roam-buffer
+  (with-current-buffer buffer
     (when (derived-mode-p 'org-roam-mode)
       (let (nodes)
         (goto-char 0)
@@ -429,7 +434,7 @@ list.  If NODE is nil, return an empty string."
 
 (define-derived-mode org-roam-ql-mode org-roam-mode "Org-roam-ql"
   "A major mode to display a list of nodes. Similar to org-roam-mode,
-but doesn't default to the org-roam-current-node."
+but doesn't default to the org-roam-buffer-current-node."
   :group 'org-roam-ql)
 
 ;;;###autoload
@@ -439,13 +444,13 @@ but doesn't default to the org-roam-current-node."
       (if (not org-roam-ql-buffer-query)
           (org-roam-buffer-refresh)
         (let ((query org-roam-ql-buffer-query)
-              (title (or org-roam-ql-buffer-title (format "%s - extended" (org-roam-node-title org-roam-current-node))))
+              (title (or org-roam-ql-buffer-title (format "%s - extended" (org-roam-node-title org-roam-buffer-current-node))))
               (in (or org-roam-ql-buffer-in "org-roam-db")))
           (setq org-roam-ql-buffer-query nil
                 org-roam-ql-buffer-title nil
                 org-roam-ql-buffer-in nil)
           (org-roam-buffer-refresh)
-          (org-roam-ql-search `(id ,(org-roam-node-id org-roam-current-node))
+          (org-roam-ql-search `(id ,(org-roam-node-id org-roam-buffer-current-node))
                               'org-roam title query)))
     (org-roam-ql--refresh-buffer)))
 
@@ -560,7 +565,7 @@ of org-roam nodes."
   "Format of the OBJ's VALUE for choices."
   (let ((value (oref obj value)))
     (format "{ %s }"
-            (s-join " | " (--map (if (equalp it value)
+            (s-join " | " (--map (if (s-equals-p it value)
                                      it
                                    (propertize it 'face 'transient-inactive-value))
                                  (oref obj choices))))))
@@ -575,11 +580,6 @@ of org-roam nodes."
         (funcall 'emacs-lisp-mode)
         (font-lock-ensure)
         (buffer-string)))))
-
-(make-variable-buffer-local (defvar org-roam-ql-buffer-title nil "The current title of the buffer."))
-(make-variable-buffer-local (defvar org-roam-ql-buffer-query nil "The current query of the buffer."))
-(make-variable-buffer-local (defvar org-roam-ql-buffer-in nil
-                              "Define which option to use - 'in-buffer' or 'org-roam-db'."))
 
 (transient-define-prefix org-roam-ql-buffer-dispatch ()
   "Show Org QL View dispatcher."
