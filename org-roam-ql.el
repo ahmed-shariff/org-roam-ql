@@ -438,31 +438,37 @@ but doesn't default to the org-roam-current-node."
 (defun org-roam-ql-refresh-buffer ()
   (interactive)
   (if (equal (buffer-name) org-roam-buffer)
-      (if (not (or org-roam-ql-buffer-query org-roam-ql-buffer-title org-roam-ql-buffer-in))
+      (if (not org-roam-ql-buffer-query)
           (org-roam-buffer-refresh)
-        ;; the org-roam-ql-buffer-query should get set automagically.
-        ;; FIXME: This part doesn't get triggered at all?
-        (setq org-roam-ql-buffer-title (foramt "%s - extended" (org-roam-node-title org-roam-current-node))
-              org-roam-ql-buffer-in "in-buffer")
-        (org-roam-ql--refresh-buffer))
-    (org-roam-ql--refresh-buffer)) ;; TODO: Render in a new buffer with the node of the org-roam buffer
+        (let ((query org-roam-ql-buffer-query)
+              (title (or org-roam-ql-buffer-title (format "%s - extended" (org-roam-node-title org-roam-current-node))))
+              (in (or org-roam-ql-buffer-in "org-roam-db")))
+          (setq org-roam-ql-buffer-query nil
+                org-roam-ql-buffer-title nil
+                org-roam-ql-buffer-in nil)
+          (org-roam-buffer-refresh)
+          (org-roam-ql-search `(id ,(org-roam-node-id org-roam-current-node))
+                              'org-roam title query)))
+    (org-roam-ql--refresh-buffer)))
 
-(defun org-roam-ql--refresh-buffer ()
-    (let* ((query (pcase org-roam-ql-buffer-in
-                    ("in-buffer" `(and ,(if (equal (buffer-name) org-roam-buffer)
-                                            `(title ,(org-roam-node-title org-roam-current-node))
-                                          `(in-buffer ,(buffer-name)))
-                                       ,org-roam-ql-buffer-query))
-                    ("org-roam-db" org-roam-ql-buffer-query)
-                    (_ (user-error "Invalid value for `org-roam-ql-buffer-in'")))))
-      (org-roam-ql--buffer-for-nodes (org-roam-ql-nodes query)
-                                     (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
-                                         (org-roam-ql--get-formatted-title (format "%s - extended" org-roam-ql-buffer-title) org-roam-ql-buffer-query)
-                                       org-roam-ql-buffer-title)
-                                     (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
-                                         (org-roam-ql--get-formatted-buffer-name (format "%s - extended" org-roam-ql-buffer-title) org-roam-ql-buffer-query)
-                                       (buffer-name))
-                                     query))))
+(defun org-roam-ql--refresh-buffer (&optional buffer-name)
+  (let* ((buffer-name (or buffer-name (buffer-name)))
+         (query (pcase org-roam-ql-buffer-in
+                  ("in-buffer" `(and (in-buffer ,buffer-name)
+                                     ,org-roam-ql-buffer-query))
+                  ("org-roam-db" org-roam-ql-buffer-query)
+                  (_ (user-error "Invalid value for `org-roam-ql-buffer-in'")))))
+    (org-roam-ql--buffer-for-nodes
+     (org-roam-ql-nodes query)
+     (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
+         (org-roam-ql--get-formatted-title
+          (format "%s - extended" (s-replace "org-roam - " "" org-roam-ql-buffer-title)) nil)
+       org-roam-ql-buffer-title)
+     (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
+         (org-roam-ql--get-formatted-buffer-name
+          (format "%s - extended" (s-replace "org-roam - " "" org-roam-ql-buffer-title)) nil)
+       buffer-name)
+     query)))
 
 (defun org-roam-ql--render-buffer (sections title buffer-name source-or-query)
   "Render SECTIONS (list of functions) in an org-roam-ql buffer."
