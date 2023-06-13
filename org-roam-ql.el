@@ -434,10 +434,11 @@ list.  If NODE is nil, return an empty string."
 but doesn't default to the org-roam-current-node."
   :group 'org-roam-ql)
 
+;;;###autoload
 (defun org-roam-ql-refresh-buffer ()
   (interactive)
   (if (equal (buffer-name) org-roam-buffer)
-      (if (em (not (or org-roam-ql-buffer-query org-roam-ql-buffer-title org-roam-ql-buffer-in)))
+      (if (not (or org-roam-ql-buffer-query org-roam-ql-buffer-title org-roam-ql-buffer-in))
           (org-roam-buffer-refresh)
         ;; the org-roam-ql-buffer-query should get set automagically.
         ;; FIXME: This part doesn't get triggered at all?
@@ -506,36 +507,70 @@ of org-roam nodes."
     (org-roam-ql--nodes-section nodes "Nodes:"))
    title buffer-name (or source-or-query nodes)))
 
+;; *****************************************************************************
 ;; org-roam-ql transient
-;; Copying from org-ql-view
-(defclass org-roam-ql--variable (transient-variable)
-  ;; FIXME: We don't need :scope, but maybe a slot has to be defined.
-  ((scope         :initarg :scope)
-   (default-value :initarg :default-value)))
+;; *****************************************************************************
+;; Copying alot it from org-ql-view and magit-transient
 
-;; copy from transient-reset-value's transient-default-value
-(cl-defmethod transient-reset-value ((obj org-roam-ql--variable))
-  (let ((value (and (slot-boundp obj 'default-value)
-                    (oref obj default-value))))
-    (oset obj value value)
-    (oset (oref obj prototype) value value)
-    (setf (alist-get (oref obj command) transient-values nil 'remove) nil)
-    (transient-save-values))
-  (transient--history-push obj)
-  (mapc #'transient-init-value transient--suffixes))
+(defclass org-roam-ql--variable (transient-variable)
+  ((default-value :initarg :default-value)))
+
+(defclass org-roam-ql--variable:choices (org-roam-ql--variable) nil)
+
+(defclass org-roam-ql--variable:sexp (org-roam-ql--variable) nil)
 
 (cl-defmethod transient-init-value ((obj org-roam-ql--variable))
-  ;; init value with the given default
-  (oset obj value (and (slot-boundp obj 'default-value)
-                       (oref obj default-value))))
+  ;; init value with the given default or the value of the related vairable
+  (oset obj value (or (symbol-value (oref obj variable))
+                      (and (slot-boundp obj 'default-value)
+                           (oref obj default-value)))))
 
 (cl-defmethod transient-infix-set ((obj org-roam-ql--variable) value)
   "Set org-roam-ql mode variable defined by OBJ to VALUE."
-  (let ((variable (oref obj variable)))
+  (let* ((variable (oref obj variable))
+         (default-value (and (slot-boundp obj 'default-value)
+                             (oref obj default-value)))
+         (value (or value default-value)))
     (oset obj value value)
     (set (make-local-variable (oref obj variable)) value)
     (unless (or value transient--prefix)
       (message "Unset %s" variable))))
+
+(cl-defmethod transient-infix-read ((obj org-roam-ql--variable:choices))
+  "Pick between CHOICES in OBJ when reading."
+  (let ((choices (oref obj choices)))
+    (if-let ((value (oref obj value)))
+        (or (cadr (member value choices))
+            (car choices))
+      (car choices))))
+
+(cl-defmethod transient-format-description ((obj org-roam-ql--variable))
+  "Format of the OBJ's DESCRIPTION."
+  (format "%s" (propertize (oref obj prompt) 'face 'transient-argument)))
+
+(cl-defmethod transient-format-value ((obj org-roam-ql--variable))
+  "Format of the OBJ's VALUE."
+  (oref obj value))
+
+(cl-defmethod transient-format-value ((obj org-roam-ql--variable:choices))
+  "Format of the OBJ's VALUE for choices."
+  (let ((value (oref obj value)))
+    (format "{ %s }"
+            (s-join " | " (--map (if (equalp it value)
+                                     it
+                                   (propertize it 'face 'transient-inactive-value))
+                                 (oref obj choices))))))
+
+(cl-defmethod transient-format-value ((obj org-roam-ql--variable:sexp))
+  "Format of the OBJ's VALUE for sexpressions."
+  ;; copied from `org-roam-ql'.
+  (let ((value (format "%S" (oref obj value))))
+    (with-temp-buffer
+      (delay-mode-hooks
+        (insert value)
+        (funcall 'emacs-lisp-mode)
+        (font-lock-ensure)
+        (buffer-string)))))
 
 (make-variable-buffer-local (defvar org-roam-ql-buffer-title nil "The current title of the buffer."))
 (make-variable-buffer-local (defvar org-roam-ql-buffer-query nil "The current query of the buffer."))
@@ -551,7 +586,6 @@ of org-roam nodes."
   [["View"
     ("r" "Refresh" org-roam-ql-refresh-buffer)]])
 
-;; Copied from org-ql-view; I have no idea whats happening here!
 (defun org-roam-ql--format-transient-key-value (key value)
   "Return KEY and VALUE formatted for display in Transient."
   ;; `window-width' minus 15 is about right.  I think there's no way
@@ -562,11 +596,11 @@ of org-roam nodes."
             (s-truncate max-width (format "%s" value)))))
 
 (transient-define-infix org-roam-ql-view--transient-title ()
-  :description (lambda () (org-roam-ql--format-transient-key-value "title" org-roam-ql-buffer-title))
   :class 'org-roam-ql--variable
   :argument ""
   :variable 'org-roam-ql-buffer-title
   :prompt "Title: "
+  :always-read t
   :reader (lambda (prompt _initial-input history)
             ;; FIXME: Figure out how to integrate initial-input.
             (read-string prompt (when org-roam-ql-buffer-title
@@ -574,24 +608,24 @@ of org-roam nodes."
                          history)))
 
 (transient-define-infix org-roam-ql-view--transient-query ()
-  :description (lambda () (org-roam-ql--format-transient-key-value "query" org-roam-ql-buffer-query))
-  :class 'org-roam-ql--variable
+  :class 'org-roam-ql--variable:sexp
   :argument ""
   :variable 'org-roam-ql-buffer-query
   :prompt "Query: "
+  :always-read t
   :reader (lambda (prompt _initial-input history)
             ;; fixme: figure out how to integrate initial-input.
             (read (read-string prompt (when org-roam-ql-buffer-query
-                                        (format "%s" org-roam-ql-buffer-query))
+                                        (format "%S" org-roam-ql-buffer-query))
                                history))))
 
-;; FIXME: Make the default value work
 (transient-define-infix org-roam-ql-view--transient-in ()
-  :description (lambda () (org-roam-ql--format-transient-key-value "in" org-roam-ql-buffer-in))
-  :class 'org-roam-ql--variable
+  :class 'org-roam-ql--variable:choices
   :argument ""
   :variable 'org-roam-ql-buffer-in 
-  :default-value "in-buffer"
+  :default-value "org-roam-db"
+  :prompt "In: "
+  :always-read t
   :choices '("in-buffer" "org-roam-db"))
 
 
