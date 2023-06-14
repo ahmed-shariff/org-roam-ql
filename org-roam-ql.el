@@ -169,6 +169,26 @@ non-nil."
 (defun org-roam-ql--extract-backlink-source (node)
   (--map (org-roam-backlink-source-node it) (org-roam-backlinks-get node)))
 
+(cl-defun org-roam-ql--expand-forwardlinks (source-or-query &key (type "id"))
+  (list (apply #'vector
+               (append '(:select :distinct links:dest
+                                 :from links
+                                 :where (in links:source $v1))
+                       (when type
+                         '(:and (= type $s2)))))
+        (apply #'vector (-map #'org-roam-node-id (org-roam-ql--nodes-cached source-or-query)))
+        type))
+
+(cl-defun org-roam-ql--expand-backlinks (source-or-query &key (type "id"))
+  (list (apply #'vector
+               (append '(:select :distinct links:source
+                                 :from links
+                                 :where (in links:dest $v1))
+                       (when type
+                         '(:and (= type $s2)))))
+        (apply #'vector (-map #'org-roam-node-id (org-roam-ql--nodes-cached source-or-query)))
+        type))
+
 (defun org-roam-ql--expansion-identity (source-or-query)
   "expansion function that passes the SOURCE-OR-QUERY as is."
   source-or-query)
@@ -180,7 +200,7 @@ non-nil."
   "Expand a org-roam-ql QUERY."
   (if (and (listp query) (member (car query) '(or and)))
       (funcall
-       #'reduce
+       #'-reduce
        (pcase (car query)
          ('or #'-union)
          ('and #'-intersection))
@@ -696,20 +716,13 @@ minibuffer or when writting querries."
             org-roam-node-properties . org-roam-ql--predicate-property-match)
            (tags org-roam-node-tags . org-roam-ql--predicate-tags-match)
            (refs org-roam-node-refs . org-roam-ql--predicate-s-match)
-           (backlink-to
-            org-roam-ql--extract-forwardlink-ids .
-            org-roam-ql--predicate-backlinked-to)
-           (backlink-from
-            org-roam-ql--extract-backlink-source .
-            org-roam-ql--predicate-backlinked-from)
-           ;; (in-buffer identity . org-roam-ql--predicate-in-query)
-           ;; (nodes-list identity . org-roam-ql--predicate-in-query)
-           ;; (function identity . org-roam-ql--predicate-in-query)
            (funcall identity . org-roam-ql--predicate-funcall)))
   (org-roam-ql-defpred (car predicate) (cadr predicate) (cddr predicate)))
 
 (dolist (expansion-function
-         '((in-buffer . org-roam-ql--expansion-identity)
+         '((backlink-to . org-roam-ql--expand-backlinks)
+           (backlink-from . org-roam-ql--expand-forwardlinks)
+           (in-buffer . org-roam-ql--expansion-identity)
            (nodes-list . org-roam-ql--expansion-identity)
            (function . org-roam-ql--expansion-identity)))
   (org-roam-ql-defexpansion (car expansion-function) (cdr expansion-function)))
