@@ -25,6 +25,7 @@
 (defvar org-roam-ql--current-nodes nil)
 ;; FIXME: What is this docstring!
 (defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
+(defvar org-roam-ql--query-expansion-functions (make-hash-table) "Holds the function to expand a query.")
 (defvar org-roam-ql--cache (make-hash-table))
 (make-variable-buffer-local (defvar org-roam-ql-buffer-title nil "The current title of the buffer."))
 (make-variable-buffer-local (defvar org-roam-ql-buffer-query nil "The current query of the buffer."))
@@ -76,8 +77,7 @@ call `org-roam-ql-clear-cache'."
                       (vconcat [:select id :from nodes :where] query))
                     args))))
    ((and (listp source-or-query) (org-roam-ql--check-if-valid-query source-or-query))
-    (-filter (lambda (it)
-               (org-roam-ql--expand-query source-or-query it)) (org-roam-node-list)))
+    (org-roam-ql--expand-query source-or-query))
    ((functionp source-or-query) (funcall source-or-query))))
 
 ;; Can we make org-roam-ql aware of any changes that can happen?
@@ -106,7 +106,8 @@ internal functions"
   (if (listp s-exp)
       (or (and (member (car s-exp) '(or and))
                (--map (org-roam-ql--check-if-valid-query it) (cdr s-exp)))
-          (member (car s-exp) (hash-table-keys org-roam-ql--query-comparison-functions)))
+          (or (gethash (car s-exp) org-roam-ql--query-comparison-functions)
+              (gethash (car s-exp) org-roam-ql--query-expansion-functions)))
     t))
 
 ;;;###autoload
@@ -119,6 +120,13 @@ and the remainder of the arguments from the predicate itself."
   `(puthash ,name
             (cons ,extraction-function ,comparison-function)
             org-roam-ql--query-comparison-functions))
+
+(defmacro org-roam-ql-defexpansion (name expansion-function)
+  "Adds an EXPANSION-FUNCTION which will be identified by NAME in a
+  org-roam-ql query. The EXPANSION-FUNCTION should the parameters
+  passed in the query and return values that can be passed to
+  `org-roam-nodes'"
+  `(puthash ,name ,expansion-function org-roam-ql--query-expansion-functions))
 
 (defun org-roam-ql--predicate-s-match (value regexp &optional exact)
   (when (and value regexp)
@@ -161,34 +169,60 @@ non-nil."
 (defun org-roam-ql--extract-backlink-source (node)
   (--map (org-roam-backlink-source-node it) (org-roam-backlinks-get node)))
 
-(defun org-roam-ql--predicate-in-query (value source-or-query)
-  (let* ((nodes (org-roam-ql--nodes-cached source-or-query))
-         ;; FIXME: equalp directly on the nodes is not working?
-         (node-ids (-map #'org-roam-node-id nodes)))
-    (member (org-roam-node-id value) node-ids)))
+(defun org-roam-ql--expansion-identity (source-or-query)
+  "expansion function that passes the SOURCE-OR-QUERY as is."
+  source-or-query)
 
 (defun org-roam-ql--predicate-funcall (value f)
   (funcall f value))
 
-(defun org-roam-ql--expand-query (query it)
-  "Used to expand a QUERY."
+(defun org-roam-ql--expand-query (query)
+  "Expand a org-roam-ql QUERY."
   (if (and (listp query) (member (car query) '(or and)))
       (funcall
+       #'reduce
        (pcase (car query)
-         ('or #'-any-p)
-         ('and #'-all-p))
-       'identity
-       (-map (lambda (sub-query) (org-roam-ql--expand-query sub-query it)) (cdr query)))
-    (-if-let* ((query-key (and (listp query) (car query)))
-               (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
-        (let ((val (funcall (car query-comparison-function-info) it)))
-          (and val
-               (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
-      (-if-let (nodes (org-roam-ql--nodes-cached query))
-          (member (org-roam-node-id it) (-map #'org-roam-node-id nodes))
-        (user-error
-         (format "Invalid query %s. %s not in org-roam-ql predicate list (See `org-roam-ql-defpred') or recognized by `org-roam-ql-nodes'."
-                            query (car query)))))))
+         ('or #'-union)
+         ('and #'-intersection))
+       (-map (lambda (sub-query) (org-roam-ql--expand-query sub-query)) (cdr query)))
+    (let* ((query-key (and (listp query) (car query)))
+           (query-expansion-function (gethash query-key org-roam-ql--query-expansion-functions))
+           (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
+      (cond
+       ((and query-key query-expansion-function)
+        (org-roam-ql--nodes-cached (apply query-expansion-function (cdr query))))
+       ;; FIXME: Think of a better way to to this
+       ((and query-key query-comparison-function-info)
+        (--filter (let ((val (funcall (car query-comparison-function-info) it)))
+                    (and val
+                         (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
+                 (org-roam-node-list)))
+       (t
+        (-if-let (nodes (org-roam-ql--nodes-cached query))
+            (member (org-roam-node-id it) (-map #'org-roam-node-id nodes))
+          (user-error
+           (format "invalid query %s. %s not in org-roam-ql predicate list (see `org-roam-ql-defpred') or recognized by `org-roam-ql-nodes'."
+                   query (car query)))))))))
+
+;; (defun org-roam-ql--expand-query (query it)
+;;   "Used to expand a QUERY, where it is a single node."
+;;   (if (and (listp query) (member (car query) '(or and)))
+;;       (funcall
+;;        (pcase (car query)
+;;          ('or #'-any-p)
+;;          ('and #'-all-p))
+;;        'identity
+;;        (-map (lambda (sub-query) (org-roam-ql--expand-query sub-query it)) (cdr query)))
+;;     (-if-let* ((query-key (and (listp query) (car query)))
+;;                (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
+;;         (let ((val (funcall (car query-comparison-function-info) it)))
+;;           (and val
+;;                (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
+;;       (-if-let (nodes (org-roam-ql--nodes-cached query))
+;;           (member (org-roam-node-id it) (-map #'org-roam-node-id nodes))
+;;         (user-error
+;;          (format "Invalid query %s. %s not in org-roam-ql predicate list (See `org-roam-ql-defpred') or recognized by `org-roam-ql-nodes'."
+;;                             query (car query)))))))
 
 ;;;###autoload
 (defun org-roam-ql-search (source-or-query display-in &optional title super-groups)
@@ -668,11 +702,17 @@ minibuffer or when writting querries."
            (backlink-from
             org-roam-ql--extract-backlink-source .
             org-roam-ql--predicate-backlinked-from)
-           (in-buffer identity . org-roam-ql--predicate-in-query)
-           (nodes-list identity . org-roam-ql--predicate-in-query)
-           (function identity . org-roam-ql--predicate-in-query)
-                     (funcall identity . org-roam-ql--predicate-funcall)))
+           ;; (in-buffer identity . org-roam-ql--predicate-in-query)
+           ;; (nodes-list identity . org-roam-ql--predicate-in-query)
+           ;; (function identity . org-roam-ql--predicate-in-query)
+           (funcall identity . org-roam-ql--predicate-funcall)))
   (org-roam-ql-defpred (car predicate) (cadr predicate) (cddr predicate)))
+
+(dolist (expansion-function
+         '((in-buffer . org-roam-ql--expansion-identity)
+           (nodes-list . org-roam-ql--expansion-identity)
+           (function . org-roam-ql--expansion-identity)))
+  (org-roam-ql-defexpansion (car expansion-function) (cdr expansion-function)))
 
 (provide 'org-roam-ql)
 
