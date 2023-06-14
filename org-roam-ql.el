@@ -199,12 +199,15 @@ non-nil."
 (defun org-roam-ql--expand-query (query)
   "Expand a org-roam-ql QUERY."
   (if (and (listp query) (member (car query) '(or and)))
-      (funcall
-       #'-reduce
-       (pcase (car query)
-         ('or #'-union)
-         ('and #'-intersection))
-       (-map (lambda (sub-query) (org-roam-ql--expand-query sub-query)) (cdr query)))
+      ;; FIXME: two nodes are not equal? using this -compare-fn as workaround
+      (let ((-compare-fn (lambda (node1 node2)
+                           (s-equals-p (org-roam-node-id node1) (org-roam-node-id node2)))))
+        (funcall
+         #'-reduce
+         (pcase (car query)
+           ('or #'-union)
+           ('and #'-intersection))
+         (--map (org-roam-ql--expand-query it) (cdr query))))
     (let* ((query-key (and (listp query) (car query)))
            (query-expansion-function (gethash query-key org-roam-ql--query-expansion-functions))
            (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
