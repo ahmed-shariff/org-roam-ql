@@ -1,16 +1,11 @@
-#+title: org-roam-ql - An org-ql interface for org-roam
 #+author: Shariff AM Faleel
 #+language: en
 
-* org-roam-ql
-
-This package provides an org-ql interface for org-roam.
+* org-roam-ql - query language for org-roam
 
 *This package is under active development.*
 
-The ~org-roam~ buffer is good at providing context to the nodes I am looking at, while ~org-ql~ provides a very nice interface for querying org files and accompanying tools to work with the results, particularly, the use of the org-agenda view.
-
-This package provides an interface to query your org-roam database and view the results in either an org-roam buffer or an org-ql buffer.
+This package an interface to easily query and display results from your ~org-roam~ database. 
 
 ** Screenshots
 
@@ -29,6 +24,7 @@ As mentioned above, the package is still in active development. If you have any 
 ** Usage
 *** Commands/functions
 
+- ~(org-roam-ql-search SOURCE-OR-QUERY &optional TITLE QUERY)~ - This creates a ~org-ql~ buffer with the nodes of the corresponding ~SOURCE-OR-QUERY~ with ~TITLE~. Additionally, this also takes a ~org-ql~ query, which will be used to further filter the results from the ~SOURCE-OR-QUERY~. ~SOURCE-OR-QUERY~ is the same as ~org-roam-ql-node~. When called interactively. This can also be called interactively, see below of what the values of ~SOURCE-OR-QUERY~ can be.
 - ~(org-roam-ql-nodes SOURCE-OR-QUERY)~ - Given a SOURCE-OR-QUERY, return a list of nodes. SOURCE-OR-QUERY can be one of the following:
   - A list of parameters that can be passed to ~org-roam-db-query~. Should be a list of the form ~(QUERY ARG1 ARG2...)~. The result of calling ~org-roam-db-query~ with these parameters should return a list of records where the first element is the ID of a corresponding node. For example:
   #+begin_src emacs-lisp
@@ -78,7 +74,10 @@ As mentioned above, the package is still in active development. If you have any 
   #+end_src
 
   The ~EXTRACTION-FUNCTION~ is a function that takes an org-roam-node and returns a value that will be passed as the first parameter to ~COMPARISON-FUNCTION~. The remainder of the parameters when calling the predicate is passed as remaining parameters ~COMPARISON-FUNCTION~. If the ~COMPARITION-FUNCTION~ returns a non-nil value, it will be included in the result.
-- ~(org-roam-ql-search SOURCE-OR-QUERY DISPLAY-IN &optional TITLE QUERY SUPER-GROUPS)~ - This creates a ~org-ql~ buffer with the nodes of the corresponding ~SOURCE-OR-QUERY~ with ~TITLE~. Additionally, this also takes a ~org-ql~ query, which will be used to further filter the results from the ~SOURCE-OR-QUERY~. ~SOURCE-OR-QUERY~ is the same as ~org-roam-ql-node~. When called interactively. This can also be called interactively. ~DISPLAY-IN~ is expected to be a symbol, either ~org-ql~ or ~org-roam~. If its ~org-ql~, the results from the ~SOURCE-OR-QUERY~ will be displayed in org-ql's agenda buffer. If its ~org-roam~, will be displayed in a org-roam-ql buffer.
+
+- ~(org-roam-ql-defexpansion name expansion-function)~ - Adds an ~EXPANSION-FUNCTION~ which will be identified by ~NAME~ in a org-roam-ql query. The ~EXPANSION-FUNCTION~ should take the parameters passed in the query and return values that can be passed to   ~org-roam-nodes~
+*** Commands in ~org-roam-ql-ql~
+~org-roam-ql-ql~ is a package that integrates ~org-roam-ql~ with ~org-ql~.
 - ~org-roam-ql-select~ - Similar to ~org-ql-select~. The first parameter is the same as ~SOURCE-OR-QUERY~.
 - ~org-roam-ql-ql-buffer-from-roam-buffer~ - Displays the nodes in a org-roam-like-buffer in a ~org-ql~ buffer
 - ~org-roam-ql-roam-buffer-from-ql-buffer~ - Displays a ~org-ql~ buffer, in a org-roam-like-buffer (uses the ~org-roam-ql-mode~).

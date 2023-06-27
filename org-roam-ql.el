@@ -147,14 +147,13 @@ internal functions"
 ;;                             query (car query)))))))
 
 ;;;###autoload
-(defun org-roam-ql-search (source-or-query &optional title super-groups)
+(defun org-roam-ql-search (source-or-query &optional title)
   "Basically what `org-ql-search does', but for org-roam-nodes.  See
 `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be. TITLE is a title
 to associate with the view. DISPLAY-IN is expected to be a symbol,
 either `'org-ql' or `'org-roam'. If its `org-ql', the results from the
 SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
-`org-roam', will be displayed in a org-roam-ql buffer. See
-`org-roam-search' for details on SUPER-GROUPS."
+`org-roam', will be displayed in a org-roam-ql buffer."
   (interactive (list (let ((query (read-minibuffer "Query: ")))
                        (if (vectorp query)
                            (list query)
@@ -224,7 +223,7 @@ and the remainder of the arguments from the predicate itself."
 
 (defmacro org-roam-ql-defexpansion (name expansion-function)
   "Adds an EXPANSION-FUNCTION which will be identified by NAME in a
-  org-roam-ql query. The EXPANSION-FUNCTION should the parameters
+  org-roam-ql query. The EXPANSION-FUNCTION should take the parameters
   passed in the query and return values that can be passed to
   `org-roam-nodes'"
   `(puthash ,name ,expansion-function org-roam-ql--query-expansion-functions))
