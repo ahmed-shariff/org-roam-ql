@@ -17,6 +17,7 @@
 
 (require 'org-ql)
 (require 'org-ql-view)
+(require 'org-roam-ql)
 (require 'org-roam-utils)
 (require 'org-roam-node)
 (require 'dash)
@@ -25,8 +26,7 @@
 
 (defvar org-roam-ql--current-nodes nil)
 
-(defun org-roam-ql--org-ql-search (nodes title)
-
+(defun org-roam-ql--org-ql-search (source-or-query nodes title)
   (with-temp-buffer
     (let* ((strings '())
            (buffer (org-roam-ql--get-formatted-buffer-name title source-or-query))
@@ -37,7 +37,7 @@
            (org-ql-view-query `(org-roam-query ,source-or-query))
            (org-ql-view-sort nil)
            (org-ql-view-narrow nil)
-           (org-ql-view-super-groups super-groups)
+           ;; (org-ql-view-super-groups super-groups)
            (org-ql-view-title title))
       ;; Invalidating cache to allow detecting changes.
       (org-roam-ql-clear-cache)
@@ -58,6 +58,52 @@
         ;;   ;; HACK - to make the buffer get rendered properly.
         ;;   (org-ql-view-refresh))))))
         ))))
+
+;; modified org-ql-view--format-element to work with org-roam nodes
+(defun org-roam-ql-view--format-node (node)
+  "Return NODE as a string with text-properties set by its property
+list.  If NODE is nil, return an empty string."
+  (if (not node)
+      ""
+    (let* ((marker
+            (org-roam-ql--get-file-marker node))
+           (properties (list
+                        'org-marker marker
+                        'org-hd-marker marker))
+           ;; (properties '())
+           (string ;;(org-roam-node-title node))
+            (s-join " "
+                    (-non-nil
+                     (list
+                      (when-let (todo (org-roam-node-todo node))
+                        (org-ql-view--add-todo-face todo))
+                      (when-let (priority (org-roam-node-priority node))
+                        (org-ql-view--add-priority-face (byte-to-string priority)))
+                      (org-roam-node-title node)
+                      nil;;due-string
+                      (when-let (tags (org-roam-node-tags node))
+                         (--> tags
+                           (s-join ":" it)
+                           (s-wrap it ":")
+                           (org-add-props it nil 'face 'org-tag))))))))
+      (remove-list-of-text-properties 0 (length string) '(line-prefix) string)
+      ;; Add all the necessary properties and faces to the whole string
+      (--> string
+        ;; FIXME: Use proper prefix
+        (concat "  " it)
+        (org-add-props it properties
+          'org-agenda-type 'search
+          'todo-state (org-roam-node-todo node)
+          'tags (org-roam-node-tags node)
+          ;;'org-habit-p (org)
+          )))))
+
+(defun org-roam-ql--get-file-marker (node)
+  (org-roam-with-file (org-roam-node-file node) t
+  ;; (with-current-buffer (find-file-noselect (org-roam-node-file node))
+  ;; (with-plain-file (org-roam-node-file node) t
+    (goto-char (org-roam-node-point node))
+    (point-marker)))
 
 ;; *****************************************************************************
 ;; Functions to work with org-ql-view
@@ -132,13 +178,9 @@
   "Convert a roam buffer to org-ql buffer."
   (interactive)
   (when (derived-mode-p 'org-roam-mode)
-    ;; TODO: if the buffer is the *org-roam* buffer, this will change
-    ;; if the current-org-roam-node itself changes.  Because of the
-    ;; `org-roam-node-sections', I am not sure how to compute the
-    ;; nodes without re-rendering it a new buffer
-    (org-roam-ql-search (buffer-name (current-buffer))
-                        'org-ql
-                        (--if-let header-line-format it ""))))
+    (org-roam-ql--org-ql-search (buffer-name (current-buffer))
+                                (org-roam-ql--nodes-from-roam-buffer (current-buffer))
+                                (--if-let header-line-format it ""))))
 
 ;;;###autoload
 (defun org-roam-ql-roam-buffer-from-ql-buffer ()
