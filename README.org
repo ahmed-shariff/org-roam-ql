@@ -57,7 +57,7 @@ As mentioned above, the package is still in active development. If you have any 
       - ~(in-buffer BUFFER-NAME)~ : This is similar to passing a buffer-name to ~org-roam-ql-nodes~. Tests if a node is in the org-roam buffer named BUFFER-NAME.
       - ~(nodes-list NODES-LIST)~ : This is similar to passing a list of nodes to ~org-roam-ql-nodes~. Tests if a node is in the NODES-LIST.
       - ~(function FUNC)~ : This is similar to passing a function to ~org-roam-ql-nodes~. Tests if the node is in the result of executing the function FUNC.
-      - ~(funcall FUNC)~ : Tests a node with the function FUNC, which takes on parameter, a org-roam node. Test passes if the function returns non-nil.
+      - ~(funcall FUNC)~ : Tests a node with the function FUNC, which takes an org-roam node as parameter. Test passes if the function returns non-nil.
 - ~(org-roam-ql-defpred NAME EXTRACTION-FUNCTION COMPARISON-FUNCTION)~ - Creates a predicate that can be used in QUERY to ~org-roam-ql-nodes~. For example, for a predicate defined as follows:
   #+begin_src emacs-lisp
   (org-roam-ql-defpred sample extraction-func comparison-func)
@@ -81,3 +81,15 @@ As mentioned above, the package is still in active development. If you have any 
 - ~org-roam-ql-select~ - Similar to ~org-ql-select~. The first parameter is the same as ~SOURCE-OR-QUERY~.
 - ~org-roam-ql-ql-buffer-from-roam-buffer~ - Displays the nodes in a org-roam-like-buffer in a ~org-ql~ buffer
 - ~org-roam-ql-roam-buffer-from-ql-buffer~ - Displays a ~org-ql~ buffer, in a org-roam-like-buffer (uses the ~org-roam-ql-mode~).
+*** org dynamic block
+Similar to ~org-ql~, ~org-roam-ql~ also provides a dynamic block. The header parameters are as follows:
+- ~:query~ - Same as SOURCE-OR-QUERY for ~org-roam-ql-search~ or ~org-roam-ql-nodes~.
+- ~:columns~ - A list of columns to display. Each column name is a slot name of ~org-roam-nodes~. For any function/accessor with a name of the form ~org-roam-node-<name>~, which takes a org-roam-node as parameter, ~<name>~ can also be used column name. For example, if there is a function named ~org-roam-node-short-title~, ~short-title~ can be used as a column name, this will result in a column with the title ~short-title~ where the content of each row is the result of calling the respective function.
+- ~:take~ (optional) - If a positive integer N, takes the first N elements, if a negative -N, take the last N nodes.
+- ~:no-link~ (optional) - if a non-nil value is set, the first column containing the links will be dropped.
+
+If no-link is not provided as a parameter, the first column is a link to the node. Since it is an id link, it will be a backlink to the node.
+
+Following is an example of a dynamic block and its result.
+
+[[file:images/dynamic-block.jpg]]

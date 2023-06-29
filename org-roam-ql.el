@@ -506,6 +506,49 @@ of org-roam nodes."
   :always-read t
   :choices '("in-buffer" "org-roam-db"))
 
+;; *****************************************************************************
+;; org dynamic block
+;; *****************************************************************************
+
+(defun org-dblock-write:org-roam-ql (params)
+  (let ((query (plist-get params :query))
+        (columns (plist-get params :columns))
+        (take (plist-get params :take))
+        (no-link (plist-get params :no-link)))
+    (if (and query columns)
+        (-if-let (nodes (org-roam-ql-nodes query))
+            (progn
+              (when take
+                (setq nodes (cl-etypecase take
+                             ((and integer (satisfies cl-minusp)) (-take-last (abs take) nodes))
+                             (integer (-take take nodes)))))
+              (insert "|"
+                      (if no-link "" "|")
+                      (string-join (--map (pcase it
+                                            ((pred symbolp) (capitalize (symbol-name it)))
+                                            (`(,_ ,name) name))
+                                          columns)
+                                   " | ")
+                      "|\n|-\n")
+              (dolist (node nodes)
+                (insert "|"
+                        (if no-link
+                            ""
+                          (format "[[id:%s][link]]|" (org-roam-node-id node)))
+                        (string-join (--map (let ((value (funcall (intern-soft
+                                                                 (format "org-roam-node-%s" it))
+                                                                      node)))
+                                                  (pcase value
+                                                    ((pred listp) (string-join (--map (format "%s" it) value) ","))
+                                                    (string value)
+                                                    (_ (format "%s" value))))
+                                            columns)
+                                         "|")
+                        "|\n"))
+              (delete-char -1)
+              (org-table-align))
+          (message "Query results is empty"))
+      (user-error "Dynamic block needs to specify :query and :columns"))))
 
 ;; Useful helper functions
 (defun org-roam-ql-insert-node-title ()
