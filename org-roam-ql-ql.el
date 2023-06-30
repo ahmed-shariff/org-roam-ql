@@ -26,7 +26,7 @@
 
 (defvar org-roam-ql--current-nodes nil)
 
-(defun org-roam-ql--org-ql-search (source-or-query nodes title)
+(defun org-roam-ql--org-ql-search (source-or-query nodes title &optional super-groups)
   (with-temp-buffer
     (let* ((strings '())
            (buffer (org-roam-ql--get-formatted-buffer-name title source-or-query))
@@ -37,7 +37,7 @@
            (org-ql-view-query `(org-roam-query ,source-or-query))
            (org-ql-view-sort nil)
            (org-ql-view-narrow nil)
-           ;; (org-ql-view-super-groups super-groups)
+           (org-ql-view-super-groups super-groups)
            (org-ql-view-title title))
       ;; Invalidating cache to allow detecting changes.
       (org-roam-ql-clear-cache)
@@ -47,11 +47,11 @@
             (format "Processing %s nodes" (length nodes))
           (push (org-roam-ql-view--format-node node) strings))
         ;; TODO: Is this necessary?
-        ;; (when super-groups
-        ;;   (let ((org-super-agenda-groups (cl-etypecase super-groups
-        ;;                                    (symbol (symbol-value super-groups))
-        ;;                                    (list super-groups))))
-        ;;     (setf strings (org-super-agenda--group-items strings))))
+        (when super-groups
+          (let ((org-super-agenda-groups (cl-etypecase super-groups
+                                           (symbol (symbol-value super-groups))
+                                           (list super-groups))))
+            (setf strings (org-super-agenda--group-items strings))))
         (org-ql-view--display :buffer buffer :header header
           :string (s-join "\n" strings))
         ;; (with-current-buffer buffer
