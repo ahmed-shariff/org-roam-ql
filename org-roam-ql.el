@@ -55,17 +55,13 @@ call `org-roam-ql-clear-cache'."
   (cond
    ;; TODO: think of a better way to display the nodes in the query
    ;; without showing it all. Perhaps use only ids?
-   ((or (org-roam-node-p source-or-query)
-        (-all-p #'org-roam-node-p source-or-query))
+   ((org-roam-ql--check-if-list-of-org-roam-nodes-list source-or-query)
     (-list source-or-query))
    ;; get-buffer returns a buffer if source-or-query is a buffer obj
    ;; or the name of a buffer
-   ((-when-let (buffer (and (or (stringp source-or-query)
-                                (bufferp source-or-query))
-                            (get-buffer source-or-query)))
-      (with-current-buffer buffer (derived-mode-p 'org-roam-mode)))
+   ((org-roam-ql--check-if-org-roam-ql-buffer source-or-query)
     (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
-   ((and (listp source-or-query) (vectorp (car source-or-query)))
+   ((org-roam-ql--check-if-org-roam-db-parameters source-or-query)
     (let ((query (car source-or-query))
           (args (cdr source-or-query)))
       (--map (org-roam-node-from-id (car it))
@@ -76,7 +72,11 @@ call `org-roam-ql-clear-cache'."
                     args))))
    ((and (listp source-or-query) (org-roam-ql--check-if-valid-query source-or-query))
     (org-roam-ql--expand-query source-or-query))
-   ((functionp source-or-query) (funcall source-or-query))))
+   ((functionp source-or-query) (--when-let (funcall source-or-query)
+                                  (if (and (listp it) (-all-p #'org-roam-node-p it))
+                                      it
+                                    (user-error "Function did not expand to list of nodes."))))
+   (t (user-error "Invalid source-or-query."))))
 
 ;; Can we make org-roam-ql aware of any changes that can happen?
 (defun org-roam-ql--nodes-cached (source-or-query)
@@ -197,14 +197,29 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
   "Returns the list of files from the list of NODES."
   (-uniq (mapcar #'org-roam-node-file nodes)))
 
+(defun org-roam-ql--check-if-list-of-org-roam-nodes-list (source-or-query)
+  (or (org-roam-node-p source-or-query)
+        (-all-p #'org-roam-node-p source-or-query)))
+
+(defun org-roam-ql--check-if-org-roam-ql-buffer (source-or-query)
+  (-when-let (buffer (and (or (stringp source-or-query)
+                                (bufferp source-or-query))
+                            (get-buffer source-or-query)))
+      (with-current-buffer buffer (derived-mode-p 'org-roam-mode))))
+
+(defun org-roam-ql--check-if-org-roam-db-parameters (source-or-query)
+  (and (listp source-or-query) (vectorp (car source-or-query))))
+
 (defun org-roam-ql--check-if-valid-query (s-exp)
   "Check if S-EXP can be expanded to a roam-query."
   (if (listp s-exp)
       (or (and (member (car s-exp) '(or and))
-               (--map (org-roam-ql--check-if-valid-query it) (cdr s-exp)))
+               (-all-p #'identity (--map (org-roam-ql--check-if-valid-query it) (cdr s-exp))))
           (or (gethash (car s-exp) org-roam-ql--query-comparison-functions)
               (gethash (car s-exp) org-roam-ql--query-expansion-functions)))
-    t))
+    (or (org-roam-ql--check-if-list-of-org-roam-nodes-list s-exp)
+        (org-roam-ql--check-if-org-roam-ql-buffer s-exp)
+        (org-roam-ql--check-if-org-roam-db-parameters s-exp))))
 
 ;; *****************************************************************************
 ;; Functions for predicates and expansions
