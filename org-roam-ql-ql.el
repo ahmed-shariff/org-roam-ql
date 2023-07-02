@@ -151,28 +151,6 @@ list.  If NODE is nil, return an empty string."
 ;; Functions to switch between org-roam/org-roam-ql buffers and
 ;; org-ql-view buffers
 ;; *****************************************************************************
-(defun org-roam-ql--nodes-from-roam-buffer (buffer)
-  "Collect the org-roam-nodes from a ORG-ROAM-BUFFER."
-  (with-current-buffer buffer
-    (when (derived-mode-p 'org-roam-mode)
-      (let (nodes)
-        (goto-char 0)
-        (while (condition-case err
-                   (progn
-                     (magit-section-forward)
-                     t ;; keep the while loop going
-                     )
-                 (user-error
-                  (if (equal (error-message-string err) "No next section")
-                      nil ;; end while loop
-                    (signal (car err) (cdr err))))) ;; somthing else happened, re-throw
-          (let ((magit-section (plist-get
-                                (text-properties-at (point))
-                                'magit-section)))
-            (when (org-roam-node-section-p magit-section)
-              (push (slot-value magit-section 'node) nodes))))
-        nodes))))
-
 ;;;###autoload
 (defun org-roam-ql-ql-buffer-from-roam-buffer ()
   "Convert a roam buffer to org-ql buffer."

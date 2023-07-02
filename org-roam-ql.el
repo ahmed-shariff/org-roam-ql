@@ -297,7 +297,7 @@ non-nil."
   (funcall f value))
 
 ;; *****************************************************************************
-;; org-roam-ql mode and functions to build them
+;; org-roam-ql mode and functions to build them and operate on them
 ;; *****************************************************************************
 (defvar org-roam-ql-mode-map
   (let ((map (make-sparse-keymap)))
@@ -389,6 +389,28 @@ of org-roam nodes."
    (list
     (org-roam-ql--nodes-section nodes "Nodes:"))
    title buffer-name (or source-or-query nodes)))
+
+(defun org-roam-ql--nodes-from-roam-buffer (buffer)
+  "Collect the org-roam-nodes from a ORG-ROAM-BUFFER."
+  (with-current-buffer buffer
+    (when (derived-mode-p 'org-roam-mode)
+      (let (nodes)
+        (goto-char 0)
+        (while (condition-case err
+                   (progn
+                     (magit-section-forward)
+                     t ;; keep the while loop going
+                     )
+                 (user-error
+                  (if (equal (error-message-string err) "No next section")
+                      nil ;; end while loop
+                    (signal (car err) (cdr err))))) ;; somthing else happened, re-throw
+          (let ((magit-section (plist-get
+                                (text-properties-at (point))
+                                'magit-section)))
+            (when (org-roam-node-section-p magit-section)
+              (push (slot-value magit-section 'node) nodes))))
+        nodes))))
 
 ;; *****************************************************************************
 ;; org-roam-ql transient
