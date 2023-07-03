@@ -76,11 +76,6 @@ As mentioned above, the package is still in active development. If you have any 
   The ~EXTRACTION-FUNCTION~ is a function that takes an org-roam-node and returns a value that will be passed as the first parameter to ~COMPARISON-FUNCTION~. The remainder of the parameters when calling the predicate is passed as remaining parameters ~COMPARISON-FUNCTION~. If the ~COMPARITION-FUNCTION~ returns a non-nil value, it will be included in the result.
 
 - ~(org-roam-ql-defexpansion name expansion-function)~ - Adds an ~EXPANSION-FUNCTION~ which will be identified by ~NAME~ in a org-roam-ql query. The ~EXPANSION-FUNCTION~ should take the parameters passed in the query and return values that can be passed to   ~org-roam-nodes~
-*** Commands in ~org-roam-ql-ql~
-~org-roam-ql-ql~ is a package that integrates ~org-roam-ql~ with ~org-ql~.
-- ~org-roam-ql-select~ - Similar to ~org-ql-select~. The first parameter is the same as ~SOURCE-OR-QUERY~.
-- ~org-roam-ql-ql-buffer-from-roam-buffer~ - Displays the nodes in a org-roam-like-buffer in a ~org-ql~ buffer
-- ~org-roam-ql-roam-buffer-from-ql-buffer~ - Displays a ~org-ql~ buffer, in a org-roam-like-buffer (uses the ~org-roam-ql-mode~).
 *** org dynamic block
 Similar to ~org-ql~, ~org-roam-ql~ also provides a dynamic block. The header parameters are as follows:
 - ~:query~ - Same as SOURCE-OR-QUERY for ~org-roam-ql-search~ or ~org-roam-ql-nodes~.
