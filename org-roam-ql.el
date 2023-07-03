@@ -327,7 +327,34 @@ non-nil."
 but doesn't default to the org-roam-buffer-current-node."
   :group 'org-roam-ql)
 
+(defun org-roam-ql--refresh-buffer-with-display-function (display-function)
+  "Refresh a buffer with a display function."
+  (let* ((buffer-name (buffer-name))
+         subquery
+         (query (pcase org-roam-ql-buffer-in
+                  ("in-buffer" (let ((query org-roam-ql-buffer-query))
+                                 (setq org-roam-ql-buffer-query
+                                       org-roam-ql--buffer-displayed-query
+                                       org-roam-ql-buffer-in "org-roam-db"
+                                       subquery t)
+                                 `(and ,org-roam-ql--buffer-displayed-query
+                                       ,query)))
+                  ("org-roam-db" org-roam-ql-buffer-query)
+                  (_ (user-error "Invalid value for `org-roam-ql-buffer-in'")))))
+    (funcall display-function
+     (org-roam-ql-nodes query)
+     (if subquery
+         (org-roam-ql--get-formatted-title
+          (format "%s - extended" (s-replace "org-roam - " "" org-roam-ql-buffer-title)) nil)
+       org-roam-ql-buffer-title)
+     (if subquery
+         (org-roam-ql--get-formatted-buffer-name
+          (format "%s - extended" (s-replace "org-roam - " "" org-roam-ql-buffer-title)) nil)
+       buffer-name)
+     query))))
+
 (defun org-roam-ql--refresh-roam-buffer ()
+  "Refresh a org-roam buffer."
   (if (equal (buffer-name) org-roam-buffer)
       (if (not org-roam-ql-buffer-query)
           (org-roam-buffer-refresh)
@@ -340,24 +367,7 @@ but doesn't default to the org-roam-buffer-current-node."
           (org-roam-buffer-refresh)
           (org-roam-ql-search `(id ,(org-roam-node-id org-roam-buffer-current-node))
                               'org-roam title query)))
-    (let* ((buffer-name (buffer-name))
-           (query (pcase org-roam-ql-buffer-in
-                    ("in-buffer" `(and ,org-roam-ql--buffer-displayed-query
-                                       ,org-roam-ql-buffer-query))
-                    ("org-roam-db" org-roam-ql-buffer-query)
-                    (_ (user-error "Invalid value for `org-roam-ql-buffer-in'")))))
-      (setq org-roam-ql-buffer-query org-roam-ql--buffer-displayed-query)
-      (org-roam-ql--roam-buffer-for-nodes
-       (org-roam-ql-nodes query)
-       (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
-           (org-roam-ql--get-formatted-title
-            (format "%s - extended" (s-replace "org-roam - " "" org-roam-ql-buffer-title)) nil)
-         org-roam-ql-buffer-title)
-       (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
-           (org-roam-ql--get-formatted-buffer-name
-            (format "%s - extended" (s-replace "org-roam - " "" org-roam-ql-buffer-title)) nil)
-         buffer-name)
-       query))))
+    (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--roam-buffer-for-nodes)))
 
 (defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query)
   "Render SECTIONS (list of functions) in an org-roam-ql buffer."
@@ -526,8 +536,8 @@ list.  If NODE is nil, return an empty string."
           )))))
 
 (defun org-roam-ql--refresh-agenda-buffer ()
-;; TODO
-  )
+  (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--agenda-buffer-for-nodes)
+  (org-roam-db-sync))
 
 (defun org-roam-ql--nodes-from-agenda-buffer ()
   ;; Copied from `org-agenda-finalize'
