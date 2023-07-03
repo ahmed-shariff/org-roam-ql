@@ -161,7 +161,7 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
                      (read-string "Title: ")))
     (let* ((nodes (org-roam-ql-nodes source-or-query))
            (title (org-roam-ql--get-formatted-title title source-or-query)))
-      (org-roam-ql--buffer-for-nodes
+      (org-roam-ql--roam-buffer-for-nodes
        nodes
        title
        (org-roam-ql--get-formatted-buffer-name title nil)
@@ -326,9 +326,7 @@ non-nil."
 but doesn't default to the org-roam-buffer-current-node."
   :group 'org-roam-ql)
 
-;;;###autoload
-(defun org-roam-ql-refresh-buffer ()
-  (interactive)
+(defun org-roam-ql--refresh-roam-buffer ()
   (if (equal (buffer-name) org-roam-buffer)
       (if (not org-roam-ql-buffer-query)
           (org-roam-buffer-refresh)
@@ -341,28 +339,25 @@ but doesn't default to the org-roam-buffer-current-node."
           (org-roam-buffer-refresh)
           (org-roam-ql-search `(id ,(org-roam-node-id org-roam-buffer-current-node))
                               'org-roam title query)))
-    (org-roam-ql--refresh-buffer)))
+    (let* ((buffer-name (or buffer-name (buffer-name)))
+           (query (pcase org-roam-ql-buffer-in
+                    ("in-buffer" `(and (in-buffer ,buffer-name)
+                                       ,org-roam-ql-buffer-query))
+                    ("org-roam-db" org-roam-ql-buffer-query)
+                    (_ (user-error "Invalid value for `org-roam-ql-buffer-in'")))))
+      (org-roam-ql--roam-buffer-for-nodes
+       (org-roam-ql-nodes query)
+       (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
+           (org-roam-ql--get-formatted-title
+            (format "%s - extended" (s-replace "org-roam - " "" org-roam-ql-buffer-title)) nil)
+         org-roam-ql-buffer-title)
+       (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
+           (org-roam-ql--get-formatted-buffer-name
+            (format "%s - extended" (s-replace "org-roam - " "" org-roam-ql-buffer-title)) nil)
+         buffer-name)
+       query))))
 
-(defun org-roam-ql--refresh-buffer (&optional buffer-name)
-  (let* ((buffer-name (or buffer-name (buffer-name)))
-         (query (pcase org-roam-ql-buffer-in
-                  ("in-buffer" `(and (in-buffer ,buffer-name)
-                                     ,org-roam-ql-buffer-query))
-                  ("org-roam-db" org-roam-ql-buffer-query)
-                  (_ (user-error "Invalid value for `org-roam-ql-buffer-in'")))))
-    (org-roam-ql--buffer-for-nodes
-     (org-roam-ql-nodes query)
-     (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
-         (org-roam-ql--get-formatted-title
-          (format "%s - extended" (s-replace "org-roam - " "" org-roam-ql-buffer-title)) nil)
-       org-roam-ql-buffer-title)
-     (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
-         (org-roam-ql--get-formatted-buffer-name
-          (format "%s - extended" (s-replace "org-roam - " "" org-roam-ql-buffer-title)) nil)
-       buffer-name)
-     query)))
-
-(defun org-roam-ql--render-buffer (sections title buffer-name source-or-query)
+(defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query)
   "Render SECTIONS (list of functions) in an org-roam-ql buffer."
   ;; copied  from `org-roam-buffer-render-contents'
   (with-current-buffer (get-buffer-create buffer-name)
@@ -398,9 +393,9 @@ of org-roam nodes."
          (insert ?\n))
        (run-hooks 'org-roam-buffer-postrender-functions))))
 
-(defun org-roam-ql--buffer-for-nodes (nodes title buffer-name &optional source-or-query)
+(defun org-roam-ql--roam-buffer-for-nodes (nodes title buffer-name &optional source-or-query)
   "View nodes in org-roam-ql buffer"
-  (org-roam-ql--render-buffer
+  (org-roam-ql--render-roam-buffer
    (list
     (org-roam-ql--nodes-section nodes "Nodes:"))
    title buffer-name (or source-or-query nodes)))
@@ -426,6 +421,139 @@ of org-roam nodes."
             (when (org-roam-node-section-p magit-section)
               (push (slot-value magit-section 'node) nodes))))
         nodes))))
+
+;; *****************************************************************************
+;; org-roam-ql-agenda-view functions 
+;; *****************************************************************************
+(defvar org-roam-ql--agenda-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map org-agenda-mode-map)
+    (define-key map "g" #'org-roam-ql-refresh-buffer)
+    (define-key map "r" #'org-roam-ql-refresh-buffer)
+    (define-key map "q" #'bury-buffer)
+    (define-key map "v" #'org-roam-ql-buffer-dispatch)
+    ;; TODO? (define-key map (kbd "C-x C-s") #'org-ql-view-save)
+    map)
+  "Keymap for agenda-view of org-roam-ql.
+Based on `org-agenda-mode-map'.")
+
+(defun org-roam-ql--agenda-buffer-for-nodes (nodes title buffer-name &optional source-or-query)
+  "Display the nodes in a agenda like buffer."
+  (with-current-buffer (get-buffer-create buffer-name)
+    (unless (eq major-mode 'org-agenda-mode)
+      (org-agenda-mode)
+      (setf buffer-read-only t))
+    (use-local-map org-roam-ql--agenda-map)
+    (let* ((strings '())
+           (buffer (org-roam-ql--get-formatted-buffer-name title source-or-query))
+           (header (concat (propertize "View: " 'face 'transient-argument)
+                           title))
+           (inhibit-read-only t))
+      (erase-buffer)
+      (setq header-line-format title
+            org-roam-ql-buffer-query source-or-query
+            org-roam-ql-buffer-title title
+            org-roam-ql-buffer-in "org-roam-db")
+      (if (not nodes)
+          (user-error "Empty result for query.")
+        (dolist-with-progress-reporter (node nodes)
+            (format "Processing %s nodes" (length nodes))
+          (push (org-roam-ql-view--format-node node) strings))
+        ;; (when super-groups
+        ;;   (let ((org-super-agenda-groups (cl-etypecase super-groups
+        ;;                                    (symbol (symbol-value super-groups))
+        ;;                                    (list super-groups))))
+        ;;     (setf strings (org-super-agenda--group-items strings))))
+        (insert (string-join strings "\n") "\n")
+        (pop-to-buffer (current-buffer))
+        (org-agenda-finalize)
+        (goto-char (point-min))))))
+
+(defun org-roam-ql--get-file-marker (node)
+  (org-roam-with-file (org-roam-node-file node) t
+  ;; (with-current-buffer (find-file-noselect (org-roam-node-file node))
+  ;; (with-plain-file (org-roam-node-file node) t
+    (goto-char (org-roam-node-point node))
+    (point-marker)))
+
+(defun org-roam-ql-view--format-node (node)
+  "Return NODE as a string with text-properties set by its property
+list.  If NODE is nil, return an empty string."
+  (if (not node)
+      ""
+    (let* ((marker
+            (org-roam-ql--get-file-marker node))
+           (properties (list
+                        'org-marker marker
+                        'org-hd-marker marker))
+           ;; (properties '())
+           (string ;;(org-roam-node-title node))
+            (s-join " "
+                    (-non-nil
+                     (list
+                      (when-let (todo (org-roam-node-todo node))
+                        (let* ((org-done-keywords org-done-keywords-for-agenda)
+                               (face (org-get-todo-face todo)))
+                          (when face
+                            (add-text-properties 0 (length keyword) (list 'face face) todo))
+                          todo))
+                      (when-let (priority (org-roam-node-priority node))
+                        (let ((string (byte-to-string priority)))
+                          (when (string-match "\\(\\[#\\(.\\)\\]\\)" string)
+                            (let ((face (org-get-priority-face (string-to-char (match-string 2 string)))))
+                              (org-add-props string nil 'face face 'font-lock-fontified t)))))
+                      (org-roam-node-title node)
+                      nil;;due-string
+                      (when-let (tags (org-roam-node-tags node))
+                         (--> tags
+                           (s-join ":" it)
+                           (s-wrap it ":")
+                           (org-add-props it nil 'face 'org-tag))))))))
+      (remove-list-of-text-properties 0 (length string) '(line-prefix) string)
+      ;; Add all the necessary properties and faces to the whole string
+      (--> string
+        ;; FIXME: Use proper prefix
+        (concat "  " it)
+        (org-add-props it properties
+          'org-agenda-type 'search
+          'todo-state (org-roam-node-todo node)
+          'tags (org-roam-node-tags node)
+          ;;'org-habit-p (org)
+          )))))
+
+(defun org-roam-ql--refresh-agenda-buffer ()
+;; TODO
+  )
+
+(defun org-roam-ql--nodes-from-agenda-buffer ()
+  ;; Copied from `org-agenda-finalize'
+  (let (mrk nodes (line-output 0))
+    (save-excursion
+      (goto-char (point-min))
+      (while (equal line-output 0)
+	(when (setq mrk (get-text-property (point) 'org-hd-marker))
+          (org-with-point-at mrk
+            ;; pick only nodes
+            (-if-let (id (org-id-get))
+                (push (org-roam-node-from-id id) nodes)
+              (user-error (format "Non roam-node headings in query (in buffer %s)."
+                                  (buffer-name))))))
+        (setq line-output (forward-line))))
+    nodes))
+
+;; *****************************************************************************
+;; Functions to switch between org-roam/org-roam-ql buffers and
+;; agenda-view buffers
+;; *****************************************************************************
+;;;###autoload
+(defun org-roam-ql-ql-buffer-from-roam-buffer ()
+  "Convert a roam buffer to agenda buffer."
+  (interactive)
+  (when (derived-mode-p 'org-roam-mode)
+    (org-roam-ql--agenda-buffer-for-nodes (org-roam-ql--nodes-from-roam-buffer (current-buffer))
+                                          org-roam-ql-buffer-title
+                                          (format "%s-" (buffer-name (current-buffer)))
+                                          org-roam-ql-buffer-query)))
 
 ;; *****************************************************************************
 ;; org-roam-ql transient
@@ -493,13 +621,22 @@ of org-roam nodes."
         (buffer-string)))))
 
 (transient-define-prefix org-roam-ql-buffer-dispatch ()
-  "Show Org QL View dispatcher."
+  "Show org-roam-buffer dispatcher."
   [["Edit"
     ("t" org-roam-ql-view--transient-title)
     ("q" org-roam-ql-view--transient-query)
     ("i" org-roam-ql-view--transient-in)]]
   [["View"
     ("r" "Refresh" org-roam-ql-refresh-buffer)]])
+
+;;;###autoload
+(defun org-roam-ql-refresh-buffer ()
+  (interactive)
+  (cond
+   ((derived-mode-p 'org-roam-mode)
+    (org-roam-ql--refresh-roam-buffer))
+   ((derived-mode-p 'org-agenda-mode)
+    (org-roam-ql--refresh-agenda-buffer))))
 
 (defun org-roam-ql--format-transient-key-value (key value)
   "Return KEY and VALUE formatted for display in Transient."
