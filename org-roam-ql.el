@@ -28,6 +28,7 @@
 (defvar org-roam-ql--cache (make-hash-table))
 (make-variable-buffer-local (defvar org-roam-ql-buffer-title nil "The current title of the buffer."))
 (make-variable-buffer-local (defvar org-roam-ql-buffer-query nil "The current query of the buffer."))
+(make-variable-buffer-local (defvar org-roam-ql--buffer-displayed-query nil "The query which produced the results of the buffer."))
 (make-variable-buffer-local (defvar org-roam-ql-buffer-in nil
                               "Define which option to use - 'in-buffer' or 'org-roam-db'."))
 
@@ -339,12 +340,13 @@ but doesn't default to the org-roam-buffer-current-node."
           (org-roam-buffer-refresh)
           (org-roam-ql-search `(id ,(org-roam-node-id org-roam-buffer-current-node))
                               'org-roam title query)))
-    (let* ((buffer-name (or buffer-name (buffer-name)))
+    (let* ((buffer-name (buffer-name))
            (query (pcase org-roam-ql-buffer-in
-                    ("in-buffer" `(and (in-buffer ,buffer-name)
+                    ("in-buffer" `(and ,org-roam-ql--buffer-displayed-query
                                        ,org-roam-ql-buffer-query))
                     ("org-roam-db" org-roam-ql-buffer-query)
                     (_ (user-error "Invalid value for `org-roam-ql-buffer-in'")))))
+      (setq org-roam-ql-buffer-query org-roam-ql--buffer-displayed-query)
       (org-roam-ql--roam-buffer-for-nodes
        (org-roam-ql-nodes query)
        (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
@@ -366,6 +368,7 @@ but doesn't default to the org-roam-buffer-current-node."
       (org-roam-ql-mode)
       (org-roam-buffer-set-header-line-format title)
       (setq org-roam-ql-buffer-query source-or-query
+            org-roam-ql--buffer-displayed-query source-or-query
             org-roam-ql-buffer-title title
             org-roam-ql-buffer-in "org-roam-db")
       (insert ?\n)
@@ -452,6 +455,7 @@ Based on `org-agenda-mode-map'.")
       (erase-buffer)
       (setq header-line-format title
             org-roam-ql-buffer-query source-or-query
+            org-roam-ql--buffer-displayed-query source-or-query
             org-roam-ql-buffer-title title
             org-roam-ql-buffer-in "org-roam-db")
       (if (not nodes)
