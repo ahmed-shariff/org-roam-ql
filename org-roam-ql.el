@@ -606,6 +606,10 @@ entries that do not have an ID, it will signal an error"
     (unless (or value transient--prefix)
       (message "Unset %s" variable))))
 
+(cl-defmethod transient-infix-set ((obj org-roam-ql--variable:sexp) value)
+  "Set the org-roam-ql mode variable."
+  (cl-call-next-method obj (read value)))
+
 (cl-defmethod transient-infix-read ((obj org-roam-ql--variable:choices))
   "Pick between CHOICES in OBJ when reading."
   (let ((choices (oref obj choices)))
@@ -633,7 +637,7 @@ entries that do not have an ID, it will signal an error"
 
 (cl-defmethod transient-format-value ((obj org-roam-ql--variable:sexp))
   "Format of the OBJ's VALUE for sexpressions."
-  ;; copied from `org-roam-ql'.
+  ;; copied from `org-ql'.
   (let ((value (format "%S" (oref obj value))))
     (with-temp-buffer
       (delay-mode-hooks
@@ -644,12 +648,16 @@ entries that do not have an ID, it will signal an error"
 
 (transient-define-prefix org-roam-ql-buffer-dispatch ()
   "Show org-roam-buffer dispatcher."
-  [["Edit"
-    ("t" org-roam-ql-view--transient-title)
+  ["Edit"
+   [("t" org-roam-ql-view--transient-title)
     ("q" org-roam-ql-view--transient-query)
     ("i" org-roam-ql-view--transient-in)]]
-  [["View"
-    ("r" "Refresh" org-roam-ql-refresh-buffer)]])
+  ["View"
+   [("r" "Refresh" org-roam-ql-refresh-buffer)]
+   [:if-derived org-roam-mode
+                ("S" "Show in agenda buffer" org-roam-ql-agenda-buffer-from-roam-buffer)]
+   [:if-derived org-agenda-mode
+                ("S" "Show in org-roam buffer" org-roam-ql-roam-buffer-from-agenda-buffer)]])
 
 ;;;###autoload
 (defun org-roam-ql-refresh-buffer ()
@@ -678,7 +686,6 @@ entries that do not have an ID, it will signal an error"
   :prompt "Title: "
   :always-read t
   :reader (lambda (prompt _initial-input history)
-            ;; FIXME: Figure out how to integrate initial-input.
             (read-string prompt (when org-roam-ql-buffer-title
                                   (format "%s" org-roam-ql-buffer-title))
                          history)))
@@ -690,10 +697,9 @@ entries that do not have an ID, it will signal an error"
   :prompt "Query: "
   :always-read t
   :reader (lambda (prompt _initial-input history)
-            ;; fixme: figure out how to integrate initial-input.
-            (read (read-string prompt (when org-roam-ql-buffer-query
-                                        (format "%S" org-roam-ql-buffer-query))
-                               history))))
+            (read-string prompt (when org-roam-ql-buffer-query
+                                  (format "%S" org-roam-ql-buffer-query))
+                         history)))
 
 (transient-define-infix org-roam-ql-view--transient-in ()
   :class 'org-roam-ql--variable:choices
