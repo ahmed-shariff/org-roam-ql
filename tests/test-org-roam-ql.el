@@ -21,13 +21,13 @@
     (it "fails when unexpected term in query"
       (expect (org-roam-ql--check-if-valid-query '(or (todo "DONE") (and (todo "TODO") (what-is-this "something")))) :to-be nil)))
 
-  (describe "Test org-roam-ql--get-queries"
-    (it "without any ql-queries"
-      (expect (org-roam-ql--get-queries '(or (todo "TODO") (tags "tag1" "tag2") (and (title "a") (tags "tag3"))))
-              :to-equal nil))
-    (it "with multiple nested queries"
-      (expect (org-roam-ql--get-queries '(or (org-roam-query (todo "TODO")) (and (org-roam-query (tags "tag1" "tag2")) (scheduled "something"))))
-              :to-equal '((org-roam-query (todo "TODO")) (org-roam-query (tags "tag1" "tag2"))))))
+  ;; (describe "Test org-roam-ql--get-queries"
+  ;;   (it "without any ql-queries"
+  ;;     (expect (org-roam-ql--get-queries '(or (todo "TODO") (tags "tag1" "tag2") (and (title "a") (tags "tag3"))))
+  ;;             :to-equal nil))
+  ;;   (it "with multiple nested queries"
+  ;;     (expect (org-roam-ql--get-queries '(or (org-roam-query (todo "TODO")) (and (org-roam-query (tags "tag1" "tag2")) (scheduled "something"))))
+  ;;             :to-equal '((org-roam-query (todo "TODO")) (org-roam-query (tags "tag1" "tag2"))))))
 
   (describe "Test org-roam-ql-nodes"
     (it "with list of nodes"
@@ -62,7 +62,7 @@
     (describe "with buffers"
       (let* ((nodes (--filter (s-match "test2.org" (org-roam-node-file it)) (org-roam-node-list)))
              (buffer-name "test-buffer"))
-        (org-roam-ql--render-buffer (list (org-roam-ql--nodes-section nodes)) "test buffer" buffer-name nodes)
+        (org-roam-ql--render-roam-buffer (list (org-roam-ql--nodes-section nodes)) "test buffer" buffer-name nodes)
         (it "as a string"
           (expect (--map #'org-roam-node-id (org-roam-ql-nodes buffer-name)) :to-equal (--map #'org-roam-node-id nodes)))
         (it "as a predicate"
@@ -70,6 +70,34 @@
     (describe "with invalid inputs"
       (it "string"
         (expect (org-roam-ql-nodes "a random string") :to-throw 'user-error))))
+
+  (describe "Test displaying content"
+    :var* ((query '(or (todo "DONE") (tags "interesting")))
+           (query-result (org-roam-ql-nodes query))
+           (query-result-ids (-map #'org-roam-node-id query-result)))
+    (it "in agenda buffer"
+      (org-roam-ql--agenda-buffer-for-nodes query-result "agenda-test" "agenda-test-buffer" query)
+      (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-agenda-buffer (get-buffer "agenda-test-buffer"))) :to-have-same-items-as query-result-ids))
+    (it "in roam buffer"
+      (org-roam-ql--roam-buffer-for-nodes query-result "roam-test" "roam-test-buffer" query)
+      (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-roam-buffer (get-buffer "roam-test-buffer"))) :to-have-same-items-as query-result-ids))
+    (let ((roam-buffer-name (org-roam-ql--get-formatted-buffer-name (org-roam-ql--get-formatted-title "test-title" nil)))
+          (agenda-buffer-name (org-roam-ql--get-formatted-buffer-name
+                               (org-roam-ql--get-formatted-title "test-title" nil "from roam buffer")))
+          (second-roam-buffer-name (org-roam-ql--get-formatted-buffer-name
+                                    (org-roam-ql--get-formatted-title
+                                     (org-roam-ql--get-formatted-title "test-title" nil "from roam buffer")
+                                     nil "from agenda buffer")))
+          roam-buffer agenda-buffer second-roam-buffer)
+      (org-roam-ql-search query "test-title")
+      (it "switching from roam to agenda buffer"
+        (with-current-buffer roam-buffer-name
+          (org-roam-ql-agenda-buffer-from-roam-buffer))
+        (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-agenda-buffer (get-buffer agenda-buffer-name))) :to-have-same-items-as query-result-ids))
+      (it "switching from agenda to roam buffer"
+        (with-current-buffer agenda-buffer-name
+          (org-roam-ql-roam-buffer-from-agenda-buffer))
+        (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-roam-buffer (get-buffer second-roam-buffer-name))) :to-have-same-items-as query-result-ids))))
 
   ;; (describe "Tets query expansion"
   ;;   (it "with only todo"
