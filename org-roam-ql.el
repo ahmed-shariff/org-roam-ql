@@ -158,25 +158,25 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
                            (list query)
                          query))
                      (read-string "Title: ")))
-    (let* ((nodes (org-roam-ql-nodes source-or-query))
-           (title (org-roam-ql--get-formatted-title title source-or-query)))
+    (let* ((nodes (org-roam-ql-nodes source-or-query)))
       (org-roam-ql--roam-buffer-for-nodes
        nodes
        title
-       (org-roam-ql--get-formatted-buffer-name title nil)
+       (org-roam-ql--get-formatted-buffer-name
+        (org-roam-ql--get-formatted-title title source-or-query))
        source-or-query)))
 
-(defun org-roam-ql--get-formatted-title (title source-or-query)
+(defun org-roam-ql--get-formatted-title (title source-or-query &optional extended-kwd)
   "Return the formatted title."
   ;; TODO: Think of a better way to get a default title
-  (format "org-roam - %s" (or title (substring (format "%s" source-or-query) 0 10))))
+  (concat (format "org-roam - %s" (or (s-replace "org-roam - " "" title)
+                                      (substring (format "%s" source-or-query) 0 10)))
+          (when extended-kwd
+            (format "- %s" extended-kwd))))
 
-(defun org-roam-ql--get-formatted-extended-title (title kwd)
-  (format "%s - %s" (s-replace "org-roam - " "" title) kwd))
-
-(defun org-roam-ql--get-formatted-buffer-name (title source-or-query)
+(defun org-roam-ql--get-formatted-buffer-name (title)
   "Return the formatted buffer name."
-  (format "*%s*" (org-roam-ql--get-formatted-title title source-or-query)))
+  (format "*%s*" title))
 
 ;; FIXME: To be performant this can be done by constructing the
 ;; results instead of going through org-ql?
@@ -336,12 +336,11 @@ but doesn't default to the org-roam-buffer-current-node."
     (funcall display-function
              (org-roam-ql-nodes query)
              (if subquery
-                 (org-roam-ql--get-formatted-title
-                  (org-roam-ql--get-formatted-extended-title org-roam-ql-buffer-title "extended") nil)
+                 (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended")
                org-roam-ql-buffer-title)
              (if subquery
                  (org-roam-ql--get-formatted-buffer-name
-                  (org-roam-ql--get-formatted-extended-title org-roam-ql-buffer-title "extended") nil)
+                  (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended"))
                buffer-name)
              query)))
 
@@ -351,7 +350,8 @@ but doesn't default to the org-roam-buffer-current-node."
       (if (not org-roam-ql-buffer-query)
           (org-roam-buffer-refresh)
         (let ((query org-roam-ql-buffer-query)
-              (title (or org-roam-ql-buffer-title (org-roam-ql--get-formatted-extended-title (org-roam-node-title org-roam-buffer-current-node) "extended")))
+              (title (or org-roam-ql-buffer-title (org-roam-ql--get-formatted-title
+                                                   (org-roam-node-title org-roam-buffer-current-node) nil "extended")))
               (in (or org-roam-ql-buffer-in "org-roam-db")))
           (setq org-roam-ql-buffer-query nil
                 org-roam-ql-buffer-title nil
@@ -368,7 +368,8 @@ but doesn't default to the org-roam-buffer-current-node."
     (let ((inhibit-read-only t))
       (erase-buffer)
       (org-roam-ql-mode)
-      (org-roam-buffer-set-header-line-format title)
+      (org-roam-buffer-set-header-line-format
+       (org-roam-ql--get-formatted-title title source-or-query))
       (setq org-roam-ql-buffer-query source-or-query
             org-roam-ql--buffer-displayed-query source-or-query
             org-roam-ql-buffer-title title
@@ -449,13 +450,14 @@ Based on `org-agenda-mode-map'.")
       (setf buffer-read-only t))
     (use-local-map org-roam-ql--agenda-map)
     (let* ((strings '())
-           (buffer (org-roam-ql--get-formatted-buffer-name title source-or-query))
+           (formatted-title (org-roam-ql--get-formatted-title title source-or-query))
+           (buffer (org-roam-ql--get-formatted-buffer-name formatted-title))
            (header (concat (propertize "View: " 'face 'transient-argument)
-                           title))
+                           formatted-title))
            (inhibit-read-only t))
       (erase-buffer)
       ;; XXX: Does the same thing irrespective of buffer!
-      (org-roam-buffer-set-header-line-format title)
+      (org-roam-buffer-set-header-line-format header)
       (setq org-roam-ql-buffer-query source-or-query
             org-roam-ql--buffer-displayed-query source-or-query
             org-roam-ql-buffer-title title
@@ -562,8 +564,9 @@ entries that do not have an ID, it will signal an error"
   (interactive)
   (if (derived-mode-p 'org-roam-mode)
     (org-roam-ql--agenda-buffer-for-nodes (org-roam-ql--nodes-from-roam-buffer (current-buffer))
-                                          org-roam-ql-buffer-title
-                                          (org-roam-ql--get-formatted-extended-title org-roam-ql-buffer-title "from roam buffer")
+                                          (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer")
+                                          (org-roam-ql--get-formatted-buffer-name
+                                           (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer"))
                                           org-roam-ql-buffer-query)
     (user-error "Not in a org-roam-ql agenda buffer.")))
 
@@ -572,8 +575,9 @@ entries that do not have an ID, it will signal an error"
   (interactive)
   (if org-roam-ql-buffer-query
       (org-roam-ql--roam-buffer-for-nodes (org-roam-ql--nodes-from-agenda-buffer (current-buffer))
-                                          org-roam-ql-buffer-title
-                                          (org-roam-ql--get-formatted-extended-title org-roam-ql-buffer-title "from agenda buffer")
+                                          (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from agenda buffer")
+                                          (org-roam-ql--get-formatted-buffer-name
+                                           (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from agenda buffer"))
                                           org-roam-ql-buffer-query)
     (user-error "Not in a org-roam-ql agenda buffer.")))
 
