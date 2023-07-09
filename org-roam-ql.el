@@ -169,7 +169,9 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
 (defun org-roam-ql--get-formatted-title (title source-or-query &optional extended-kwd)
   "Return the formatted title."
   ;; TODO: Think of a better way to get a default title
-  (concat (format "org-roam - %s" (or (s-replace "org-roam - " "" title)
+  (concat (format "org-roam - %s" (or (s-replace "org-roam - " "" (if (stringp title)
+                                                                      title
+                                                                    (prin1-to-string title)))
                                       (substring (format "%s" source-or-query) 0 10)))
           (when extended-kwd
             (format "- %s" extended-kwd))))
