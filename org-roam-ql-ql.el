@@ -23,17 +23,16 @@
 (require 'dash)
 (require 's)
 
+(make-variable-buffer-local (defvar org-roam-ql-ql--current-nodes nil))
 
-(defvar org-roam-ql--current-nodes nil)
-
-(defun org-roam-ql--org-ql-search (source-or-query nodes title &optional super-groups)
+(defun org-roam-ql--ql-view-buffer-for-nodes (nodes title buffer-name &optional source-or-query super-groups)
+  "Display nodes in org-ql-view buffer."
   (with-temp-buffer
     (let* ((strings '())
            (buffer (org-roam-ql--get-formatted-buffer-name title source-or-query))
            (header (org-ql-view--header-line-format
                     :title title))
            (org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))
-           ;; TODO: When the query also has a org-roam-query
            (org-ql-view-query `(org-roam-query ,source-or-query))
            (org-ql-view-sort nil)
            (org-ql-view-narrow nil)
@@ -46,7 +45,6 @@
         (dolist-with-progress-reporter (node nodes)
             (format "Processing %s nodes" (length nodes))
           (push (org-roam-ql-view--format-node node) strings))
-        ;; TODO: Is this necessary?
         (when super-groups
           (let ((org-super-agenda-groups (cl-etypecase super-groups
                                            (symbol (symbol-value super-groups))
@@ -54,56 +52,9 @@
             (setf strings (org-super-agenda--group-items strings))))
         (org-ql-view--display :buffer buffer :header header
           :string (s-join "\n" strings))
-        ;; (with-current-buffer buffer
-        ;;   ;; HACK - to make the buffer get rendered properly.
-        ;;   (org-ql-view-refresh))))))
-        ))))
-
-;; modified org-ql-view--format-element to work with org-roam nodes
-(defun org-roam-ql-view--format-node (node)
-  "Return NODE as a string with text-properties set by its property
-list.  If NODE is nil, return an empty string."
-  (if (not node)
-      ""
-    (let* ((marker
-            (org-roam-ql--get-file-marker node))
-           (properties (list
-                        'org-marker marker
-                        'org-hd-marker marker))
-           ;; (properties '())
-           (string ;;(org-roam-node-title node))
-            (s-join " "
-                    (-non-nil
-                     (list
-                      (when-let (todo (org-roam-node-todo node))
-                        (org-ql-view--add-todo-face todo))
-                      (when-let (priority (org-roam-node-priority node))
-                        (org-ql-view--add-priority-face (byte-to-string priority)))
-                      (org-roam-node-title node)
-                      nil;;due-string
-                      (when-let (tags (org-roam-node-tags node))
-                         (--> tags
-                           (s-join ":" it)
-                           (s-wrap it ":")
-                           (org-add-props it nil 'face 'org-tag))))))))
-      (remove-list-of-text-properties 0 (length string) '(line-prefix) string)
-      ;; Add all the necessary properties and faces to the whole string
-      (--> string
-        ;; FIXME: Use proper prefix
-        (concat "  " it)
-        (org-add-props it properties
-          'org-agenda-type 'search
-          'todo-state (org-roam-node-todo node)
-          'tags (org-roam-node-tags node)
-          ;;'org-habit-p (org)
-          )))))
-
-(defun org-roam-ql--get-file-marker (node)
-  (org-roam-with-file (org-roam-node-file node) t
-  ;; (with-current-buffer (find-file-noselect (org-roam-node-file node))
-  ;; (with-plain-file (org-roam-node-file node) t
-    (goto-char (org-roam-node-point node))
-    (point-marker)))
+        (with-current-buffer buffer
+          ;; HACK - to make the buffer get rendered properly.
+          (org-ql-view-refresh))))))
 
 ;; *****************************************************************************
 ;; Functions to work with org-ql-view
@@ -116,16 +67,16 @@ list.  If NODE is nil, return an empty string."
                               `(seq bol (0+ space) ":ID:" (0+ space)
                                     (or ,@(-map
                                            #'org-roam-node-id
-                                           org-roam-ql--current-nodes))
+                                           org-roam-ql-ql--current-nodes))
                                     eol))
                      :query t))))
 
-(defun org-roam-ql--get-queries (query)
+(defun org-roam-ql-ql--get-roam-queries (query)
   "Recursively traverse and get the org-roam-query's from a org-ql query."
   (if (listp query)
       (if (equal (car query) 'org-roam-query)
           (list query)
-        (apply #'append (-non-nil (--map (org-roam-ql--get-queries it) query))))
+        (apply #'append (-non-nil (--map (org-roam-ql-ql--get-roam-queries it) query))))
     nil))
 
 (defun org-roam-ql--refresh (other-func &rest rest)
@@ -133,19 +84,24 @@ list.  If NODE is nil, return an empty string."
 `org-roam-ql' function, update the variables accordingly."
   (unless org-ql-view-buffers-files
     (user-error "Not an Org QL View buffer"))
-  (-when-let (queries (org-roam-ql--get-queries org-ql-view-query))
+  (-when-let (queries (org-roam-ql-ql--get-roam-queries org-ql-view-query))
     (let* ((nodes (apply #'append
                          (--map (apply #'org-roam-ql--nodes-cached
                                        (cdr it))
                                 queries))))
       (org-roam-ql-clear-cache)
-      (setq org-roam-ql--current-nodes nodes)
+      (setq org-roam-ql-ql--current-nodes nodes)
       ;; If results are empty buffer gets empty
       ;; `org-ql-view-buffers-files' is left alone to avoid org-ql
       ;; erroring with "Not an Org QL View buffer"
       (when nodes
         (setq org-ql-view-buffers-files (org-roam-ql--nodes-files nodes)))))
-  (apply other-func rest))
+  (apply other-func rest)
+  (when (and org-roam-ql-ql--current-nodes (--any (equal (org-roam-node-level it) 0) org-roam-ql-ql--current-nodes))
+    (let ((inhibit-read-only t))
+      (goto (point-max))
+      (insert (propertize "WARNING: org-ql does not contain file nodes." 'face 'error)))))
+
 
 ;; *****************************************************************************
 ;; Functions to switch between org-roam/org-roam-ql buffers and
@@ -155,33 +111,31 @@ list.  If NODE is nil, return an empty string."
 (defun org-roam-ql-ql-buffer-from-roam-buffer ()
   "Convert a roam buffer to org-ql buffer."
   (interactive)
-  (when (derived-mode-p 'org-roam-mode)
-    (org-roam-ql--org-ql-search (buffer-name (current-buffer))
-                                (org-roam-ql--nodes-from-roam-buffer (current-buffer))
-                                (--if-let header-line-format it ""))))
+  (when (or (derived-mode-p 'org-agenda-mode) (derived-mode-p 'org-roam-mode))
+    (let* ((b (buffer-name (current-buffer)))
+           (title (org-roam-ql--get-formatted-title b nil "from org-ql-view")))
+      (org-roam-ql--ql-view-buffer-for-nodes (cond
+                                              ((derived-mode-p 'org-roam-mode)
+                                               (org-roam-ql--nodes-from-roam-buffer (current-buffer)))
+                                              ((derived-mode-p 'org-agenda-mode)
+                                               (org-roam-ql--nodes-from-agenda-buffer (current-buffer))))
+                                             title
+                                             (org-roam-ql--get-formatted-buffer-name
+                                              title)
+                                             `(in-buffer ,b)))))
 
 ;;;###autoload
-(defun org-roam-ql-roam-buffer-from-ql-buffer ()
-  "Convert a org-ql reusult to a roam-buffer."
+(defun org-roam-ql-roam-buffer-frmo-agenda-buffer ()
+  "Convert a agenda reusult to a roam-buffer."
   (interactive)
   (unless org-ql-view-buffers-files
     (user-error "Not an Org QL View buffer"))
-  ;; Copied from `org-agenda-finalize'
-  (let (mrk nodes (line-output 0))
-    (save-excursion
-      (goto-char (point-min))
-      (while (equal line-output 0)
-	(when (setq mrk (get-text-property (point) 'org-hd-marker))
-          (org-with-point-at mrk
-            ;; pick only nodes
-            (-if-let (id (org-id-get))
-                (push (org-roam-node-from-id id) nodes)
-              (user-error (format "Non roam-node headings in query (in buffer %s)."
-                                  (buffer-name))))))
-        (setq line-output (forward-line))))
-    (org-roam-ql--buffer-for-nodes nodes
-                                   org-ql-view-title
-                                   (format "*From ql: %s*" org-ql-view-title))))
+  (when (derived-mode-p 'org-agenda-mode)
+    (org-roam-ql--agenda-buffer-for-nodes (org-roam-ql--nodes-from-agenda-buffer (current-buffer))
+                                          (org-roam-ql--get-formatted-title b nil "from org-ql-view") 
+                                          (org-roam-ql--get-formatted-buffer-name
+                                           (org-roam-ql--get-formatted-title b nil "from org-ql-view"))
+                                          `(in-buffer ,b))))
 
 (advice-add 'org-ql-view-refresh :around #'org-roam-ql--refresh)
 

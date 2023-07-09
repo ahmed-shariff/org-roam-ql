@@ -21,14 +21,6 @@
     (it "fails when unexpected term in query"
       (expect (org-roam-ql--check-if-valid-query '(or (todo "DONE") (and (todo "TODO") (what-is-this "something")))) :to-be nil)))
 
-  ;; (describe "Test org-roam-ql--get-queries"
-  ;;   (it "without any ql-queries"
-  ;;     (expect (org-roam-ql--get-queries '(or (todo "TODO") (tags "tag1" "tag2") (and (title "a") (tags "tag3"))))
-  ;;             :to-equal nil))
-  ;;   (it "with multiple nested queries"
-  ;;     (expect (org-roam-ql--get-queries '(or (org-roam-query (todo "TODO")) (and (org-roam-query (tags "tag1" "tag2")) (scheduled "something"))))
-  ;;             :to-equal '((org-roam-query (todo "TODO")) (org-roam-query (tags "tag1" "tag2"))))))
-
   (describe "Test org-roam-ql-nodes"
     (it "with list of nodes"
       (let ((nodes (cl-subseq (org-roam-node-list) 0 3)))
@@ -116,6 +108,15 @@
         (with-current-buffer agenda-buffer-name
           (org-roam-ql-roam-buffer-from-agenda-buffer))
         (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-roam-buffer (get-buffer second-roam-buffer-name))) :to-have-same-items-as query-result-ids))))
+
+  (describe "Test org-roam-ql-ql--get-roam-queries"
+    (it "without any ql-queries"
+      (expect (org-roam-ql-ql--get-roam-queries '(or (todo "TODO") (tags "tag1" "tag2") (and (title "a") (tags "tag3"))))
+              :to-equal nil))
+    (it "with multiple nested queries"
+      (expect (org-roam-ql-ql--get-roam-queries '(or (org-roam-query (todo "TODO")) (and (org-roam-query (tags "tag1" "tag2")) (scheduled "something"))))
+              :to-equal '((org-roam-query (todo "TODO")) (org-roam-query (tags "tag1" "tag2"))))))
+
 
   ;; (describe "Tets query expansion"
   ;;   (it "with only todo"
