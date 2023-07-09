@@ -59,7 +59,9 @@ one of the following:
    ;; get-buffer returns a buffer if source-or-query is a buffer obj
    ;; or the name of a buffer
    ((org-roam-ql--check-if-org-roam-ql-buffer source-or-query)
-    (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
+    (cond 
+     ((derived-mode-p 'org-roam-mode) (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
+     ((derived-mode-p 'org-agenda-mode) (org-roam-ql--nodes-from-agenda-buffer (get-buffer source-or-query)))))
    ((org-roam-ql--check-if-org-roam-db-parameters source-or-query)
     (let ((query (car source-or-query))
           (args (cdr source-or-query)))
@@ -209,7 +211,8 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
   (-when-let (buffer (and (or (stringp source-or-query)
                                 (bufferp source-or-query))
                             (get-buffer source-or-query)))
-      (with-current-buffer buffer (derived-mode-p 'org-roam-mode))))
+    (with-current-buffer buffer (or (derived-mode-p 'org-agenda-mode)
+                                    (derived-mode-p 'org-roam-mode)))))
 
 (defun org-roam-ql--check-if-org-roam-db-parameters (source-or-query)
   (and (listp source-or-query) (vectorp (car source-or-query))))
@@ -420,7 +423,7 @@ of org-roam nodes."
    title buffer-name (or source-or-query nodes)))
 
 (defun org-roam-ql--nodes-from-roam-buffer (buffer)
-  "Collect the org-roam-nodes from a ORG-ROAM-BUFFER."
+  "Collect the org-roam-nodes from a valid buffer."
   (with-current-buffer buffer
     (when (derived-mode-p 'org-roam-mode)
       (let (nodes)

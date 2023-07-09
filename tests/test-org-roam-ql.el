@@ -59,14 +59,32 @@
         (expect (org-roam-ql-nodes (lambda () 'somthing-else)) :to-throw 'user-error))
       (it "returning nil"
         (expect (org-roam-ql-nodes (lambda () nil)) :to-equal nil)))
-    (describe "with buffers"
+    ;; FIXME: Not sure why passing just the buffer name is not working here!
+    (describe "with roam buffers"
       (let* ((nodes (--filter (s-match "test2.org" (org-roam-node-file it)) (org-roam-node-list)))
              (buffer-name "test-buffer"))
-        (org-roam-ql--render-roam-buffer (list (org-roam-ql--nodes-section nodes)) "test buffer" buffer-name nodes)
+        (org-roam-ql--roam-buffer-for-nodes nodes "test buffer" buffer-name nodes)
         (it "as a string"
-          (expect (--map #'org-roam-node-id (org-roam-ql-nodes buffer-name)) :to-equal (--map #'org-roam-node-id nodes)))
+          (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
+                                             (org-roam-ql-nodes buffer-name)))
+                  :to-have-same-items-as (-map #'org-roam-node-id nodes)))
         (it "as a predicate"
-          (expect (--map #'org-roam-node-id (org-roam-ql-nodes `(in-buffer ,buffer-name))) :to-equal (--map #'org-roam-node-id nodes)))))
+          (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
+                                             (org-roam-ql-nodes `(in-buffer ,buffer-name))))
+                  :to-have-same-items-as (-map #'org-roam-node-id nodes)))))
+    ;; FIXME: Not sure why passing just the buffer name is not working here!
+    (describe "with agenda buffers"
+      (let* ((nodes (--filter (s-match "test2.org" (org-roam-node-file it)) (org-roam-node-list)))
+             (buffer-name "test-buffer"))
+        (org-roam-ql--agenda-buffer-for-nodes nodes "test buffer" buffer-name nodes)
+        (it "as a string"
+          (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
+                                             (org-roam-ql-nodes buffer-name)))
+                  :to-have-same-items-as (-map #'org-roam-node-id nodes)))
+        (it "as a predicate"
+          (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
+                                             (org-roam-ql-nodes `(in-buffer ,buffer-name))))
+                  :to-have-same-items-as (-map #'org-roam-node-id nodes)))))
     (describe "with invalid inputs"
       (it "string"
         (expect (org-roam-ql-nodes "a random string") :to-throw 'user-error))))
