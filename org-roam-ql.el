@@ -610,10 +610,6 @@ entries that do not have an ID, it will signal an error"
     (unless (or value transient--prefix)
       (message "Unset %s" variable))))
 
-(cl-defmethod transient-infix-set ((obj org-roam-ql--variable:sexp) value)
-  "Set the org-roam-ql mode variable."
-  (cl-call-next-method obj (read value)))
-
 (cl-defmethod transient-infix-read ((obj org-roam-ql--variable:choices))
   "Pick between CHOICES in OBJ when reading."
   (let ((choices (oref obj choices)))
@@ -701,9 +697,15 @@ entries that do not have an ID, it will signal an error"
   :prompt "Query: "
   :always-read t
   :reader (lambda (prompt _initial-input history)
-            (read-string prompt (when org-roam-ql-buffer-query
-                                  (format "%S" org-roam-ql-buffer-query))
-                         history)))
+            ;; FIXME: History has both sexp and the string representations
+            ;; read-string won't work with sexpressions. For now, to avoid
+            ;; errors when going through history, pre-processing it.
+            (let ((string-only-history (delete-dups (--map (if (stringp it) it
+                                                             (format "%S" it))
+                                                           (symbol-value history)))))
+              (read (read-string prompt (when org-roam-ql-buffer-query
+                                          (format "%S" org-roam-ql-buffer-query))
+                               'string-only-history)))))
 
 (transient-define-infix org-roam-ql-view--transient-in ()
   :class 'org-roam-ql--variable:choices
