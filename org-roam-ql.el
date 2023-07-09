@@ -26,6 +26,7 @@
 (defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
 (defvar org-roam-ql--query-expansion-functions (make-hash-table) "Holds the function to expand a query.")
 (defvar org-roam-ql--cache (make-hash-table))
+(defvar org-roam-ql--search-query-history '() "History of queries with org-roam-ql-search")
 (make-variable-buffer-local (defvar org-roam-ql-buffer-title nil "The current title of the buffer."))
 (make-variable-buffer-local (defvar org-roam-ql-buffer-query nil "The current query of the buffer."))
 (make-variable-buffer-local (defvar org-roam-ql--buffer-displayed-query nil "The query which produced the results of the buffer."))
@@ -155,7 +156,12 @@ to associate with the view. DISPLAY-IN is expected to be a symbol,
 either `'org-ql' or `'org-roam'. If its `org-ql', the results from the
 SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
 `org-roam', will be displayed in a org-roam-ql buffer."
-  (interactive (list (let ((query (read-minibuffer "Query: ")))
+  (interactive (list (let* ((query (read-string "Query: " nil 'org-roam-ql--search-query-history)))
+                       (setf org-roam-ql--search-query-history (delete-dups
+                                                                (append
+                                                                 org-roam-ql--search-query-history
+                                                                 (list query)))
+                             query (read query))
                        (if (vectorp query)
                            (list query)
                          query))
