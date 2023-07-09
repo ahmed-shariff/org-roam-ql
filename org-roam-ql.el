@@ -269,29 +269,41 @@ value is a string equal to VALUE."
   "Return non-nil if all strings in VALUES are in the list of strings TAGS."
   (--all-p (member it values) (-list tags)))
 
-(cl-defun org-roam-ql--expand-forwardlinks (source-or-query &key (type "id"))
+(cl-defun org-roam-ql--expand-forwardlinks (source-or-query &key (type "id") (combine :and))
   "Returns parameters org-roam-nodes that would return a list of
 nodes that have forward links to any nodes that SOURCE-OR-QUERY
-resolves to, as a list. TYPE is the type of the link."
+resolves to, as a list. TYPE is the type of the link. COMBINE can be
+:and or :or. If :and, only nodes that have forwardlinks to all results of
+source-or-query, else if have forwardlinks to any of them."
   (list (apply #'vector
                (append '(:select :distinct links:dest
                                  :from links
                                  :where (in links:source $v1))
-                       (when type
-                         '(:and (= type $s2)))))
+                           (when type
+                             `(,(pcase combine
+                                  (:and :and)
+                                  (:or :or)
+                                  (_ (user-error "keyword :combine should be :and or :or; got %s" combine)))
+                               (= type $s2)))))
         (apply #'vector (-map #'org-roam-node-id (org-roam-ql--nodes-cached source-or-query)))
         type))
 
-(cl-defun org-roam-ql--expand-backlinks (source-or-query &key (type "id"))
-  "Returns parameters org-roam-nodes that would return a list of
-nodes that have back links to any nodes that SOURCE-OR-QUERY
-resolves to, as a list. TYPE is the type of the link."
+(cl-defun org-roam-ql--expand-backlinks (source-or-query &key (type "id") (combine :and))
+  "Returns parameters org-roam-nodes that would return a list of nodes
+that have back links to any nodes that SOURCE-OR-QUERY resolves to, as
+a list. TYPE is the type of the link. COMBINE can be :and or :or. If
+:and, only nodes that have backlinks to all results of
+source-or-query, else if have backlinks to any of them."
   (list (apply #'vector
                (append '(:select :distinct links:source
                                  :from links
                                  :where (in links:dest $v1))
                        (when type
-                         '(:and (= type $s2)))))
+                         `(,(pcase combine
+                              (:and :and)
+                              (:or :or)
+                              (_ (user-error "keyword :combine should be :and or :or; got %s" combine)))
+                           (= type $s2)))))
         (apply #'vector (-map #'org-roam-node-id (org-roam-ql--nodes-cached source-or-query)))
         type))
 
