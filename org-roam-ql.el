@@ -598,13 +598,13 @@ entries that do not have an ID, it will signal an error"
 (defun org-roam-ql-roam-buffer-from-agenda-buffer ()
   "Convert a agenda-buffer reusult to a roam-buffer."
   (interactive)
-  (if org-roam-ql-buffer-query
-      (org-roam-ql--roam-buffer-for-nodes (org-roam-ql--nodes-from-agenda-buffer (current-buffer))
-                                          (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from agenda buffer")
-                                          (org-roam-ql--get-formatted-buffer-name
-                                           (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from agenda buffer"))
-                                          org-roam-ql-buffer-query)
-    (user-error "Not in a org-roam-ql agenda buffer.")))
+  (org-roam-ql--roam-buffer-for-nodes (org-roam-ql--nodes-from-agenda-buffer (current-buffer))
+                                      (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from agenda buffer")
+                                      (org-roam-ql--get-formatted-buffer-name
+                                       (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from agenda buffer"))
+                                      (if org-roam-ql-buffer-query
+                                          org-roam-ql-buffer-query
+                                        `(in-buffer ,(buffer-name)))))
 
 ;; *****************************************************************************
 ;; org-roam-ql transient
