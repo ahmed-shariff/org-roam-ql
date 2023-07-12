@@ -61,8 +61,10 @@ one of the following:
    ;; or the name of a buffer
    ((org-roam-ql--check-if-org-roam-ql-buffer source-or-query)
     (cond 
-     ((derived-mode-p 'org-roam-mode) (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
-     ((derived-mode-p 'org-agenda-mode) (org-roam-ql--nodes-from-agenda-buffer (get-buffer source-or-query)))))
+     ((with-current-buffer source-or-query (derived-mode-p 'org-roam-mode))
+      (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
+     ((with-current-buffer source-or-query (derived-mode-p 'org-agenda-mode))
+      (org-roam-ql--nodes-from-agenda-buffer (get-buffer source-or-query)))))
    ((org-roam-ql--check-if-org-roam-db-parameters source-or-query)
     (let ((query (car source-or-query))
           (args (cdr source-or-query)))

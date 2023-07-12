@@ -23,13 +23,13 @@
 (require 'dash)
 (require 's)
 
-(make-variable-buffer-local (defvar org-roam-ql-ql--current-nodes nil))
+(defvar org-roam-ql-ql--current-nodes nil)
 
 (defun org-roam-ql--ql-view-buffer-for-nodes (nodes title buffer-name &optional source-or-query super-groups)
   "Display nodes in org-ql-view buffer."
   (with-temp-buffer
     (let* ((strings '())
-           (buffer (org-roam-ql--get-formatted-buffer-name title source-or-query))
+           (buffer (org-roam-ql--get-formatted-buffer-name title))
            (header (org-ql-view--header-line-format
                     :title title))
            (org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))
@@ -97,10 +97,15 @@
       (when nodes
         (setq org-ql-view-buffers-files (org-roam-ql--nodes-files nodes)))))
   (apply other-func rest)
-  (when (and org-roam-ql-ql--current-nodes (--any (equal (org-roam-node-level it) 0) org-roam-ql-ql--current-nodes))
+  (when-let ((_ org-roam-ql-ql--current-nodes)
+             (file-nodes (--filter (equal (org-roam-node-level it) 0) org-roam-ql-ql--current-nodes)))
     (let ((inhibit-read-only t))
-      (goto (point-max))
-      (insert (propertize "WARNING: org-ql does not contain file nodes." 'face 'error)))))
+      (goto-char (point-max))
+      (insert
+       (propertize
+        (format "\n\n  WARNING: skipping %s file nodes"
+                (length file-nodes))
+        'face 'error)))))
 
 
 ;; *****************************************************************************
