@@ -27,11 +27,11 @@
 (defvar org-roam-ql--query-expansion-functions (make-hash-table) "Holds the function to expand a query.")
 (defvar org-roam-ql--cache (make-hash-table))
 (defvar org-roam-ql--search-query-history '() "History of queries with org-roam-ql-search")
-(make-variable-buffer-local (defvar org-roam-ql-buffer-title nil "The current title of the buffer."))
-(make-variable-buffer-local (defvar org-roam-ql-buffer-query nil "The current query of the buffer."))
-(make-variable-buffer-local (defvar org-roam-ql--buffer-displayed-query nil "The query which produced the results of the buffer."))
-(make-variable-buffer-local (defvar org-roam-ql-buffer-in nil
-                              "Define which option to use - 'in-buffer' or 'org-roam-db'."))
+(defvar-local org-roam-ql-buffer-title nil "The current title of the buffer.")
+(defvar-local org-roam-ql-buffer-query nil "The current query of the buffer.")
+(defvar-local org-roam-ql--buffer-displayed-query nil "The query which produced the results of the buffer.")
+(defvar-local org-roam-ql-buffer-in nil
+  "Define which option to use - 'in-buffer' or 'org-roam-db'.")
 
 ;;;###autoload
 (defun org-roam-ql-nodes (source-or-query)
