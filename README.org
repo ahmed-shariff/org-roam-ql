@@ -24,8 +24,14 @@ Example configuration:
     :straight (org-roam-ql :type git :host github :repo "ahmed-shariff/org-roam-ql"
                            :files (:defaults (:exclude "org-roam-ql-ql.el")))
     :after (org-roam)
-    :bind (:map minibuffer-mode-map
-           ("C-c n i" . org-roam-ql-insert-node-title)))
+    :bind ((:map org-roam-mode-map
+            ;; Have org-roam-ql's transient available in org-roam-mode buffers
+            ("v" . org-roam-ql-buffer-dispatch)
+            :map minibuffer-mode-map
+            ;; Be able to add titles in queries while in minibuffer.
+            ;; This is similar to `org-roam-node-insert', but adds
+            ;; only title as a string.
+            ("C-c n i" . org-roam-ql-insert-node-title))))
 #+end_src
 
 ** Usage

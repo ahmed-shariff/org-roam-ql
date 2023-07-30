@@ -747,12 +747,13 @@ If there are entries that do not have an ID, it will signal an error"
             ;; FIXME: History has both sexp and the string representations
             ;; read-string won't work with sexpressions. For now, to avoid
             ;; errors when going through history, pre-processing it.
-            (let ((string-only-history (delete-dups (--map (if (stringp it) it
-                                                             (format "%S" it))
-                                                           (symbol-value history)))))
-              (read (read-string prompt (when org-roam-ql-buffer-query
-                                          (format "%S" org-roam-ql-buffer-query))
-                               'string-only-history)))))
+            (setf (symbol-value history)
+                  (delete-dups (--map (if (stringp it) it
+                                        (format "%S" it))
+                                      (symbol-value history))))
+            (read (read-string prompt (when org-roam-ql-buffer-query
+                                        (format "%S" org-roam-ql-buffer-query))
+                               history))))
 
 (transient-define-infix org-roam-ql-view--transient-in ()
   :class 'org-roam-ql--variable--choices
@@ -815,9 +816,6 @@ Can be used in the minibuffer or when writting querries."
   (insert (format "\"%s\"" (org-roam-node-title (org-roam-node-read nil nil nil t)))))
 
 ;; setup of org-roam-ql
-
-(define-key org-roam-mode-map "v" #'org-roam-ql-buffer-dispatch)
-
 (dolist (predicate
          '((file org-roam-node-file . org-roam-ql--predicate-s-match)
            (file-title org-roam-node-file-title . org-roam-ql--predicate-s-match)
