@@ -7,24 +7,31 @@
 
 This package an interface to easily query and display results from your ~org-roam~ database. 
 
-** Screenshots
+** Screen-shots
 
-[[images/demo1.gif]]
+You can query org-roam with ~org-roam-ql-search~. The results are displayed in an org-roam like buffer. org-roam-ql also comes with a transient that can be used to modify the results viewed. The transient can be activated with ~v~. You can modify the title (~t~), query (~q~) and specify if the query is a subquery (apply query on the results of the buffer) or query against the org-roam database (~i~). Refreshing the buffer (~r~) will display the updated results.
 
-[[images/demo2.gif]]
+[[images/demo4.gif]]
+
+The transient is available in the org-roam buffer as well, this allows you to start a query from the results in the org-roam buffer. You also can view the results in an agenda like buffer.
+
+[[images/demo3.gif]]
 
 ** Installation
-TBD (quelpa, straight?)
-
-** Caveats
-As mentioned above, the package is still in active development. If you have any feedback, it is most welcome. I listing out some of the bigger issues I am trying to solve:
-- Performance
-- Currently, org-ql works only with entries (i.e., headline nodes)
+Example configuration:
+#+begin_src emacs-lisp
+  (use-package org-roam-ql
+    :straight (org-roam-ql :type git :host github :repo "ahmed-shariff/org-roam-ql"
+                           :files (:defaults (:exclude "org-roam-ql-ql.el")))
+    :after (org-roam)
+    :bind (:map minibuffer-mode-map
+           ("C-c n i" . org-roam-ql-insert-node-title)))
+#+end_src
 
 ** Usage
 *** Commands/functions
 
-- ~(org-roam-ql-search SOURCE-OR-QUERY &optional TITLE QUERY)~ - This creates a ~org-ql~ buffer with the nodes of the corresponding ~SOURCE-OR-QUERY~ with ~TITLE~. Additionally, this also takes a ~org-ql~ query, which will be used to further filter the results from the ~SOURCE-OR-QUERY~. ~SOURCE-OR-QUERY~ is the same as ~org-roam-ql-node~. When called interactively. This can also be called interactively, see below of what the values of ~SOURCE-OR-QUERY~ can be.
+- ~(org-roam-ql-search SOURCE-OR-QUERY &optional TITLE QUERY)~ - This is an interactive command that creates a ~org-ql~ buffer with the nodes of the corresponding ~SOURCE-OR-QUERY~ with ~TITLE~. Additionally, this also takes a ~org-ql~ query, which will be used to further filter the results from the ~SOURCE-OR-QUERY~. ~SOURCE-OR-QUERY~ is the same as ~org-roam-ql-node~. When called interactively. This can also be called interactively, see below of what the values of ~SOURCE-OR-QUERY~ can be.
 - ~(org-roam-ql-nodes SOURCE-OR-QUERY)~ - Given a SOURCE-OR-QUERY, return a list of nodes. SOURCE-OR-QUERY can be one of the following:
   - A list of parameters that can be passed to ~org-roam-db-query~. Should be a list of the form ~(QUERY ARG1 ARG2...)~. The result of calling ~org-roam-db-query~ with these parameters should return a list of records where the first element is the ID of a corresponding node. For example:
   #+begin_src emacs-lisp
@@ -88,3 +95,15 @@ If no-link is not provided as a parameter, the first column is a link to the nod
 Following is an example of a dynamic block and its result.
 
 [[file:images/dynamic-block.jpg]]
+** Working with ~org-ql~ 
+Optionally, ~org-roam-ql~ results can be visualized in [[https://github.com/alphapapa/org-ql][org-ql]], available through the extension ~org-roam-ql-ql~ (naming things is hard!!)
+#+begin_src emacs-lisp
+  (use-package org-roam-ql-ql
+    :straight (org-roam-q-ql :type git :host github :repo "ahmed-shariff/org-roam-ql"
+                             :files (:defaults (:exclude "org-roam-ql.el")))
+    :after (org-roam org-ql org-roam-ql))
+#+end_src
+
+Note that the org-ql only works with org entries, i.e., `heading nodes`. Hence, if there any file-nodes in the result, they will not be displayed. To be clear about that, when org-roam-ql results are displayed in an org-ql-view buffer, a warning is added to the end mentioning how many file-nodes were there in the result. If the extension is loaded, you may view the org-roam-ql results with ~Q~ from the org-roam-ql transient. A org-ql-view can be viewed in an org-roam like buffer with ~R~ from the org-ql-view transient.
+
+[[images/demo5.gif]]
