@@ -145,12 +145,8 @@ internal functions"
                     (and val
                          (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
                  (org-roam-node-list)))
-       (t
-        (-if-let (nodes (org-roam-ql--nodes-cached query))
-            (member (org-roam-node-id it) (-map #'org-roam-node-id nodes))
-          (user-error
-           (format "invalid query %s. %s not in org-roam-ql predicate list (see `org-roam-ql-defpred') or recognized by `org-roam-ql-nodes'."
-                   query (car query)))))))))
+       ;; `org-roam-ql-nodes' will error if query is invalid
+       (t (org-roam-ql--nodes-cached query))))))
 
 ;;;###autoload
 (defun org-roam-ql-search (source-or-query &optional title)
