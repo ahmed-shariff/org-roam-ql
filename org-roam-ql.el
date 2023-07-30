@@ -382,8 +382,9 @@ but doesn't default to the org-roam-buffer-current-node."
                 org-roam-ql-buffer-title nil
                 org-roam-ql-buffer-in nil)
           (org-roam-buffer-refresh)
-          (org-roam-ql-search `(id ,(org-roam-node-id org-roam-buffer-current-node))
-                              'org-roam title query)))
+          (org-roam-ql-search `(and (backlink-to (id ,(org-roam-node-id org-roam-buffer-current-node)))
+                                    ,query)
+                              title)))
     (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--roam-buffer-for-nodes)))
 
 (defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query)
