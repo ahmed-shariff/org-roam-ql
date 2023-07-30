@@ -1,22 +1,43 @@
-;;; org-roam-ql.el --- Intgrating org-roam and org-ql -*- lexical-binding: t -*-
+;;; org-roam-ql.el --- Interface to query and view results from org-roam -*- lexical-binding: t -*-
 
 ;; Copyright (c) 2023 Shariff AM Faleel (shariff.mfa@outlook.com)
 
+;; Permission is hereby granted, free of charge, to any person obtaining a copy
+;; of this software and associated documentation files (the "Software"), to deal
+;; in the Software without restriction, including without limitation the rights
+;; to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+;; copies of the Software, and to permit persons to whom the Software is
+;; furnished to do so, subject to the following conditions:
+;;
+;; The above copyright notice and this permission notice shall be included in all
+;; copies or substantial portions of the Software.
+;;
+;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+;; EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+;; MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+;; NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+;; BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+;; ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+;; CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+;; SOFTWARE.
+
 ;; Author: Shariff AM Faleel
 ;; Version: 0.1
-;; Package-Requires: ((emacs "28") (org-ql "0.7-pre") (org "9.0") (org-roam "2.2.2") (s "1.13.1") (magit-section "3.3.0"))
+;; Package-Requires: ((emacs "28") (org-roam "2.2.0") (s "1.12.0") (magit-section "3.3.0") (transient "0.4") (org-super-agenda "1.2"))
 ;; Homepage: https://github.com/ahmed-shariff/org-roam-ql
 ;; Keywords: org-roam, query
 ;; SPDX-License-Identifier: MIT
 
 ;;; Commentary:
 
-;; TBD
+;; Inspired by org-ql, this package provides an interface to easily
+;; query and view the results from an org-roam database.
 
 ;;; Code:
 
-(require 'org-ql)
-(require 'org-ql-view)
+(require 'magit-section)
+(require 'transient)
+(require 'org-super-agenda)
 (require 'org-roam-utils)
 (require 'org-roam-node)
 (require 'dash)
@@ -26,7 +47,7 @@
 (defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
 (defvar org-roam-ql--query-expansion-functions (make-hash-table) "Holds the function to expand a query.")
 (defvar org-roam-ql--cache (make-hash-table))
-(defvar org-roam-ql--search-query-history '() "History of queries with org-roam-ql-search")
+(defvar org-roam-ql--search-query-history '() "History of queries with `org-roam-ql-search'.")
 (defvar-local org-roam-ql-buffer-title nil "The current title of the buffer.")
 (defvar-local org-roam-ql-buffer-query nil "The current query of the buffer.")
 (defvar-local org-roam-ql--buffer-displayed-query nil "The query which produced the results of the buffer.")
@@ -35,19 +56,19 @@
 
 ;;;###autoload
 (defun org-roam-ql-nodes (source-or-query)
-  "Convert SOURCE-OR-QUERY to org-roam-nodes.  SOURCE-OR-QUERY can be
-one of the following:
+  "Convert SOURCE-OR-QUERY to org-roam-nodes.
+SOURCE-OR-QUERY can be one of the following:
 - A org-roam-ql query.
-- A buffer-name of a org-roam-mode buffer.
-- A list of params that can be passed to `org-roam-db-query'. Expected
-  to have the form (QUERY ARG1 ARG2 ARG3...). `org-roam-db-query' will
+- A `buffer-name' of a `org-roam-mode' buffer.
+- A list of params that can be passed to `org-roam-db-query'.  Expected
+  to have the form (QUERY ARG1 ARG2 ARG3...).  `org-roam-db-query' will
   called with the list or parameters as: (org-roam-db-query QUERY ARG1
-  ARG2 ARG3...). The first element in each row in the result from the
+  ARG2 ARG3...).  The first element in each row in the result from the
   query is expected to have the ID of a corresponding node, which will
-  be conerted to a org-roam-node. QUERY can be a complete query. If
+  be conerted to a org-roam-node.  QUERY can be a complete query.  If
   the query is going to be of the form [:select [id] :from nodes
   :where (= todo \"TODO\")], you can omit the part till after
-  :where. i.e., pass only [(= todo \"TODO\")] and the rest will get
+  :where i.e., pass only [(= todo \"TODO\")] and the rest will get
   appended in the front.
 - A list of org-roam-nodes or an org-roam-node.
 - An org-roam-query.
@@ -60,7 +81,7 @@ one of the following:
    ;; get-buffer returns a buffer if source-or-query is a buffer obj
    ;; or the name of a buffer
    ((org-roam-ql--check-if-org-roam-ql-buffer source-or-query)
-    (cond 
+    (cond
      ((with-current-buffer source-or-query (derived-mode-p 'org-roam-mode))
       (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
      ((with-current-buffer source-or-query (derived-mode-p 'org-agenda-mode))
@@ -79,14 +100,15 @@ one of the following:
    ((functionp source-or-query) (--when-let (funcall source-or-query)
                                   (if (and (listp it) (-all-p #'org-roam-node-p it))
                                       it
-                                    (user-error "Function did not expand to list of nodes."))))
-   (t (user-error "Invalid source-or-query."))))
+                                    (user-error "Function did not expand to list of nodes"))))
+   (t (user-error "Invalid source-or-query"))))
 
 ;; Can we make org-roam-ql aware of any changes that can happen?
 (defun org-roam-ql--nodes-cached (source-or-query)
-  "Cache results of org-roam-ql-nodes.
-  Not caching or invalidating in the top level function as the
-database/buffers can change. currently this is only used by the
+  "Cache results of `org-roam-ql-nodes'.
+See `org-roam-ql-nodes' for information on SOURCE-OR-QUERY.
+Not caching or invalidating in the top level function as the
+database/buffers can change.  Currently this is only used by the
 internal functions"
   (let ((cached-value (gethash source-or-query org-roam-ql--cache)))
     (if cached-value
@@ -130,33 +152,13 @@ internal functions"
            (format "invalid query %s. %s not in org-roam-ql predicate list (see `org-roam-ql-defpred') or recognized by `org-roam-ql-nodes'."
                    query (car query)))))))))
 
-;; (defun org-roam-ql--expand-query (query it)
-;;   "Used to expand a QUERY, where it is a single node."
-;;   (if (and (listp query) (member (car query) '(or and)))
-;;       (funcall
-;;        (pcase (car query)
-;;          ('or #'-any-p)
-;;          ('and #'-all-p))
-;;        'identity
-;;        (-map (lambda (sub-query) (org-roam-ql--expand-query sub-query it)) (cdr query)))
-;;     (-if-let* ((query-key (and (listp query) (car query)))
-;;                (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
-;;         (let ((val (funcall (car query-comparison-function-info) it)))
-;;           (and val
-;;                (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
-;;       (-if-let (nodes (org-roam-ql--nodes-cached query))
-;;           (member (org-roam-node-id it) (-map #'org-roam-node-id nodes))
-;;         (user-error
-;;          (format "Invalid query %s. %s not in org-roam-ql predicate list (See `org-roam-ql-defpred') or recognized by `org-roam-ql-nodes'."
-;;                             query (car query)))))))
-
 ;;;###autoload
 (defun org-roam-ql-search (source-or-query &optional title)
-  "Basically what `org-ql-search does', but for org-roam-nodes.  See
-`org-roam-ql-nodes' for what SOURCE-OR-QUERY can be. TITLE is a title
-to associate with the view. DISPLAY-IN is expected to be a symbol,
-either `'org-ql' or `'org-roam'. If its `org-ql', the results from the
-SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
+  "Basically what `org-ql-search does', but for org-roam-nodes.
+See `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be.  TITLE is a title
+to associate with the view.  DISPLAY-IN is expected to be a symbol,
+either `'org-ql' or `'org-roam'.  If its `org-ql', the results from the
+SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer.  If its
 `org-roam', will be displayed in a org-roam-ql buffer."
   (interactive (list (let* ((query (read-string "Query: " nil 'org-roam-ql--search-query-history)))
                        (setf org-roam-ql--search-query-history (delete-dups
@@ -177,7 +179,9 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
        source-or-query)))
 
 (defun org-roam-ql--get-formatted-title (title source-or-query &optional extended-kwd)
-  "Return the formatted title."
+  "Return the formatted TITLE.
+If TITLE is nil, Use SOURCE-OR-QUERY to generate a title.
+When EXTENDED-KWD is provided, append that to the returned."
   ;; TODO: Think of a better way to get a default title
   (concat (format "org-roam - %s" (or (s-replace "org-roam - " "" (if (stringp title)
                                                                       title
@@ -187,7 +191,7 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
             (format "- %s" extended-kwd))))
 
 (defun org-roam-ql--get-formatted-buffer-name (title)
-  "Return the formatted buffer name."
+  "Return the formatted buffer name from the TITLE."
   (format "*%s*" title))
 
 ;; FIXME: To be performant this can be done by constructing the
@@ -208,14 +212,17 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
 ;;       (org-ql-select buffers query :action action :narrow narrow :sort sort))))
 
 (defun org-roam-ql--nodes-files (nodes)
-  "Returns the list of files from the list of NODES."
+  "Return the list of files from the list of NODES."
   (-uniq (mapcar #'org-roam-node-file nodes)))
 
 (defun org-roam-ql--check-if-list-of-org-roam-nodes-list (source-or-query)
+  "Return non-nil if SOURCE-OR-QUERY is a list of org-roam-nodes."
   (or (org-roam-node-p source-or-query)
         (-all-p #'org-roam-node-p source-or-query)))
 
 (defun org-roam-ql--check-if-org-roam-ql-buffer (source-or-query)
+  "Return non-nil if SOURCE-OR-QUERY is buffer org-roam-ql can understand.
+This would be either an `org-agenda' buffer or a `org-roam' like buffer."
   (-when-let (buffer (and (or (stringp source-or-query)
                                 (bufferp source-or-query))
                             (get-buffer source-or-query)))
@@ -223,6 +230,7 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
                                     (derived-mode-p 'org-roam-mode)))))
 
 (defun org-roam-ql--check-if-org-roam-db-parameters (source-or-query)
+  "Test if SOURCE-OR-QUERY are valid parameters for `org-roam-db-query'."
   (and (listp source-or-query) (vectorp (car source-or-query))))
 
 (defun org-roam-ql--check-if-valid-query (s-exp)
@@ -242,19 +250,20 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer. If its
 
 ;;;###autoload
 (defmacro org-roam-ql-defpred (name extraction-function comparison-function)
-  "Creates a roam-predicate with the NAME.  The COMPARISON-FUNCTION is
-a function that returns non-nil if this predicate doesn't fail for a
-given org-roam-node. The first value passed to this function would be
-the value from calling the EXTRACT-FUNCTION with the respective node,
-and the remainder of the arguments from the predicate itself."
+  "Create a org-roam-ql predicate with the NAME.
+The COMPARISON-FUNCTION is a function that returns non-nil if this
+predicate doesn't fail for a given org-roam-node.  The first value
+passed to this function would be the value from calling the
+EXTRACTION-FUNCTION with the respective node, and the remainder of the
+arguments from the predicate itself."
   `(puthash ,name
             (cons ,extraction-function ,comparison-function)
             org-roam-ql--query-comparison-functions))
 
 (defmacro org-roam-ql-defexpansion (name expansion-function)
-  "Adds an EXPANSION-FUNCTION which will be identified by NAME in a
-  org-roam-ql query. The EXPANSION-FUNCTION should take the parameters
-  passed in the query and return values that can be passed to
+  "Add an EXPANSION-FUNCTION identified by NAME in an org-roam-ql query.
+The EXPANSION-FUNCTION should take the parameters
+passed in the query and return values that can be passed to
   `org-roam-nodes'"
   `(puthash ,name ,expansion-function org-roam-ql--query-expansion-functions))
 
@@ -273,8 +282,8 @@ If EXACT, test if VALUE and REGEXP are equal strings."
 
 ;; TODO: Multivalue properties
 (defun org-roam-ql--predicate-property-match (value prop prop-val)
-  "Return non-nil if PROP is a key in the alist PROP-VAL, and its
-value is a string equal to VALUE."
+  "Return non-nil if PROP is a key in the alist PROP-VAL.
+And its value is a string equal to VALUE."
   (-when-let (val (assoc prop value))
     (s-match prop-val (cdr val))))
 
@@ -283,11 +292,13 @@ value is a string equal to VALUE."
   (--all-p (member it values) (-list tags)))
 
 (cl-defun org-roam-ql--expand-forwardlinks (source-or-query &key (type "id") (combine :and))
-  "Returns parameters org-roam-nodes that would return a list of
-nodes that have forward links to any nodes that SOURCE-OR-QUERY
-resolves to, as a list. TYPE is the type of the link. COMBINE can be
-:and or :or. If :and, only nodes that have forwardlinks to all results of
-source-or-query, else if have forwardlinks to any of them."
+  "Expansion function for forwardlinks.
+Return parameters that cab be passed to org-roam-nodes that would
+return a list of nodes that have forward links to any nodes that
+SOURCE-OR-QUERY resolves to, as a list.  TYPE is the type of the
+link.  COMBINE can be :and or :or.  If :and, only nodes that have
+forwardlinks to all results of source-or-query, else if have
+forwardlinks to any of them."
   (list (apply #'vector
                (append '(:select :distinct links:dest
                                  :from links
@@ -296,16 +307,17 @@ source-or-query, else if have forwardlinks to any of them."
                              `(,(pcase combine
                                   (:and :and)
                                   (:or :or)
-                                  (_ (user-error "keyword :combine should be :and or :or; got %s" combine)))
+                                  (_ (user-error "Keyword :combine should be :and or :or; got %s" combine)))
                                (= type $s2)))))
         (apply #'vector (-map #'org-roam-node-id (org-roam-ql--nodes-cached source-or-query)))
         type))
 
 (cl-defun org-roam-ql--expand-backlinks (source-or-query &key (type "id") (combine :and))
-  "Returns parameters org-roam-nodes that would return a list of nodes
+  "Expansion function for backlinks.
+Returns parameters org-roam-nodes that would return a list of nodes
 that have back links to any nodes that SOURCE-OR-QUERY resolves to, as
-a list. TYPE is the type of the link. COMBINE can be :and or :or. If
-:and, only nodes that have backlinks to all results of
+a list.  TYPE is the type of the link.  COMBINE can be :and or :or.
+If :and, only nodes that have backlinks to all results of
 source-or-query, else if have backlinks to any of them."
   (list (apply #'vector
                (append '(:select :distinct links:source
@@ -315,17 +327,17 @@ source-or-query, else if have backlinks to any of them."
                          `(,(pcase combine
                               (:and :and)
                               (:or :or)
-                              (_ (user-error "keyword :combine should be :and or :or; got %s" combine)))
+                              (_ (user-error "Keyword :combine should be :and or :or; got %s" combine)))
                            (= type $s2)))))
         (apply #'vector (-map #'org-roam-node-id (org-roam-ql--nodes-cached source-or-query)))
         type))
 
 (defun org-roam-ql--expansion-identity (source-or-query)
-  "expansion function that passes the SOURCE-OR-QUERY as is."
+  "Expansion function that passes the SOURCE-OR-QUERY as is."
   source-or-query)
 
 (defun org-roam-ql--predicate-funcall (value f)
-  "Returns the value of calling the function F with VALUE as its parameter."
+  "Return the value of calling the function F with VALUE as its parameter."
   (funcall f value))
 
 ;; *****************************************************************************
@@ -337,15 +349,16 @@ source-or-query, else if have backlinks to any of them."
     (define-key map "v" #'org-roam-ql-buffer-dispatch)
     (define-key map [remap revert-buffer] #'org-roam-ql-refresh-buffer)
     map)
-  "Keymap for roam-buffer. Extends `org-roam-mode-map'")
+  "Keymap for roam-buffer.  Extends `org-roam-mode-map'.")
 
 (define-derived-mode org-roam-ql-mode org-roam-mode "Org-roam-ql"
-  "A major mode to display a list of nodes. Similar to org-roam-mode,
-but doesn't default to the org-roam-buffer-current-node."
+  "A major mode to display a list of nodes.
+Similar to `org-roam-mode', but doesn't default to the
+`org-roam-buffer-current-node'."
   :group 'org-roam-ql)
 
 (defun org-roam-ql--refresh-buffer-with-display-function (display-function)
-  "Refresh a buffer with a display function."
+  "Refresh a buffer with a DISPLAY-FUNCTION."
   (let* ((buffer-name (buffer-name))
          subquery
          (query (pcase org-roam-ql-buffer-in
@@ -376,8 +389,7 @@ but doesn't default to the org-roam-buffer-current-node."
           (org-roam-buffer-refresh)
         (let ((query org-roam-ql-buffer-query)
               (title (or org-roam-ql-buffer-title (org-roam-ql--get-formatted-title
-                                                   (org-roam-node-title org-roam-buffer-current-node) nil "extended")))
-              (in (or org-roam-ql-buffer-in "org-roam-db")))
+                                                   (org-roam-node-title org-roam-buffer-current-node) nil "extended"))))
           (setq org-roam-ql-buffer-query nil
                 org-roam-ql-buffer-title nil
                 org-roam-ql-buffer-in nil)
@@ -388,7 +400,9 @@ but doesn't default to the org-roam-buffer-current-node."
     (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--roam-buffer-for-nodes)))
 
 (defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query)
-  "Render SECTIONS (list of functions) in an org-roam-ql buffer."
+  "Render SECTIONS (list of functions) in an org-roam-ql buffer.
+TITLE is the title, BUFFER-NAME is the name for the buffer.  See
+`org-roam-nodes' for information on SOURCE-OR-QUERY."
   ;; copied  from `org-roam-buffer-render-contents'
   (with-current-buffer (get-buffer-create buffer-name)
     (let ((inhibit-read-only t))
@@ -407,9 +421,10 @@ but doesn't default to the org-roam-buffer-current-node."
     (display-buffer (current-buffer))))
 
 (defmacro org-roam-ql--nodes-section (nodes &optional heading)
-  "Returns a function that can be passed as a section for
-`okm-render-org-roam-buffer' with the NODES.  Nodes should be a list
-of org-roam nodes."
+  "Return a function that generate magit-sections for NODES.
+This can be passed as a section for `okm-render-org-roam-buffer' with
+the NODES.  Nodes should be a list of org-roam nodes.  HEADING is the
+heading of the `magit-section'"
   `(lambda ()
      (magit-insert-section (org-roam)
        (magit-insert-heading ,heading)
@@ -425,14 +440,16 @@ of org-roam nodes."
        (run-hooks 'org-roam-buffer-postrender-functions))))
 
 (defun org-roam-ql--roam-buffer-for-nodes (nodes title buffer-name &optional source-or-query)
-  "View nodes in org-roam-ql buffer"
+  "View nodes in org-roam-ql buffer.
+See `org-roam-ql--render-roam-buffer' for TITLE BUFFER-NAME and SOURCE-OR-QUERY.
+See `org-roam-ql--nodes-section' for NODES."
   (org-roam-ql--render-roam-buffer
    (list
     (org-roam-ql--nodes-section nodes "Nodes:"))
    title buffer-name (or source-or-query nodes)))
 
 (defun org-roam-ql--nodes-from-roam-buffer (buffer)
-  "Collect the org-roam-nodes from a valid buffer."
+  "Collect the org-roam-nodes from a valid BUFFER."
   (with-current-buffer buffer
     (when (derived-mode-p 'org-roam-mode)
       (let (nodes)
@@ -454,7 +471,7 @@ of org-roam nodes."
         nodes))))
 
 ;; *****************************************************************************
-;; org-roam-ql-agenda-view functions 
+;; org-roam-ql-agenda-view functions
 ;; *****************************************************************************
 (defvar org-roam-ql--agenda-map
   (let ((map (make-sparse-keymap)))
@@ -469,7 +486,10 @@ of org-roam nodes."
 Based on `org-agenda-mode-map'.")
 
 (defun org-roam-ql--agenda-buffer-for-nodes (nodes title buffer-name &optional source-or-query super-groups)
-  "Display the nodes in a agenda like buffer."
+  "Display the nodes in a agenda like buffer.
+See `org-roam-ql--render-roam-buffer' for TITLE BUFFER-NAME and SOURCE-OR-QUERY.
+See `org-roam-ql--nodes-section' for NODES.
+See `org-super-agenda' for SUPER-GROUPS."
   (with-current-buffer (get-buffer-create buffer-name)
     (unless (eq major-mode 'org-agenda-mode)
       (org-agenda-mode)
@@ -477,7 +497,6 @@ Based on `org-agenda-mode-map'.")
     (use-local-map org-roam-ql--agenda-map)
     (let* ((strings '())
            (formatted-title (org-roam-ql--get-formatted-title title source-or-query))
-           (buffer (org-roam-ql--get-formatted-buffer-name formatted-title))
            (header (concat (propertize "View: " 'face 'transient-argument)
                            formatted-title))
            (inhibit-read-only t))
@@ -489,7 +508,7 @@ Based on `org-agenda-mode-map'.")
             org-roam-ql-buffer-title title
             org-roam-ql-buffer-in "org-roam-db")
       (if (not nodes)
-          (user-error "Empty result for query.")
+          (user-error "Empty result for query")
         (dolist-with-progress-reporter (node nodes)
             (format "Processing %s nodes" (length nodes))
           (push (org-roam-ql-view--format-node node) strings))
@@ -504,6 +523,7 @@ Based on `org-agenda-mode-map'.")
         (goto-char (point-min))))))
 
 (defun org-roam-ql--get-file-marker (node)
+  "Return a marker for NODE."
   (org-roam-with-file (org-roam-node-file node) t
   ;; (with-current-buffer (find-file-noselect (org-roam-node-file node))
   ;; (with-plain-file (org-roam-node-file node) t
@@ -512,8 +532,9 @@ Based on `org-agenda-mode-map'.")
 
 ;; copied from `org-ql-search'
 (defun org-roam-ql-view--format-node (node)
-  "Return NODE as a string with text-properties set by its property
-list. If NODE is nil, return an empty string."
+  "Format NODE to a string.
+Return NODE as a string with text-properties set by its property
+list.  If NODE is nil, return an empty string."
   (if (not node)
       ""
     (let* ((marker
@@ -558,12 +579,11 @@ list. If NODE is nil, return an empty string."
 
 (defun org-roam-ql--refresh-agenda-buffer ()
   "Refresh the agenda-based org-roam-ql buffer."
-  (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--agenda-buffer-for-nodes)
-  (org-roam-db-sync))
+  (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--agenda-buffer-for-nodes))
 
 (defun org-roam-ql--nodes-from-agenda-buffer (buffer)
-  "Return the list of nodes from the agenda-buffer. If there are
-entries that do not have an ID, it will signal an error"
+  "Return the list of nodes from the `org-agenda' BUFFER.
+If there are entries that do not have an ID, it will signal an error"
   ;; Copied from `org-agenda-finalize'
   (with-current-buffer buffer
     (let (mrk nodes (line-output 0))
@@ -594,7 +614,7 @@ entries that do not have an ID, it will signal an error"
                                           (org-roam-ql--get-formatted-buffer-name
                                            (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer"))
                                           org-roam-ql-buffer-query)
-    (user-error "Not in a org-roam-ql agenda buffer.")))
+    (user-error "Not in a org-roam-ql agenda buffer")))
 
 (defun org-roam-ql-roam-buffer-from-agenda-buffer ()
   "Convert a agenda-buffer reusult to a roam-buffer."
@@ -615,11 +635,12 @@ entries that do not have an ID, it will signal an error"
 (defclass org-roam-ql--variable (transient-variable)
   ((default-value :initarg :default-value)))
 
-(defclass org-roam-ql--variable:choices (org-roam-ql--variable) nil)
+(defclass org-roam-ql--variable--choices (org-roam-ql--variable) nil)
 
-(defclass org-roam-ql--variable:sexp (org-roam-ql--variable) nil)
+(defclass org-roam-ql--variable--sexp (org-roam-ql--variable) nil)
 
 (cl-defmethod transient-init-value ((obj org-roam-ql--variable))
+  "Initialize the transient value of OBJ."
   ;; init value with the given default or the value of the related vairable
   (oset obj value (or (symbol-value (oref obj variable))
                       (and (slot-boundp obj 'default-value)
@@ -636,7 +657,7 @@ entries that do not have an ID, it will signal an error"
     (unless (or value transient--prefix)
       (message "Unset %s" variable))))
 
-(cl-defmethod transient-infix-read ((obj org-roam-ql--variable:choices))
+(cl-defmethod transient-infix-read ((obj org-roam-ql--variable--choices))
   "Pick between CHOICES in OBJ when reading."
   (let ((choices (oref obj choices)))
     (if-let ((value (oref obj value)))
@@ -652,7 +673,7 @@ entries that do not have an ID, it will signal an error"
   "Format of the OBJ's VALUE."
   (oref obj value))
 
-(cl-defmethod transient-format-value ((obj org-roam-ql--variable:choices))
+(cl-defmethod transient-format-value ((obj org-roam-ql--variable--choices))
   "Format of the OBJ's VALUE for choices."
   (let ((value (oref obj value)))
     (format "{ %s }"
@@ -661,7 +682,7 @@ entries that do not have an ID, it will signal an error"
                                    (propertize it 'face 'transient-inactive-value))
                                  (oref obj choices))))))
 
-(cl-defmethod transient-format-value ((obj org-roam-ql--variable:sexp))
+(cl-defmethod transient-format-value ((obj org-roam-ql--variable--sexp))
   "Format of the OBJ's VALUE for sexpressions."
   ;; copied from `org-ql'.
   (let ((value (format "%S" (oref obj value))))
@@ -673,7 +694,7 @@ entries that do not have an ID, it will signal an error"
         (buffer-string)))))
 
 (transient-define-prefix org-roam-ql-buffer-dispatch ()
-  "Show org-roam-buffer dispatcher."
+  "Show `org-roam-buffer' dispatcher."
   ["Edit"
    [("t" org-roam-ql-view--transient-title)
     ("q" org-roam-ql-view--transient-query)
@@ -687,7 +708,7 @@ entries that do not have an ID, it will signal an error"
 
 ;;;###autoload
 (defun org-roam-ql-refresh-buffer ()
-"Refresh org-roam-ql buffer (agenda/org-roam)"
+  "Refresh org-roam-ql buffer (agenda/org-roam)."
   (interactive)
   (cond
    ((derived-mode-p 'org-roam-mode)
@@ -717,7 +738,7 @@ entries that do not have an ID, it will signal an error"
                          history)))
 
 (transient-define-infix org-roam-ql-view--transient-query ()
-  :class 'org-roam-ql--variable:sexp
+  :class 'org-roam-ql--variable--sexp
   :argument ""
   :variable 'org-roam-ql-buffer-query
   :prompt "Query: "
@@ -734,9 +755,9 @@ entries that do not have an ID, it will signal an error"
                                'string-only-history)))))
 
 (transient-define-infix org-roam-ql-view--transient-in ()
-  :class 'org-roam-ql--variable:choices
+  :class 'org-roam-ql--variable--choices
   :argument ""
-  :variable 'org-roam-ql-buffer-in 
+  :variable 'org-roam-ql-buffer-in
   :default-value "org-roam-db"
   :prompt "In: "
   :always-read t
@@ -747,7 +768,7 @@ entries that do not have an ID, it will signal an error"
 ;; *****************************************************************************
 
 (defun org-dblock-write:org-roam-ql (params)
-  "Write org block for org-roam-ql."
+  "Write org block for org-roam-ql with PARAMS."
   (let ((query (plist-get params :query))
         (columns (plist-get params :columns))
         (take (plist-get params :take))
@@ -757,8 +778,8 @@ entries that do not have an ID, it will signal an error"
             (progn
               (when take
                 (setq nodes (cl-etypecase take
-                             ((and integer (satisfies cl-minusp)) (-take-last (abs take) nodes))
-                             (integer (-take take nodes)))))
+                              ((and integer (satisfies cl-minusp)) (-take-last (abs take) nodes))
+                              (integer (-take take nodes)))))
               (insert "|"
                       (if no-link "" "|")
                       (string-join (--map (pcase it
@@ -773,14 +794,13 @@ entries that do not have an ID, it will signal an error"
                             ""
                           (format "[[id:%s][link]]|" (org-roam-node-id node)))
                         (string-join (--map (let ((value (funcall (intern-soft
-                                                                 (format "org-roam-node-%s" it))
-                                                                      node)))
-                                                  (pcase value
-                                                    ((pred listp) (string-join (--map (format "%s" it) value) ","))
-                                                    (string value)
-                                                    (_ (format "%s" value))))
+                                                                   (format "org-roam-node-%s" it))
+                                                                  node)))
+                                              (pcase value
+                                                ((pred listp) (string-join (--map (format "%s" it) value) ","))
+                                                (_ (format "%s" value))))
                                             columns)
-                                         "|")
+                                     "|")
                         "|\n"))
               (delete-char -1)
               (org-table-align))
@@ -789,8 +809,8 @@ entries that do not have an ID, it will signal an error"
 
 ;; Useful helper functions
 (defun org-roam-ql-insert-node-title ()
-  "Select a node and insert only its title. Can be used in the
-minibuffer or when writting querries."
+  "Select a node and insert only its title.
+Can be used in the minibuffer or when writting querries."
   (interactive)
   (insert (format "\"%s\"" (org-roam-node-title (org-roam-node-read nil nil nil t)))))
 
