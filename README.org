@@ -107,7 +107,9 @@ Optionally, ~org-roam-ql~ results can be visualized in [[https://github.com/alph
   (use-package org-roam-ql-ql
     :straight (org-roam-q-ql :type git :host github :repo "ahmed-shariff/org-roam-ql"
                              :files (:defaults (:exclude "org-roam-ql.el")))
-    :after (org-roam org-ql org-roam-ql))
+    :after (org-ql org-roam-ql)
+    :config
+    (org-roam-ql-ql-init))
 #+end_src
 
 Note that the org-ql only works with org entries, i.e., `heading nodes`. Hence, if there any file-nodes in the result, they will not be displayed. To be clear about that, when org-roam-ql results are displayed in an org-ql-view buffer, a warning is added to the end mentioning how many file-nodes were there in the result. If the extension is loaded, you may view the org-roam-ql results with ~Q~ from the org-roam-ql transient. A org-ql-view can be viewed in an org-roam like buffer with ~R~ from the org-ql-view transient.

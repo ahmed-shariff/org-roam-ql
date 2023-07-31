@@ -168,16 +168,19 @@ parameters were ever passed"
                                              (org-roam-ql--get-formatted-title b nil "from org-ql-view"))
                                             `(in-buffer ,b)))))
 
-(advice-add 'org-ql-view-refresh :around #'org-roam-ql-ql--refresh)
+;;;###autoload
+(defun org-roam-ql-ql-init ()
+  "Integrate `org-roam-ql' into `org-ql'."
+  (advice-add 'org-ql-view-refresh :around #'org-roam-ql-ql--refresh)
 
-(transient-insert-suffix
-  'org-roam-ql-buffer-dispatch '(1 -1)
-  [("Q" "View in org-ql buffer" org-roam-ql-ql-buffer-from-roam-buffer)])
+  (transient-insert-suffix
+    'org-roam-ql-buffer-dispatch '(1 -1)
+    [("Q" "View in org-ql buffer" org-roam-ql-ql-buffer-from-roam-buffer)])
 
-(transient-insert-suffix
-  'org-ql-view-dispatch '(1)
-  [["org-roam-ql"
-    ("R" "View in org roam buffer" org-roam-ql-ql-roam-buffer-from-agenda-buffer)]])
+  (transient-insert-suffix
+    'org-ql-view-dispatch '(1)
+    [["org-roam-ql"
+      ("R" "View in org roam buffer" org-roam-ql-ql-roam-buffer-from-agenda-buffer)]]))
 
 (provide 'org-roam-ql-ql)
 
