@@ -25,7 +25,6 @@
 ;; Version: 0.1
 ;; Package-Requires: ((emacs "28") (org-roam-ql "0.1") (org-ql "0.7") (org-roam "2.2.0") (s "1.12.0") (transient "0.4"))
 ;; Homepage: https://github.com/ahmed-shariff/org-roam-ql
-;; Keywords: org-roam, query, org
 ;; SPDX-License-Identifier: MIT
 
 ;;; Commentary:

@@ -25,7 +25,6 @@
 ;; Version: 0.1
 ;; Package-Requires: ((emacs "28") (org-roam "2.2.0") (s "1.12.0") (magit-section "3.3.0") (transient "0.4") (org-super-agenda "1.2"))
 ;; Homepage: https://github.com/ahmed-shariff/org-roam-ql
-;; Keywords: org-roam, query
 ;; SPDX-License-Identifier: MIT
 
 ;;; Commentary:
@@ -420,7 +419,7 @@ TITLE is the title, BUFFER-NAME is the name for the buffer.  See
   "Return a function that generate magit-sections for NODES.
 This can be passed as a section for `okm-render-org-roam-buffer' with
 the NODES.  Nodes should be a list of org-roam nodes.  HEADING is the
-heading of the `magit-section'"
+heading for the function `magit-section'"
   `(lambda ()
      (magit-insert-section (org-roam)
        (magit-insert-heading ,heading)
@@ -586,13 +585,13 @@ If there are entries that do not have an ID, it will signal an error"
       (save-excursion
         (goto-char (point-min))
         (while (equal line-output 0)
-	  (when (setq mrk (get-text-property (point) 'org-hd-marker))
+          (when (setq mrk (get-text-property (point) 'org-hd-marker))
             (org-with-point-at mrk
               ;; pick only nodes
               (-if-let (id (org-id-get))
                   (push (org-roam-node-from-id id) nodes)
-                (user-error (format "Non roam-node headings in query (in buffer %s)."
-                                    (buffer-name))))))
+                (user-error "Non roam-node headings in query (in buffer %s).?"
+                            (buffer-name)))))
           (setq line-output (forward-line))))
       nodes)))
 
@@ -605,11 +604,11 @@ If there are entries that do not have an ID, it will signal an error"
   "Convert a roam buffer to agenda buffer."
   (interactive)
   (if (derived-mode-p 'org-roam-mode)
-    (org-roam-ql--agenda-buffer-for-nodes (org-roam-ql--nodes-from-roam-buffer (current-buffer))
-                                          (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer")
-                                          (org-roam-ql--get-formatted-buffer-name
-                                           (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer"))
-                                          org-roam-ql-buffer-query)
+      (org-roam-ql--agenda-buffer-for-nodes (org-roam-ql--nodes-from-roam-buffer (current-buffer))
+                                            (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer")
+                                            (org-roam-ql--get-formatted-buffer-name
+                                             (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer"))
+                                            org-roam-ql-buffer-query)
     (user-error "Not in a org-roam-ql agenda buffer")))
 
 (defun org-roam-ql-roam-buffer-from-agenda-buffer ()
@@ -685,12 +684,12 @@ If there are entries that do not have an ID, it will signal an error"
     (with-temp-buffer
       (delay-mode-hooks
         (insert value)
-        (funcall 'emacs-lisp-mode)
+        (funcall #'emacs-lisp-mode)
         (font-lock-ensure)
         (buffer-string)))))
 
 (transient-define-prefix org-roam-ql-buffer-dispatch ()
-  "Show `org-roam-buffer' dispatcher."
+  "Show `org-roam-ql' dispatcher."
   ["Edit"
    [("t" org-roam-ql-view--transient-title)
     ("q" org-roam-ql-view--transient-query)
