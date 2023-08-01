@@ -143,7 +143,7 @@ internal functions"
         (--filter (let ((val (funcall (car query-comparison-function-info) it)))
                     (and val
                          (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
-                 (org-roam-node-list)))
+                  (org-roam-node-list)))
        ;; `org-roam-ql-nodes' will error if query is invalid
        (t (org-roam-ql--nodes-cached query))))))
 
@@ -165,13 +165,13 @@ SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer.  If its
                            (list query)
                          query))
                      (read-string "Title: ")))
-    (let* ((nodes (org-roam-ql-nodes source-or-query)))
-      (org-roam-ql--roam-buffer-for-nodes
-       nodes
-       title
-       (org-roam-ql--get-formatted-buffer-name
-        (org-roam-ql--get-formatted-title title source-or-query))
-       source-or-query)))
+  (let* ((nodes (org-roam-ql-nodes source-or-query)))
+    (org-roam-ql--roam-buffer-for-nodes
+     nodes
+     title
+     (org-roam-ql--get-formatted-buffer-name
+      (org-roam-ql--get-formatted-title title source-or-query))
+     source-or-query)))
 
 (defun org-roam-ql--get-formatted-title (title source-or-query &optional extended-kwd)
   "Return the formatted TITLE.
@@ -213,14 +213,14 @@ When EXTENDED-KWD is provided, append that to the returned."
 (defun org-roam-ql--check-if-list-of-org-roam-nodes-list (source-or-query)
   "Return non-nil if SOURCE-OR-QUERY is a list of org-roam-nodes."
   (or (org-roam-node-p source-or-query)
-        (-all-p #'org-roam-node-p source-or-query)))
+      (-all-p #'org-roam-node-p source-or-query)))
 
 (defun org-roam-ql--check-if-org-roam-ql-buffer (source-or-query)
   "Return non-nil if SOURCE-OR-QUERY is buffer org-roam-ql can understand.
 This would be either an `org-agenda' buffer or a `org-roam' like buffer."
   (-when-let (buffer (and (or (stringp source-or-query)
-                                (bufferp source-or-query))
-                            (get-buffer source-or-query)))
+                              (bufferp source-or-query))
+                          (get-buffer source-or-query)))
     (with-current-buffer buffer (or (derived-mode-p 'org-agenda-mode)
                                     (derived-mode-p 'org-roam-mode)))))
 
@@ -298,12 +298,12 @@ forwardlinks to any of them."
                (append '(:select :distinct links:dest
                                  :from links
                                  :where (in links:source $v1))
-                           (when type
-                             `(,(pcase combine
-                                  (:and :and)
-                                  (:or :or)
-                                  (_ (user-error "Keyword :combine should be :and or :or; got %s" combine)))
-                               (= type $s2)))))
+                       (when type
+                         `(,(pcase combine
+                              (:and :and)
+                              (:or :or)
+                              (_ (user-error "Keyword :combine should be :and or :or; got %s" combine)))
+                           (= type $s2)))))
         (apply #'vector (-map #'org-roam-node-id (org-roam-ql--nodes-cached source-or-query)))
         type))
 
@@ -520,8 +520,8 @@ See `org-super-agenda' for SUPER-GROUPS."
 (defun org-roam-ql--get-file-marker (node)
   "Return a marker for NODE."
   (org-roam-with-file (org-roam-node-file node) t
-  ;; (with-current-buffer (find-file-noselect (org-roam-node-file node))
-  ;; (with-plain-file (org-roam-node-file node) t
+    ;; (with-current-buffer (find-file-noselect (org-roam-node-file node))
+    ;; (with-plain-file (org-roam-node-file node) t
     (goto-char (org-roam-node-point node))
     (point-marker)))
 
@@ -556,21 +556,21 @@ list.  If NODE is nil, return an empty string."
                       (org-roam-node-title node)
                       nil;;due-string
                       (when-let (tags (org-roam-node-tags node))
-                         (--> tags
-                           (s-join ":" it)
-                           (s-wrap it ":")
-                           (org-add-props it nil 'face 'org-tag))))))))
+                        (--> tags
+                             (s-join ":" it)
+                             (s-wrap it ":")
+                             (org-add-props it nil 'face 'org-tag))))))))
       (remove-list-of-text-properties 0 (length string) '(line-prefix) string)
       ;; Add all the necessary properties and faces to the whole string
       (--> string
-        ;; FIXME: Use proper prefix (from org-ql, what does this mean?)
-        (concat "  " it)
-        (org-add-props it properties
-          'org-agenda-type 'search
-          'todo-state (org-roam-node-todo node)
-          'tags (org-roam-node-tags node)
-          ;;'org-habit-p (org)
-          )))))
+           ;; FIXME: Use proper prefix (from org-ql, what does this mean?)
+           (concat "  " it)
+           (org-add-props it properties
+             'org-agenda-type 'search
+             'todo-state (org-roam-node-todo node)
+             'tags (org-roam-node-tags node)
+             ;;'org-habit-p (org)
+             )))))
 
 (defun org-roam-ql--refresh-agenda-buffer ()
   "Refresh the agenda-based org-roam-ql buffer."
