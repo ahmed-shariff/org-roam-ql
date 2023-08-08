@@ -1,6 +1,6 @@
 #+author: Shariff AM Faleel
 #+language: en
-
+#+HTML: <a href="https://melpa.org/#/org-roam-ql"><img src="https://melpa.org/packages/org-roam-ql-badge.svg"></a> <a href="https://stable.melpa.org/#/org-roam-ql"><img src="https://stable.melpa.org/packages/org-roam-ql-badge.svg"></a>
 * org-roam-ql - query language for org-roam
 
 *This package is under active development.*
