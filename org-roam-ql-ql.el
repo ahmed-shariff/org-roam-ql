@@ -121,7 +121,7 @@ parameters were ever passed"
       (when nodes
         (setq org-ql-view-buffers-files (org-roam-ql--nodes-files nodes)))))
   (apply other-func rest)
-  (when-let ((_ org-roam-ql-ql--current-nodes)
+  (when-let ((-have-nodes org-roam-ql-ql--current-nodes)
              (file-nodes (--filter (equal (org-roam-node-level it) 0) org-roam-ql-ql--current-nodes)))
     (let ((inhibit-read-only t))
       (goto-char (point-max))
