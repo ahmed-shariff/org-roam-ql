@@ -1,6 +1,7 @@
 #+author: Shariff AM Faleel
 #+language: en
-#+HTML: <a href="https://melpa.org/#/org-roam-ql"><img src="https://melpa.org/packages/org-roam-ql-badge.svg"></a> <a href="https://stable.melpa.org/#/org-roam-ql"><img src="https://stable.melpa.org/packages/org-roam-ql-badge.svg"></a>
+#+HTML: <table> <tr> <td> org-roam-ql </td> <td> <a href="https://melpa.org/#/org-roam-ql"><img src="https://melpa.org/packages/org-roam-ql-badge.svg"></a> </td> <td> <a href="https://stable.melpa.org/#/org-roam-ql"><img src="https://stable.melpa.org/packages/org-roam-ql-badge.svg"></a> </td> </tr> <tr> <td> org-roam-ql-ql </td> <td> <a href="https://melpa.org/#/org-roam-ql-ql"><img src="https://melpa.org/packages/org-roam-ql-ql-badge.svg"></a> </td> <td> <a href="https://stable.melpa.org/#/org-roam-ql-ql"><img src="https://stable.melpa.org/packages/org-roam-ql-ql-badge.svg"></a> </td> </tr> </table>
+
 * org-roam-ql - query language for org-roam
 
 *This package is under active development.*
@@ -17,21 +18,28 @@ The transient is available in the org-roam buffer as well, this allows you to st
 
 [[images/demo3.gif]]
 
-** Installation
+** Installation/Setup
+~org-roam-ql~ can be installed from [[https://melpa.org/#/org-roam-ql][MELPA]] or with other package management tools like [[https://framagit.org/steckerhalter/quelpa][quelpa]] and [[https://github.com/radian-software/straight.el][straight]]
+
 Example configuration:
 #+begin_src emacs-lisp
   (use-package org-roam-ql
+    ;; If using straight
     :straight (org-roam-ql :type git :host github :repo "ahmed-shariff/org-roam-ql"
                            :files (:defaults (:exclude "org-roam-ql-ql.el")))
+    ;; If using quelpa
+    :quelpa (org-roam-ql :fetcher github :repo "ahmed-shariff/org-roam-ql"
+                         :files (:defaults (:exclude "org-roam-ql-ql.el")))
+    ;; Simple configuration
     :after (org-roam)
     :bind ((:map org-roam-mode-map
-            ;; Have org-roam-ql's transient available in org-roam-mode buffers
-            ("v" . org-roam-ql-buffer-dispatch)
-            :map minibuffer-mode-map
-            ;; Be able to add titles in queries while in minibuffer.
-            ;; This is similar to `org-roam-node-insert', but adds
-            ;; only title as a string.
-            ("C-c n i" . org-roam-ql-insert-node-title))))
+                 ;; Have org-roam-ql's transient available in org-roam-mode buffers
+                 ("v" . org-roam-ql-buffer-dispatch)
+                 :map minibuffer-mode-map
+                 ;; Be able to add titles in queries while in minibuffer.
+                 ;; This is similar to `org-roam-node-insert', but adds
+                 ;; only title as a string.
+                 ("C-c n i" . org-roam-ql-insert-node-title))))
 #+end_src
 
 ** Usage
@@ -102,11 +110,17 @@ Following is an example of a dynamic block and its result.
 
 [[file:images/dynamic-block.jpg]]
 ** Working with ~org-ql~ 
-Optionally, ~org-roam-ql~ results can be visualized in [[https://github.com/alphapapa/org-ql][org-ql]], available through the extension ~org-roam-ql-ql~ (naming things is hard!!)
+Optionally, ~org-roam-ql~ results can be visualized in [[https://github.com/alphapapa/org-ql][org-ql]], available through the extension ~org-roam-ql-ql~ (naming things is hard!!). This is also can be installed from [[https://melpa.org/#/org-roam-ql-ql][MELPA]] or with other package management tools like [[https://framagit.org/steckerhalter/quelpa][quelpa]] and [[https://github.com/radian-software/straight.el][straight]].
+
 #+begin_src emacs-lisp
   (use-package org-roam-ql-ql
-    :straight (org-roam-q-ql :type git :host github :repo "ahmed-shariff/org-roam-ql"
-                             :files (:defaults (:exclude "org-roam-ql.el")))
+    ;; If using straight
+    :straight (org-roam-ql-ql :type git :host github :repo "ahmed-shariff/org-roam-ql"
+                              :files (:defaults (:exclude "org-roam-ql.el")))
+    ;; If using quelpa
+    :quelpa (org-roam-ql-ql :fetcher github :repo "ahmed-shariff/org-roam-ql"
+                            :files (:defaults (:exclude "org-roam-ql.el")))
+    ;; Simple config
     :after (org-ql org-roam-ql)
     :config
     (org-roam-ql-ql-init))
