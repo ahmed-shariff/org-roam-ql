@@ -83,6 +83,8 @@ See `org-super-agenda' for SUPER-GROUPS."
 
 (org-ql-defpred org-roam-query (query)
   "To be used with the org-roam-ql. Checks if a node is a result of a passed query."
+  ;; FIXME: Adding body because of Warning: Unused lexical argument `query'
+  :body (cl-assert query)
   :preambles ((`(,predicate-names . ,query)
                (list :regexp (rx-to-string
                               `(seq bol (0+ space) ":ID:" (0+ space)
