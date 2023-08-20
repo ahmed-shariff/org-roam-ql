@@ -122,16 +122,21 @@ internal functions"
 
 (defun org-roam-ql--expand-query (query)
   "Expand a org-roam-ql QUERY."
-  (if (and (listp query) (member (car query) '(or and)))
+  (if (and (listp query) (member (car query) '(or and not)))
       ;; FIXME: two nodes are not equal? using this -compare-fn as workaround
       (let ((-compare-fn (lambda (node1 node2)
                            (s-equals-p (org-roam-node-id node1) (org-roam-node-id node2)))))
-        (funcall
-         #'-reduce
-         (pcase (car query)
-           ('or #'-union)
-           ('and #'-intersection))
-         (--map (org-roam-ql--expand-query it) (cdr query))))
+        (if (eq (car query) 'not)
+            (-difference
+             ;; Caching values
+             (org-roam-ql--nodes-cached (org-roam-node-list))
+             (org-roam-ql--expand-query (cadr query)))
+          (funcall
+           #'-reduce
+           (pcase (car query)
+             ('or #'-union)
+             ('and #'-intersection))
+           (--map (org-roam-ql--expand-query it) (cdr query)))))
     (let* ((query-key (and (listp query) (car query)))
            (query-expansion-function (gethash query-key org-roam-ql--query-expansion-functions))
            (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
@@ -143,7 +148,8 @@ internal functions"
         (--filter (let ((val (funcall (car query-comparison-function-info) it)))
                     (and val
                          (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
-                  (org-roam-node-list)))
+                  ;; Caching values
+                  (org-roam-ql--nodes-cached (org-roam-node-list))))
        ;; `org-roam-ql-nodes' will error if query is invalid
        (t (org-roam-ql--nodes-cached query))))))
 
@@ -231,7 +237,7 @@ This would be either an `org-agenda' buffer or a `org-roam' like buffer."
 (defun org-roam-ql--check-if-valid-query (s-exp)
   "Check if S-EXP can be expanded to a roam-query."
   (if (listp s-exp)
-      (or (and (member (car s-exp) '(or and))
+      (or (and (member (car s-exp) '(or and not))
                (-all-p #'identity (--map (org-roam-ql--check-if-valid-query it) (cdr s-exp))))
           (or (gethash (car s-exp) org-roam-ql--query-comparison-functions)
               (gethash (car s-exp) org-roam-ql--query-expansion-functions)))

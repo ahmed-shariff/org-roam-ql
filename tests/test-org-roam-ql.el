@@ -43,6 +43,13 @@
                                                   (s-match "DONE" todo-state))
                                              (member "interesting" tags)))
                                        (org-roam-node-list)))
+                                #'string>)))
+      (it "not"
+        (expect (sort (-map #'org-roam-node-id (org-roam-ql-nodes '(not (tags "interesting")))) #'string>)
+                :to-equal (sort (-map #'org-roam-node-id
+                                      (--filter
+                                       (not (member "interesting" (org-roam-node-tags it)))
+                                       (org-roam-node-list)))
                                 #'string>))))
     (describe "with function"
       (it "returning list of nodes"

@@ -61,6 +61,7 @@ Example configuration:
     Currently, the query can have the following predicates:
       - ~(or ARG1 ARG2 ...)~ : Test if a node satisfies any of the parameters (when it's a predicate) or is contained in any of them (acceptable values for QUERY in ~org-roam-ql-nodes~). ARG1, ARG2, etc. are any other predicates or an acceptable value QUERY for ~org-roam-ql-nodes~.
       - ~(and ARG1 ARG2 ...)~ : Similar to ~or~, but should satisfy all conditions or contained in the result of acceptable values for QUERY.
+      - ~(not QUERY)~ : Tests if a node doesn't match the result of QUERY. QUERY is any valid SOURCE-OR-QUERY.
       - ~(file REGEXP &optional EXACT)~ : Test if nodes file name matches REGEXP. If EXACT is non-nil, the file slot should be an exact match to REGEXP. Note the file slot of an org-roam-node would contain the absolute path.
       - ~(file-title REGEXP &optional EXACT)~ : Similar to ~file~, tests the file-title slot of a node.
       - ~(id ID)~ : Tests if the ID of a node is a match to the value passed.
