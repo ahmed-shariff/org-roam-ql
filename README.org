@@ -2,13 +2,23 @@
 #+language: en
 #+HTML: <table> <tr> <td> org-roam-ql </td> <td> <a href="https://melpa.org/#/org-roam-ql"><img src="https://melpa.org/packages/org-roam-ql-badge.svg"></a> </td> <td> <a href="https://stable.melpa.org/#/org-roam-ql"><img src="https://stable.melpa.org/packages/org-roam-ql-badge.svg"></a> </td> </tr> <tr> <td> org-roam-ql-ql </td> <td> <a href="https://melpa.org/#/org-roam-ql-ql"><img src="https://melpa.org/packages/org-roam-ql-ql-badge.svg"></a> </td> <td> <a href="https://stable.melpa.org/#/org-roam-ql-ql"><img src="https://stable.melpa.org/packages/org-roam-ql-ql-badge.svg"></a> </td> </tr> </table>
 
-* org-roam-ql - query language for org-roam
+#+TITLE: org-roam-ql - query language for org-roam
 
 *This package is under active development.*
 
 This package an interface to easily query and display results from your ~org-roam~ database. 
 
-** Screen-shots
+* Contents
+- [[#screen-shots][Screen-shots]]
+- [[#installationSetup][Installation/Setup]]
+- [[#usage][Usage]]
+  - [[#installationsetup][Installation/Setup]]
+  - [[#valid-values-for-source-or-query][Valid values for SOURCE-OR-QUERY]]
+  - [[#adding-new-predicates][Adding new predicates]]
+  - [[#org-dynamic-block][Org dynamic block]]
+- [[#working-with-org-ql][Working with org-ql]]
+
+* Screen-shots
 
 You can query org-roam with ~org-roam-ql-search~. The results are displayed in an org-roam like buffer. org-roam-ql also comes with a transient that can be used to modify the results viewed. The transient can be activated with ~v~. You can modify the title (~t~), query (~q~) and specify if the query is a subquery (apply query on the results of the buffer) or query against the org-roam database (~i~). Refreshing the buffer (~r~) will display the updated results.
 
@@ -18,7 +28,7 @@ The transient is available in the org-roam buffer as well, this allows you to st
 
 [[images/demo3.gif]]
 
-** Installation/Setup
+* Installation/Setup
 ~org-roam-ql~ can be installed from [[https://melpa.org/#/org-roam-ql][MELPA]] or with other package management tools like [[https://framagit.org/steckerhalter/quelpa][quelpa]] and [[https://github.com/radian-software/straight.el][straight]]
 
 Example configuration:
@@ -42,65 +52,69 @@ Example configuration:
                  ("C-c n i" . org-roam-ql-insert-node-title))))
 #+end_src
 
-** Usage
-*** Commands/functions
-
-- ~(org-roam-ql-search SOURCE-OR-QUERY &optional TITLE QUERY)~ - This is an interactive command that creates a ~org-ql~ buffer with the nodes of the corresponding ~SOURCE-OR-QUERY~ with ~TITLE~. Additionally, this also takes a ~org-ql~ query, which will be used to further filter the results from the ~SOURCE-OR-QUERY~. ~SOURCE-OR-QUERY~ is the same as ~org-roam-ql-node~. When called interactively. This can also be called interactively, see below of what the values of ~SOURCE-OR-QUERY~ can be.
-- ~(org-roam-ql-nodes SOURCE-OR-QUERY)~ - Given a SOURCE-OR-QUERY, return a list of nodes. SOURCE-OR-QUERY can be one of the following:
-  - A list of parameters that can be passed to ~org-roam-db-query~. Should be a list of the form ~(QUERY ARG1 ARG2...)~. The result of calling ~org-roam-db-query~ with these parameters should return a list of records where the first element is the ID of a corresponding node. For example:
+* Usage
+** Commands/functions
+- =org-roam-ql-search (SOURCE-OR-QUERY &optional TITLE)= :: This is an interactive command that creates a ~org-roam-ql~ buffer with the nodes of the corresponding ~SOURCE-OR-QUERY~ with ~TITLE~. An ~org-roam-ql~ buffer is functionally similar to the ~org-roam-buffer~, but allows displaying any list of nodes (see screen-shots above). ~SOURCE-OR-QUERY~ is the same as ~org-roam-ql-node~. When called interactively, it will prompt for the ~SOURCE-OR-QUERY~ and ~TITLE~.
+- =org-roam-ql-nodes (SOURCE-OR-QUERY)= :: Given a ~SOURCE-OR-QUERY~, return a list of nodes. See below for ~SOURCE-OR-QUERY~.
+** Valid values for ~SOURCE-OR-QUERY~
+- A list of parameters that can be passed to ~org-roam-db-query~ :: It should be a list of the form ~(QUERY ARG1 ARG2...)~. The result of calling ~org-roam-db-query~ with these parameters should return a list of records where the first element is the ID of a corresponding node. For example:
   #+begin_src emacs-lisp
   (org-roam-ql-nodes '([:select [id] :from nodes :where (= todo \"TODO\")]))
   #+end_src
-  - A buffer or buffer-name of a ~org-roam~ buffer or a ~org-roam-ql~ buffer.
-  - A function that returns a list of ~org-roam-nodes~
-  - A QUERY which can be passed to ~org-roam-query~, which in itself is a ~org-ql~ predicate.
+- Buffer name :: A buffer or buffer-name of a ~org-roam~ buffer, a ~org-roam-ql~ buffer or an agenda like buffer displaying a list of org-roam nodes.
+- Function :: A function that returns a list of ~org-roam-nodes~
+- A ~QUERY~ :: This is a predicate, similar to the predicates in [[https://github.com/alphapapa/org-ql][org-ql]]. Returns all nodes that pass for the given predicate. For example, consider the following call to ~org-roam-ql-nodes~:
     #+begin_src emacs-lisp
     (org-roam-ql-nodes '(and (todo "TODO") (tags "tag1" "tag2") "*org-roam*"))
     #+end_src
-    The QUERY passed above would test on all org-roam-nodes returned by ~(org-roam-nodes-list)~. In the above example, the result would contain any nodes that have todo set to TODO, have tags "tag1" and "tag2" and is in the org-roam buffer.
-    Currently, the query can have the following predicates:
-      - ~(or ARG1 ARG2 ...)~ : Test if a node satisfies any of the parameters (when it's a predicate) or is contained in any of them (acceptable values for QUERY in ~org-roam-ql-nodes~). ARG1, ARG2, etc. are any other predicates or an acceptable value QUERY for ~org-roam-ql-nodes~.
-      - ~(and ARG1 ARG2 ...)~ : Similar to ~or~, but should satisfy all conditions or contained in the result of acceptable values for QUERY.
-      - ~(not QUERY)~ : Tests if a node doesn't match the result of QUERY. QUERY is any valid SOURCE-OR-QUERY.
-      - ~(file REGEXP &optional EXACT)~ : Test if nodes file name matches REGEXP. If EXACT is non-nil, the file slot should be an exact match to REGEXP. Note the file slot of an org-roam-node would contain the absolute path.
-      - ~(file-title REGEXP &optional EXACT)~ : Similar to ~file~, tests the file-title slot of a node.
-      - ~(id ID)~ : Tests if the ID of a node is a match to the value passed.
-      - ~(level LEVEL)~ : Tests if the level of a node is equal to LEVEL.
-      - ~(todo REGEXP &optional EXACT)~ : Similar to ~file~, tests the todo state of a node.
-      - ~(priority REGEXP &optional EXACT)~ : Similar to ~file~, tests the priority of a node.
-      - ~(scheduled)~ : TBD
-      - ~(deadline)~ : TBD
-      - ~(title REGRXP &optional EXACT)~ : Similar to ~file~, tests the title of a node.
-      - ~(properties PROP PROP-VAL)~ : Tests if the value of the property of a node PROP is a match to PROP-VAL. PROP-VAL can be a regular expression.
-      - ~(tags TAG1 TAG2 ...)~ : Tests if the tags of a node have TAG1, TAG2, etc.
-      - ~(refs REGEXP &optional EXACT)~ : Similar to ~file~, tests the nodes refs slot.
-      - ~(backlink-to QUERY)~ : Tests if the node has a backlink to any of the nodes from the resulting QUERY. QUERY is acceptable value for ~org-roam-ql-nodes~.
-      - ~(backlink-from QUERY)~ : Similar to ~backlink-to~, tests if there are any backlinks from (forwardlinks) the resulting nodes from QUERY.
-      - ~(in-buffer BUFFER-NAME)~ : This is similar to passing a buffer-name to ~org-roam-ql-nodes~. Tests if a node is in the org-roam buffer named BUFFER-NAME.
-      - ~(nodes-list NODES-LIST)~ : This is similar to passing a list of nodes to ~org-roam-ql-nodes~. Tests if a node is in the NODES-LIST.
-      - ~(function FUNC)~ : This is similar to passing a function to ~org-roam-ql-nodes~. Tests if the node is in the result of executing the function FUNC.
-      - ~(funcall FUNC)~ : Tests a node with the function FUNC, which takes an org-roam node as parameter. Test passes if the function returns non-nil.
-- ~(org-roam-ql-defpred NAME EXTRACTION-FUNCTION COMPARISON-FUNCTION)~ - Creates a predicate that can be used in QUERY to ~org-roam-ql-nodes~. For example, for a predicate defined as follows:
+    In the above example, the result would contain any nodes whose todo state is =TODO=, has tags "tag1" and "tag2" and is in the org-roam buffer.
+    Following are predicates available by default in org-roam-ql:
+   - =or (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)= :: Tests if a node matches/contained-in any of the ~SOURCE-OR-QUERY~'s. 
+   - =and (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)= :: Similar to ~or~, but should satisfy all predicates or contained in the results or any of the ~SOURCE-OR-QUERY~'s.
+   - =not (SOURCE-OR-QUERY)= :: Tests if a node doesn't match the result or not contained in the result of ~SOURCE-OR-QUERY~.
+   - =file (REGEXP &optional EXACT)= :: Test if nodes file name matches ~REGEXP~. If ~EXACT~ is non-nil, the file slot should be an exact match to ~REGEXP~. Note the file slot of an org-roam-node would contain the absolute path.
+   - =file-title (REGEXP &optional EXACT)= :: Similar to ~file~, tests the ~file-title~ slot of a node.
+   - =id (ID)= :: Tests if the ~ID~ of a node is a match to the value passed.
+   - =level (LEVEL)= :: Tests if the ~level~ of a node is equal to ~LEVEL~.
+   - =todo (REGEXP &optional EXACT)= :: Similar to ~file~, tests the todo state of a node.
+   - =priority (REGEXP &optional EXACT)= :: Similar to ~file~, tests the priority of a node.
+   - =scheduled= :: TBD
+   - =deadline= :: TBD
+   - =title (REGRXP &optional EXACT)= :: Similar to ~file~, tests the title of a node.
+   - =properties (PROP PROP-VAL)= :: Tests if the value of the property of a node PROP is a match to PROP-VAL. PROP-VAL can be a regular expression.
+   - =tags (TAG1 TAG2 ...)= :: Tests if the tags of a node have TAG1, TAG2, etc.
+   - =refs (REGEXP &optional EXACT)= :: Similar to ~file~, tests the nodes refs slot.
+   - =backlink-to (SOURCE-OR-QUERY)= :: Tests if the node has a backlink to any of the nodes from the results ~SOURCE-OR-QUERY~.
+   - =backlink-from (SOURCE-OR-QUERY)= :: Similar to ~backlink-to~, tests if there are any backlinks from (aka forwardlinks) the resulting nodes from ~SOURCE-OR-QUERY~.
+   - =in-buffer (BUFFER-NAME)= :: This is similar to passing a buffer-name as ~SOURCE-OR-QUERY~. Tests if a node is in the org-roam buffer named ~BUFFER-NAME~.
+   - =nodes-list (NODES-LIST)= :: This is similar to passing a list of nodes as ~SOURCE-OR-QUERY~. Tests if a node is in the ~NODES-LIST~.
+   - =function (FUNC)= :: This is similar to passing a function as ~SOURCE-OR-QUERY~. Tests if the node is in the result of executing the function ~FUNC~.
+   - =funcall (FUNC)= :: Tests a node with the function ~FUNC~, which takes an org-roam node as parameter. Test passes if the function returns non-nil.
+
+** Adding new predicates
+There are two ways to add a new predicate to org-roam-ql: 
+- =org-roam-ql-defpred (NAME EXTRACTION-FUNCTION COMPARISON-FUNCTION)= :: Creates a predicate that can be used as ~SOURCE-OR-QUERY~. For example, for a predicate defined as follows:
   #+begin_src emacs-lisp
-  (org-roam-ql-defpred sample extraction-func comparison-func)
+  (org-roam-ql-defpred sample extraction-function comparison-function)
   #+end_src
 
-  When the following predicate is used in the ~QUERY~:
+  When the following predicate is used as ~SOURCE-OR-QUERY~ :
   #+begin_src emacs-lisp
-  (sample arg1 arg2)
+  (org-roam-ql-nodes '(sample arg1 arg2))
   #+end_src
 
-  It tests each ~node~ as follows:
+  It tests each ~node~ in the whole org-roam database as follows:
   #+begin_src emacs-lisp
-  (apply comparison-func (append (list (funcall extraction-func node)) arg1 arg2))
+  (apply comparison-function (append (list (funcall extraction-function node)) arg1 arg2))
   #+end_src
 
-  The ~EXTRACTION-FUNCTION~ is a function that takes an org-roam-node and returns a value that will be passed as the first parameter to ~COMPARISON-FUNCTION~. The remainder of the parameters when calling the predicate is passed as remaining parameters ~COMPARISON-FUNCTION~. If the ~COMPARITION-FUNCTION~ returns a non-nil value, it will be included in the result.
+  The ~EXTRACTION-FUNCTION~ is a takes an org-roam-node and returns a value that will be passed as the first parameter to ~COMPARISON-FUNCTION~. The remainder of the parameters when calling the predicate is passed as remaining parameters to ~COMPARISON-FUNCTION~. When the ~COMPARISON-FUNCTION~ returns a non-nil value, it will be included in the result.
 
-- ~(org-roam-ql-defexpansion name expansion-function)~ - Adds an ~EXPANSION-FUNCTION~ which will be identified by ~NAME~ in a org-roam-ql query. The ~EXPANSION-FUNCTION~ should take the parameters passed in the query and return values that can be passed to   ~org-roam-nodes~
-*** org dynamic block
+- =org-roam-ql-defexpansion (NAME EXPANSION-FUNCTION)= :: Adds an ~EXPANSION-FUNCTION~ which will be identified by ~NAME~ in a org-roam-ql query. The ~EXPANSION-FUNCTION~ should take the parameters passed in the query and return values that can be passed to ~org-roam-nodes~.
+
+** Org dynamic block
 Similar to ~org-ql~, ~org-roam-ql~ also provides a dynamic block. The header parameters are as follows:
-- ~:query~ - Same as SOURCE-OR-QUERY for ~org-roam-ql-search~ or ~org-roam-ql-nodes~.
+- ~:query~ - A valid ~SOURCE-OR-QUERY~
 - ~:columns~ - A list of columns to display. Each column name is a slot name of ~org-roam-nodes~. For any function/accessor with a name of the form ~org-roam-node-<name>~, which takes a org-roam-node as parameter, ~<name>~ can also be used column name. For example, if there is a function named ~org-roam-node-short-title~, ~short-title~ can be used as a column name, this will result in a column with the title ~short-title~ where the content of each row is the result of calling the respective function.
 - ~:take~ (optional) - If a positive integer N, takes the first N elements, if a negative -N, take the last N nodes.
 - ~:no-link~ (optional) - if a non-nil value is set, the first column containing the links will be dropped.
@@ -110,7 +124,7 @@ If no-link is not provided as a parameter, the first column is a link to the nod
 Following is an example of a dynamic block and its result.
 
 [[file:images/dynamic-block.jpg]]
-** Working with ~org-ql~ 
+* Working with org-ql
 Optionally, ~org-roam-ql~ results can be visualized in [[https://github.com/alphapapa/org-ql][org-ql]], available through the extension ~org-roam-ql-ql~ (naming things is hard!!). This is also can be installed from [[https://melpa.org/#/org-roam-ql-ql][MELPA]] or with other package management tools like [[https://framagit.org/steckerhalter/quelpa][quelpa]] and [[https://github.com/radian-software/straight.el][straight]].
 
 #+begin_src emacs-lisp
