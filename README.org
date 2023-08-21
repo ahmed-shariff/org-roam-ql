@@ -93,9 +93,9 @@ Example configuration:
 
 ** Adding new predicates
 There are two ways to add a new predicate to org-roam-ql: 
-- =org-roam-ql-defpred (NAME EXTRACTION-FUNCTION COMPARISON-FUNCTION)= :: Creates a predicate that can be used as ~SOURCE-OR-QUERY~. For example, for a predicate defined as follows:
+- =org-roam-ql-defpred (NAME DOCSTRING EXTRACTION-FUNCTION COMPARISON-FUNCTION)= :: Creates a predicate that can be used as ~SOURCE-OR-QUERY~. For example, for a predicate defined as follows:
   #+begin_src emacs-lisp
-  (org-roam-ql-defpred sample extraction-function comparison-function)
+  (org-roam-ql-defpred sample "A sample predicate" extraction-function comparison-function)
   #+end_src
 
   When the following predicate is used as ~SOURCE-OR-QUERY~ :
@@ -110,7 +110,7 @@ There are two ways to add a new predicate to org-roam-ql:
 
   The ~EXTRACTION-FUNCTION~ is a takes an org-roam-node and returns a value that will be passed as the first parameter to ~COMPARISON-FUNCTION~. The remainder of the parameters when calling the predicate is passed as remaining parameters to ~COMPARISON-FUNCTION~. When the ~COMPARISON-FUNCTION~ returns a non-nil value, it will be included in the result.
 
-- =org-roam-ql-defexpansion (NAME EXPANSION-FUNCTION)= :: Adds an ~EXPANSION-FUNCTION~ which will be identified by ~NAME~ in a org-roam-ql query. The ~EXPANSION-FUNCTION~ should take the parameters passed in the query and return values that can be passed to ~org-roam-nodes~.
+- =org-roam-ql-defexpansion (NAME DOCSTRING EXPANSION-FUNCTION)= :: Adds an ~EXPANSION-FUNCTION~ which will be identified by ~NAME~ in a org-roam-ql query. The ~EXPANSION-FUNCTION~ should take the parameters passed in the query and return values that can be passed to ~org-roam-nodes~.
 
 ** Org dynamic block
 Similar to ~org-ql~, ~org-roam-ql~ also provides a dynamic block. The header parameters are as follows:

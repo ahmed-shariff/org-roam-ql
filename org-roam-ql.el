@@ -138,16 +138,16 @@ internal functions"
              ('and #'-intersection))
            (--map (org-roam-ql--expand-query it) (cdr query)))))
     (let* ((query-key (and (listp query) (car query)))
-           (query-expansion-function (gethash query-key org-roam-ql--query-expansion-functions))
+           (query-expansion-function-info (gethash query-key org-roam-ql--query-expansion-functions))
            (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
       (cond
-       ((and query-key query-expansion-function)
-        (org-roam-ql--nodes-cached (apply query-expansion-function (cdr query))))
+       ((and query-key query-expansion-function-info)
+        (org-roam-ql--nodes-cached (apply (cdr query-expansion-function-info) (cdr query))))
        ;; FIXME: Think of a better way to to this
        ((and query-key query-comparison-function-info)
-        (--filter (let ((val (funcall (car query-comparison-function-info) it)))
+        (--filter (let ((val (funcall (cadr query-comparison-function-info) it)))
                     (and val
-                         (apply (cdr query-comparison-function-info) (append (list val) (cdr query)))))
+                         (apply (caddr query-comparison-function-info) (append (list val) (cdr query)))))
                   ;; Caching values
                   (org-roam-ql--nodes-cached (org-roam-node-list))))
        ;; `org-roam-ql-nodes' will error if query is invalid
@@ -254,23 +254,25 @@ Sets the history as well."
 ;; *****************************************************************************
 
 ;;;###autoload
-(defmacro org-roam-ql-defpred (name extraction-function comparison-function)
+(defmacro org-roam-ql-defpred (name docstring extraction-function comparison-function)
   "Create a org-roam-ql predicate with the NAME.
+DOCSTRING is the docstring of the predicate.
 The COMPARISON-FUNCTION is a function that returns non-nil if this
 predicate doesn't fail for a given org-roam-node.  The first value
 passed to this function would be the value from calling the
 EXTRACTION-FUNCTION with the respective node, and the remainder of the
 arguments from the predicate itself."
   `(puthash ,name
-            (cons ,extraction-function ,comparison-function)
+            (list ,docstring ,extraction-function ,comparison-function)
             org-roam-ql--query-comparison-functions))
 
-(defmacro org-roam-ql-defexpansion (name expansion-function)
+(defmacro org-roam-ql-defexpansion (name docstring expansion-function)
   "Add an EXPANSION-FUNCTION identified by NAME in an org-roam-ql query.
+DOCSTRING is the docstring of the predicate.
 The EXPANSION-FUNCTION should take the parameters
 passed in the query and return values that can be passed to
   `org-roam-nodes'"
-  `(puthash ,name ,expansion-function org-roam-ql--query-expansion-functions))
+  `(puthash ,name (cons ,docstring ,expansion-function) org-roam-ql--query-expansion-functions))
 
 (defun org-roam-ql--predicate-s-match (value regexp &optional exact)
   "Return non-nil if there is a REGEXP match in VALUE.
@@ -814,32 +816,32 @@ Can be used in the minibuffer or when writting querries."
 
 ;; setup of org-roam-ql
 (dolist (predicate
-         '((file org-roam-node-file . org-roam-ql--predicate-s-match)
-           (file-title org-roam-node-file-title . org-roam-ql--predicate-s-match)
-           (file-atime org-roam-node-file-atime . time-equal-p)
-           (file-mtime org-roam-node-file-mtime . time-equal-p)
-           (id org-roam-node-id . org-roam-ql--predicate-s-equals-p)
-           (level org-roam-node-level . equal)
-           (point org-roam-node-point . equal)
-           (todo org-roam-node-todo . org-roam-ql--predicate-s-match)
-           (priority org-roam-node-priority . org-roam-ql--predicate-s-match)
-           (scheduled org-roam-node-scheduled . time-less-p)
-           (deadline org-roam-node-deadline . time-less-p)
-           (title org-roam-node-title . org-roam-ql--predicate-s-match)
-           (properties
+         '((file "Compare to `file' of a node" org-roam-node-file . org-roam-ql--predicate-s-match)
+           (file-title "Compare to `file-title' of a node" org-roam-node-file-title . org-roam-ql--predicate-s-match)
+           (file-atime "Compare to `file-atime' of a node" org-roam-node-file-atime . time-equal-p)
+           (file-mtime "Compare to `file-mtime' of a node" org-roam-node-file-mtime . time-equal-p)
+           (id "Compare to `id' of a node" org-roam-node-id . org-roam-ql--predicate-s-equals-p)
+           (level "Compare to `level' of a node" org-roam-node-level . equal)
+           (point "Compare to `point' of a node" org-roam-node-point . equal)
+           (todo "Compare to `todo' of a node" org-roam-node-todo . org-roam-ql--predicate-s-match)
+           (priority "Compare to `priority' of a node" org-roam-node-priority . org-roam-ql--predicate-s-match)
+           (scheduled "Compare to `scheduled' of a node"  org-roam-node-scheduled . time-less-p)
+           (deadline "Compare to `deadline' of a node"  org-roam-node-deadline . time-less-p)
+           (title "Compare to `title' of a node" org-roam-node-title . org-roam-ql--predicate-s-match)
+           (properties "Compare to `properties' of a node"
             org-roam-node-properties . org-roam-ql--predicate-property-match)
-           (tags org-roam-node-tags . org-roam-ql--predicate-tags-match)
-           (refs org-roam-node-refs . org-roam-ql--predicate-s-match)
-           (funcall identity . org-roam-ql--predicate-funcall)))
-  (org-roam-ql-defpred (car predicate) (cadr predicate) (cddr predicate)))
+           (tags "Compare to `tags' of a node" org-roam-node-tags . org-roam-ql--predicate-tags-match)
+           (refs "Compare to `refs' of a node" org-roam-node-refs . org-roam-ql--predicate-s-match)
+           (funcall "Function to test with a node" identity . org-roam-ql--predicate-funcall)))
+  (org-roam-ql-defpred (car predicate) (cadr predicate) (caddr predicate) (cdddr predicate)))
 
 (dolist (expansion-function
-         '((backlink-to . org-roam-ql--expand-backlinks)
-           (backlink-from . org-roam-ql--expand-forwardlinks)
-           (in-buffer . org-roam-ql--expansion-identity)
-           (nodes-list . org-roam-ql--expansion-identity)
-           (function . org-roam-ql--expansion-identity)))
-  (org-roam-ql-defexpansion (car expansion-function) (cdr expansion-function)))
+         '((backlink-to "Backlinks to results of QUERY." . org-roam-ql--expand-backlinks)
+           (backlink-from "Forewardlinks to results of QUERY" . org-roam-ql--expand-forwardlinks)
+           (in-buffer "In BUFFER" . org-roam-ql--expansion-identity)
+           (nodes-list "List of nodes" . org-roam-ql--expansion-identity)
+           (function "FUNCTION that returns list of nodes" . org-roam-ql--expansion-identity)))
+  (org-roam-ql-defexpansion (car expansion-function) (cadr expansion-function) (cddr expansion-function)))
 
 (provide 'org-roam-ql)
 
