@@ -161,12 +161,7 @@ to associate with the view.  DISPLAY-IN is expected to be a symbol,
 either `'org-ql' or `'org-roam'.  If its `org-ql', the results from the
 SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer.  If its
 `org-roam', will be displayed in a org-roam-ql buffer."
-  (interactive (list (let* ((query (read-string "Query: " nil 'org-roam-ql--search-query-history)))
-                       (setf org-roam-ql--search-query-history (delete-dups
-                                                                (append
-                                                                 org-roam-ql--search-query-history
-                                                                 (list query)))
-                             query (read query))
+  (interactive (list (let ((query (org-roam-ql--read-query)))
                        (if (vectorp query)
                            (list query)
                          query))
@@ -245,6 +240,15 @@ This would be either an `org-agenda' buffer or a `org-roam' like buffer."
         (org-roam-ql--check-if-org-roam-ql-buffer s-exp)
         (org-roam-ql--check-if-org-roam-db-parameters s-exp))))
 
+(defun org-roam-ql--read-query (&optional initial-input)
+  "Read query from minibuffer.
+Sets the history as well."
+  (let* ((query (read-string "Query: " initial-input 'org-roam-ql--search-query-history)))
+    (setf org-roam-ql--search-query-history (delete-dups
+                                             (append
+                                              org-roam-ql--search-query-history
+                                              (list query))))
+    (read query)))
 ;; *****************************************************************************
 ;; Functions for predicates and expansions
 ;; *****************************************************************************
@@ -745,16 +749,8 @@ If there are entries that do not have an ID, it will signal an error"
   :prompt "Query: "
   :always-read t
   :reader (lambda (prompt _initial-input history)
-            ;; FIXME: History has both sexp and the string representations
-            ;; read-string won't work with sexpressions. For now, to avoid
-            ;; errors when going through history, pre-processing it.
-            (setf (symbol-value history)
-                  (delete-dups (--map (if (stringp it) it
-                                        (format "%S" it))
-                                      (symbol-value history))))
-            (read (read-string prompt (when org-roam-ql-buffer-query
-                                        (format "%S" org-roam-ql-buffer-query))
-                               history))))
+            (org-roam-ql--read-query (when org-roam-ql-buffer-query
+                                       (format "%S" org-roam-ql-buffer-query)))))
 
 (transient-define-infix org-roam-ql-view--transient-in ()
   :class 'org-roam-ql--variable--choices
