@@ -243,12 +243,90 @@ This would be either an `org-agenda' buffer or a `org-roam' like buffer."
 (defun org-roam-ql--read-query (&optional initial-input)
   "Read query from minibuffer.
 Sets the history as well."
-  (let* ((query (read-string "Query: " initial-input 'org-roam-ql--search-query-history)))
-    (setf org-roam-ql--search-query-history (delete-dups
-                                             (append
-                                              org-roam-ql--search-query-history
-                                              (list query))))
-    (read query)))
+  ;; Copied from `simple.el' `read--expression'
+  (let ((minibuffer-completing-symbol t))
+    (minibuffer-with-setup-hook
+        (lambda ()
+          ;; KLUDGE: No idea why this is here!
+          (set-syntax-table emacs-lisp-mode-syntax-table)
+          (add-hook 'completion-at-point-functions
+                    #'org-roam-ql--completion-at-point nil t))
+      (let ((query (read-from-minibuffer "Query: " initial-input org-roam-ql--read-query-map nil
+                                         'org-roam-ql--search-query-history)))
+        (setf org-roam-ql--search-query-history (delete-dups
+                                                 (append
+                                                  org-roam-ql--search-query-history
+                                                  (list query))))
+        (read query)))))
+
+;; Copied from `simple.el' `read-experssion-map'
+(defvar org-roam-ql--read-query-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m "\M-\t" 'completion-at-point)
+    (define-key m "\t" 'completion-at-point)
+    (set-keymap-parent m minibuffer-local-map)
+    m))
+
+;; Copied from `elisp-completion-at-point'
+(defun org-roam-ql--completion-at-point ()
+  (with-syntax-table emacs-lisp-mode-syntax-table
+    (let* ((pos (point))
+	   (beg (condition-case nil
+		    (save-excursion
+		      (backward-sexp 1)
+		      (skip-chars-forward "`',‘#")
+		      (point))
+		  (scan-error pos)))
+	   (end
+	    (unless (or (eq beg (point-max))
+			(member (char-syntax (char-after beg))
+                                '(?\" ?\()))
+	      (condition-case nil
+		  (save-excursion
+		    (goto-char beg)
+		    (forward-sexp 1)
+                    (skip-chars-backward "'’")
+		    (when (>= (point) pos)
+		      (point)))
+		(scan-error pos))))
+           ;; t if in function position.
+           (funpos (eq (char-before beg) ?\()))
+      (cond
+       ;; predicates
+       ((and end funpos)
+        (list beg end
+          (lambda (string pred action)
+            (cond
+             ((eq action 'metadata)
+              (cons
+               'metadata
+               `((annotation-function . ,(lambda (str)
+                                           (let* ((sym (intern-soft str)))
+                                             (let ((comparison-function (gethash sym org-roam-ql--query-comparison-functions))
+                                                   (expansion-function (gethash sym org-roam-ql--query-expansion-functions)))
+                                               (cond
+                                                (comparison-function
+                                                 (concat (propertize " :" 'face 'shadow)
+                                                         (propertize (s-replace-regexp "([^ ]* " "("
+                                                                                       (elisp-get-fnsym-args-string (caddr comparison-function) 0))
+                                                                     'face  '(:inherit shadow :weight extra-bold))
+                                                         " - "
+                                                         (propertize (car comparison-function)
+                                                                     'face 'shadow)))
+                                                (expansion-function
+                                                 (concat (propertize " :" 'face 'shadow)
+                                                         (propertize (elisp-get-fnsym-args-string (cdr expansion-function) 0)
+                                                                     'face  '(:inherit shadow :weight extra-bold))
+                                                         (propertize (car expansion-function)
+                                                                     'face 'shadow)))))))))))
+             (t
+              (complete-with-action
+               action
+               (append
+                (hash-table-keys org-roam-ql--query-comparison-functions)
+                (hash-table-keys org-roam-ql--query-expansion-functions))
+               string pred))))))))))
+
 ;; *****************************************************************************
 ;; Functions for predicates and expansions
 ;; *****************************************************************************

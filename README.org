@@ -54,7 +54,7 @@ Example configuration:
 
 * Usage
 ** Commands/functions
-- =org-roam-ql-search (SOURCE-OR-QUERY &optional TITLE)= :: This is an interactive command that creates a ~org-roam-ql~ buffer with the nodes of the corresponding ~SOURCE-OR-QUERY~ with ~TITLE~. An ~org-roam-ql~ buffer is functionally similar to the ~org-roam-buffer~, but allows displaying any list of nodes (see screen-shots above). ~SOURCE-OR-QUERY~ is the same as ~org-roam-ql-node~. When called interactively, it will prompt for the ~SOURCE-OR-QUERY~ and ~TITLE~.
+- =org-roam-ql-search (SOURCE-OR-QUERY &optional TITLE)= :: This is an interactive command that creates a ~org-roam-ql~ buffer with the nodes of the corresponding ~SOURCE-OR-QUERY~ with ~TITLE~. An ~org-roam-ql~ buffer is functionally similar to the ~org-roam-buffer~, but allows displaying any list of nodes (see screen-shots above). ~SOURCE-OR-QUERY~ is the same as ~org-roam-ql-node~. When called interactively, it will prompt for the ~SOURCE-OR-QUERY~ and ~TITLE~. Note that when entering queries interactively either in ~org-roam-ql-search~ or in the transient, you can get completion-at-point with tab.
 - =org-roam-ql-nodes (SOURCE-OR-QUERY)= :: Given a ~SOURCE-OR-QUERY~, return a list of nodes. See below for ~SOURCE-OR-QUERY~.
 ** Valid values for ~SOURCE-OR-QUERY~
 - A list of parameters that can be passed to ~org-roam-db-query~ :: It should be a list of the form ~(QUERY ARG1 ARG2...)~. The result of calling ~org-roam-db-query~ with these parameters should return a list of records where the first element is the ID of a corresponding node. For example:
