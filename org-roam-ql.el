@@ -306,17 +306,22 @@ Sets the history as well."
                                                    (expansion-function (gethash sym org-roam-ql--query-expansion-functions)))
                                                (cond
                                                 (comparison-function
-                                                 (concat (propertize " :" 'face 'shadow)
-                                                         (propertize (s-replace-regexp "([^ ]* " "("
-                                                                                       (elisp-get-fnsym-args-string (caddr comparison-function) 0))
-                                                                     'face  '(:inherit shadow :weight extra-bold))
-                                                         " - "
+                                                 (concat (propertize " : " 'face 'shadow)
+                                                         (let ((fun-doc (elisp-get-fnsym-args-string (caddr comparison-function) 0)))
+                                                           (when fun-doc
+                                                             (concat (propertize (s-replace-regexp "([^ ]* " "("
+                                                                                           fun-doc)
+                                                                         'face  '(:inherit shadow :weight extra-bold))
+                                                                     " - ")))
                                                          (propertize (car comparison-function)
                                                                      'face 'shadow)))
                                                 (expansion-function
-                                                 (concat (propertize " :" 'face 'shadow)
-                                                         (propertize (elisp-get-fnsym-args-string (cdr expansion-function) 0)
-                                                                     'face  '(:inherit shadow :weight extra-bold))
+                                                 (concat (propertize " : " 'face 'shadow)
+                                                         (let ((fun-doc (elisp-get-fnsym-args-string (cdr expansion-function) 0)))
+                                                           (when fun-doc
+                                                             (concat (propertize fun-doc
+                                                                                 'face  '(:inherit shadow :weight extra-bold))
+                                                                     " - ")))
                                                          (propertize (car expansion-function)
                                                                      'face 'shadow)))))))))))
              (t
