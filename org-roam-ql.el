@@ -240,6 +240,14 @@ This would be either an `org-agenda' buffer or a `org-roam' like buffer."
         (org-roam-ql--check-if-org-roam-ql-buffer s-exp)
         (org-roam-ql--check-if-org-roam-db-parameters s-exp))))
 
+;; Copied from `simple.el' `read-experssion-map'
+(defvar org-roam-ql--read-query-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m "\M-\t" 'completion-at-point)
+    (define-key m "\t" 'completion-at-point)
+    (set-keymap-parent m minibuffer-local-map)
+    m))
+
 (defun org-roam-ql--read-query (&optional initial-input)
   "Read query from minibuffer.
 Sets the history as well."
@@ -258,14 +266,6 @@ Sets the history as well."
                                                   org-roam-ql--search-query-history
                                                   (list query))))
         (read query)))))
-
-;; Copied from `simple.el' `read-experssion-map'
-(defvar org-roam-ql--read-query-map
-  (let ((m (make-sparse-keymap)))
-    (define-key m "\M-\t" 'completion-at-point)
-    (define-key m "\t" 'completion-at-point)
-    (set-keymap-parent m minibuffer-local-map)
-    m))
 
 ;; Copied from `elisp-completion-at-point'
 (defun org-roam-ql--completion-at-point ()
@@ -838,7 +838,7 @@ If there are entries that do not have an ID, it will signal an error"
   :variable 'org-roam-ql-buffer-query
   :prompt "Query: "
   :always-read t
-  :reader (lambda (prompt _initial-input history)
+  :reader (lambda (&rest _)
             (org-roam-ql--read-query (when org-roam-ql-buffer-query
                                        (format "%S" org-roam-ql-buffer-query)))))
 
