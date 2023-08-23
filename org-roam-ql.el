@@ -383,44 +383,49 @@ And its value is a string equal to VALUE."
 
 (cl-defun org-roam-ql--expand-forwardlinks (source-or-query &key (type "id") (combine :and))
   "Expansion function for forwardlinks.
-Return parameters that cab be passed to org-roam-nodes that would
-return a list of nodes that have forward links to any nodes that
+Return a list of nodes that have forward links to any nodes that
 SOURCE-OR-QUERY resolves to, as a list.  TYPE is the type of the
 link.  COMBINE can be :and or :or.  If :and, only nodes that have
 forwardlinks to all results of source-or-query, else if have
 forwardlinks to any of them."
-  (list (apply #'vector
-               (append '(:select :distinct links:dest
-                                 :from links
-                                 :where (in links:source $v1))
-                       (when type
-                         `(,(pcase combine
-                              (:and :and)
-                              (:or :or)
-                              (_ (user-error "Keyword :combine should be :and or :or; got %s" combine)))
-                           (= type $s2)))))
-        (apply #'vector (-map #'org-roam-node-id (org-roam-ql--nodes-cached source-or-query)))
-        type))
+  (org-roam-ql--expand-link source-or-query type combine nil))
 
 (cl-defun org-roam-ql--expand-backlinks (source-or-query &key (type "id") (combine :and))
   "Expansion function for backlinks.
-Returns parameters org-roam-nodes that would return a list of nodes
-that have back links to any nodes that SOURCE-OR-QUERY resolves to, as
-a list.  TYPE is the type of the link.  COMBINE can be :and or :or.
-If :and, only nodes that have backlinks to all results of
-source-or-query, else if have backlinks to any of them."
-  (list (apply #'vector
-               (append '(:select :distinct links:source
-                                 :from links
-                                 :where (in links:dest $v1))
-                       (when type
-                         `(,(pcase combine
-                              (:and :and)
-                              (:or :or)
-                              (_ (user-error "Keyword :combine should be :and or :or; got %s" combine)))
-                           (= type $s2)))))
-        (apply #'vector (-map #'org-roam-node-id (org-roam-ql--nodes-cached source-or-query)))
-        type))
+Returns a list of nodes that have back links to any nodes that
+SOURCE-OR-QUERY resolves to, as a list.  TYPE is the type of the link.
+COMBINE can be :and or :or.  If :and, only nodes that have backlinks
+to all results of source-or-query, else if have backlinks to any of
+them."
+  (org-roam-ql--expand-link source-or-query type combine t))
+
+(defun org-roam-ql--expand-link (source-or-query type combine is-backlink)
+  "Expansion function for links.
+Returns a list of nodes that have back links to any nodes that
+SOURCE-OR-QUERY resolves to, as a list.  TYPE is the type of the link.
+COMBINE can be :and or :or.  If :and, only nodes that have backlinks
+to all results of source-or-query, else if have backlinks to any of
+them.  If is-backlink is nil, return forward links, else return
+backlinks"
+  (let* ((query-nodes (org-roam-ql--nodes-cached source-or-query))
+         (query-nodes-count (length query-nodes))
+         (target-col (if is-backlink 'links:source 'links:dest))
+         (test-col (if is-backlink 'links:dest 'links:source)))
+    (->> (org-roam-db-query (apply #'vector
+                                   (append `(:select [,target-col (funcall count :distinct ,test-col)]
+                                                     :from links
+                                                     :where (in ,test-col $v1))
+                                           (when type
+                                             `(:and (= type $s2)))
+                                           `(:group-by ,target-col)))
+                            (apply #'vector (-map #'org-roam-node-id query-nodes))
+                            type)
+         (--filter
+          (pcase combine
+            (:and (= (cadr it) query-nodes-count))
+            (:or (> (cadr it) 1))
+            (_ (user-error "Keyword :combine should be :and or :or; got %s" combine))))
+         (--map (org-roam-node-from-id (car it))))))
 
 (defun org-roam-ql--expansion-identity (source-or-query)
   "Expansion function that passes the SOURCE-OR-QUERY as is."
