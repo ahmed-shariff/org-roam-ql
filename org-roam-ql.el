@@ -245,20 +245,19 @@ This would be either an `org-agenda' buffer or a `org-roam' like buffer."
   "Read query from minibuffer.
 Sets the history as well."
   ;; Copied from `simple.el' `read--expression'
-  (let ((minibuffer-completing-symbol t))
-    (minibuffer-with-setup-hook
-        (lambda ()
-          ;; KLUDGE: No idea why this is here!
-          (set-syntax-table emacs-lisp-mode-syntax-table)
-          (add-hook 'completion-at-point-functions
-                    #'org-roam-ql--completion-at-point nil t))
-      (let ((query (read-from-minibuffer "Query: " initial-input org-roam-ql--read-query-map nil
-                                         'org-roam-ql--search-query-history)))
-        (setf org-roam-ql--search-query-history (delete-dups
-                                                 (append
-                                                  org-roam-ql--search-query-history
-                                                  (list query))))
-        (read query)))))
+  (minibuffer-with-setup-hook
+      (lambda ()
+        ;; KLUDGE: No idea why this is here!
+        (set-syntax-table emacs-lisp-mode-syntax-table)
+        (add-hook 'completion-at-point-functions
+                  #'org-roam-ql--completion-at-point nil t))
+    (let ((query (read-from-minibuffer "Query: " initial-input org-roam-ql--read-query-map nil
+                                       'org-roam-ql--search-query-history)))
+      (setf org-roam-ql--search-query-history (delete-dups
+                                               (append
+                                                org-roam-ql--search-query-history
+                                                (list query))))
+      (read query))))
 
 ;; Copied from `elisp-completion-at-point'
 (defun org-roam-ql--completion-at-point ()
