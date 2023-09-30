@@ -399,7 +399,10 @@ COMBINE can be :and or :or.  If :and, only nodes that have backlinks
 to all results of source-or-query, else if have backlinks to any of
 them.  If is-backlink is nil, return forward links, else return
 backlinks"
-  (let* ((query-nodes (org-roam-ql--nodes-cached source-or-query))
+  (let* ((query-nodes
+          ;; NOTE: -compare-fn is set in the `org-roam-ql--expand-query'
+          (-uniq
+           (org-roam-ql--nodes-cached source-or-query)))
          (query-nodes-count (length query-nodes))
          (target-col (if is-backlink 'links:source 'links:dest))
          (test-col (if is-backlink 'links:dest 'links:source)))
