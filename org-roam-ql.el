@@ -758,7 +758,7 @@ If there are entries that do not have an ID, it will signal an error"
 
 (cl-defmethod transient-format-value ((obj org-roam-ql--variable))
   "Format of the OBJ's VALUE."
-  (oref obj value))
+  (or (oref obj value) ""))
 
 (cl-defmethod transient-format-value ((obj org-roam-ql--variable--choices))
   "Format of the OBJ's VALUE for choices."
