@@ -118,6 +118,7 @@ There are two ways to add a new predicate to org-roam-ql:
 Similar to ~org-ql~, ~org-roam-ql~ also provides a dynamic block. The header parameters are as follows:
 - ~:query~ - A valid [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]]
 - ~:columns~ - A list of columns to display. Each column name is a slot name of ~org-roam-nodes~. For any function/accessor with a name of the form ~org-roam-node-<name>~, which takes an org-roam-node as a parameter, ~<name>~ can also be used column name. For example, if there is a function named ~org-roam-node-short-title~, ~short-title~ can be used as a column name, this will result in a column with the title ~short-title~ where the content of each row is the result of calling the respective function.
+- ~:sort~ - Name of a registered sort functions. See [[#commandsfunctions][ ~org-roam-ql-search~ ]] for more info on the values for sort functions.
 - ~:take~ (optional) - If a positive integer N, take the first N elements, if a negative -N, take the last N nodes.
 - ~:no-link~ (optional) - If a non-nil value is set, the first column containing the links will be dropped.
 

@@ -913,10 +913,11 @@ If there are entries that do not have an ID, it will signal an error"
   "Write org block for org-roam-ql with PARAMS."
   (let ((query (plist-get params :query))
         (columns (plist-get params :columns))
+        (sort (plist-get params :sort))
         (take (plist-get params :take))
         (no-link (plist-get params :no-link)))
     (if (and query columns)
-        (-if-let (nodes (org-roam-ql-nodes query))
+        (-if-let (nodes (org-roam-ql-nodes query sort))
             (progn
               (when take
                 (setq nodes (cl-etypecase take
