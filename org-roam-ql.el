@@ -43,6 +43,7 @@
 (defvar org-roam-ql--search-query-history '() "History of queries with `org-roam-ql-search'.")
 (defvar-local org-roam-ql-buffer-title nil "The current title of the buffer.")
 (defvar-local org-roam-ql-buffer-query nil "The current query of the buffer.")
+(defvar-local org-roam-ql-buffer-sort nil "The current sort function of the buffer.")
 (defvar-local org-roam-ql--buffer-displayed-query nil "The query which produced the results of the buffer.")
 (defvar-local org-roam-ql-buffer-in nil
   "Define which option to use - 'in-buffer' or 'org-roam-db'.")
@@ -103,7 +104,7 @@ functions."
         (t (user-error "Invalid source-or-query")))
        (if-let ((-sort-fn (when sort-fn
                             (or (and (functionp sort-fn) sort-fn)
-                                (gethash sort-fn org-roam-ql--sort-functions)))))
+                                (gethash sort-fn org-roam-ql--sort-functions) sort-fn))))
            (seq-sort -sort-fn it)
          it)))
 
@@ -159,25 +160,29 @@ internal functions"
        (t (org-roam-ql--nodes-cached query))))))
 
 ;;;###autoload
-(defun org-roam-ql-search (source-or-query &optional title)
+(defun org-roam-ql-search (source-or-query &optional title sort-fn)
   "Basically what `org-ql-search does', but for org-roam-nodes.
 See `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be.  TITLE is a title
 to associate with the view.  DISPLAY-IN is expected to be a symbol,
 either `'org-ql' or `'org-roam'.  If its `org-ql', the results from the
 SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer.  If its
-`org-roam', will be displayed in a org-roam-ql buffer."
+`org-roam', will be displayed in a org-roam-ql buffer.  SORT-FN is
+used for sorting the results.  It can be a string name of a slot or a
+predicate function which can be used to sort the nodes.  See
+`org-roam-nodes' for more info on this"
   (interactive (list (let ((query (org-roam-ql--read-query)))
                        (if (vectorp query)
                            (list query)
                          query))
                      (read-string "Title: ")))
-  (let* ((nodes (org-roam-ql-nodes source-or-query)))
+  (let* ((nodes (org-roam-ql-nodes source-or-query sort-fn)))
     (org-roam-ql--roam-buffer-for-nodes
      nodes
      title
      (org-roam-ql--get-formatted-buffer-name
       (org-roam-ql--get-formatted-title title source-or-query))
-     source-or-query)))
+     source-or-query
+     sort-fn)))
 
 (defun org-roam-ql--get-formatted-title (title source-or-query &optional extended-kwd)
   "Return the formatted TITLE.
@@ -457,7 +462,8 @@ overwritten."
 
 (defun org-roam-ql--sort-function-for-slot (slot-name comparison-function-name)
   "Add a sort function of SLOT-NAME of org-roam-node.
-COMPARISON-FUNCTION-NAME is the symbol of function."
+COMPARISON-FUNCTION-NAME is the symbol of function.
+DOCSTRING is the documentation string to use for the function."
   (let ((getter (intern-soft
                  (format "org-roam-node-%s" slot-name))))
     (org-roam-ql-register-sort-fn
@@ -497,7 +503,7 @@ Similar to `org-roam-mode', but doesn't default to the
                   ("org-roam-db" org-roam-ql-buffer-query)
                   (_ (user-error "Invalid value for `org-roam-ql-buffer-in'")))))
     (funcall display-function
-             (org-roam-ql-nodes query)
+             (org-roam-ql-nodes query org-roam-ql-buffer-sort)
              (if subquery
                  (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended")
                org-roam-ql-buffer-title)
@@ -505,7 +511,8 @@ Similar to `org-roam-mode', but doesn't default to the
                  (org-roam-ql--get-formatted-buffer-name
                   (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended"))
                buffer-name)
-             query)))
+             query
+             org-roam-ql-buffer-sort)))
 
 (defun org-roam-ql--refresh-roam-buffer ()
   "Refresh a org-roam buffer."
@@ -524,10 +531,10 @@ Similar to `org-roam-mode', but doesn't default to the
                               title)))
     (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--roam-buffer-for-nodes)))
 
-(defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query)
+(defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query sort-fn)
   "Render SECTIONS (list of functions) in an org-roam-ql buffer.
 TITLE is the title, BUFFER-NAME is the name for the buffer.  See
-`org-roam-nodes' for information on SOURCE-OR-QUERY."
+`org-roam-nodes' for information on SOURCE-OR-QUERY. See `org-roam-ql-nodes' for SORT-FN."
   ;; copied  from `org-roam-buffer-render-contents'
   (with-current-buffer (get-buffer-create buffer-name)
     (let ((inhibit-read-only t))
@@ -538,6 +545,7 @@ TITLE is the title, BUFFER-NAME is the name for the buffer.  See
       (setq org-roam-ql-buffer-query source-or-query
             org-roam-ql--buffer-displayed-query source-or-query
             org-roam-ql-buffer-title title
+            org-roam-ql-buffer-sort sort-fn
             org-roam-ql-buffer-in "org-roam-db")
       (insert ?\n)
       (dolist (section sections)
@@ -564,14 +572,15 @@ heading for the function `magit-section'"
          (insert ?\n))
        (run-hooks 'org-roam-buffer-postrender-functions))))
 
-(defun org-roam-ql--roam-buffer-for-nodes (nodes title buffer-name &optional source-or-query)
+(defun org-roam-ql--roam-buffer-for-nodes (nodes title buffer-name &optional source-or-query sort-fn)
   "View nodes in org-roam-ql buffer.
 See `org-roam-ql--render-roam-buffer' for TITLE BUFFER-NAME and SOURCE-OR-QUERY.
-See `org-roam-ql--nodes-section' for NODES."
+See `org-roam-ql--nodes-section' for NODES.
+See `org-roam-ql-nodes' for SORT-FN."
   (org-roam-ql--render-roam-buffer
    (list
     (org-roam-ql--nodes-section nodes "Nodes:"))
-   title buffer-name (or source-or-query nodes)))
+   title buffer-name (or source-or-query nodes) sort-fn))
 
 (defun org-roam-ql--nodes-from-roam-buffer (buffer)
   "Collect the org-roam-nodes from a valid BUFFER."
@@ -610,10 +619,11 @@ See `org-roam-ql--nodes-section' for NODES."
   "Keymap for agenda-view of org-roam-ql.
 Based on `org-agenda-mode-map'.")
 
-(defun org-roam-ql--agenda-buffer-for-nodes (nodes title buffer-name &optional source-or-query super-groups)
+(defun org-roam-ql--agenda-buffer-for-nodes (nodes title buffer-name &optional source-or-query sort-fn super-groups)
   "Display the nodes in a agenda like buffer.
 See `org-roam-ql--render-roam-buffer' for TITLE BUFFER-NAME and SOURCE-OR-QUERY.
 See `org-roam-ql--nodes-section' for NODES.
+See `org-roam-ql-nodes' for SORT-FN.
 See `org-super-agenda' for SUPER-GROUPS."
   (with-current-buffer (get-buffer-create buffer-name)
     (unless (eq major-mode 'org-agenda-mode)
@@ -631,6 +641,7 @@ See `org-super-agenda' for SUPER-GROUPS."
       (setq org-roam-ql-buffer-query source-or-query
             org-roam-ql--buffer-displayed-query source-or-query
             org-roam-ql-buffer-title title
+            org-roam-ql-buffer-sort sort-fn
             org-roam-ql-buffer-in "org-roam-db")
       (if (not nodes)
           (user-error "Empty result for query")
@@ -823,6 +834,7 @@ If there are entries that do not have an ID, it will signal an error"
   ["Edit"
    [("t" org-roam-ql-view--transient-title)
     ("q" org-roam-ql-view--transient-query)
+    ("s" org-roam-ql-view--transient-sort)
     ("i" org-roam-ql-view--transient-in)]]
   ["View"
    [("r" "Refresh" org-roam-ql-refresh-buffer)]
@@ -871,6 +883,18 @@ If there are entries that do not have an ID, it will signal an error"
   :reader (lambda (&rest _)
             (org-roam-ql--read-query (when org-roam-ql-buffer-query
                                        (format "%S" org-roam-ql-buffer-query)))))
+
+(transient-define-infix org-roam-ql-view--transient-sort ()
+  :class 'org-roam-ql--variable--sexp
+  :argument ""
+  :variable 'org-roam-ql-buffer-sort
+  :prompt "Sort-by: "
+  :always-read t
+  :default-value nil
+  :reader (lambda (prompt initial-input history)
+            (completing-read prompt
+                             (cons nil (hash-table-keys org-roam-ql--sort-functions))
+                             nil 'require-match initial-input history)))
 
 (transient-define-infix org-roam-ql-view--transient-in ()
   :class 'org-roam-ql--variable--choices
