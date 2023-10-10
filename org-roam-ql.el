@@ -38,6 +38,7 @@
 ;; FIXME: What is this docstring!
 (defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
 (defvar org-roam-ql--query-expansion-functions (make-hash-table) "Holds the function to expand a query.")
+(defvar org-roam-ql--sort-functions (make-hash-table :test 'equal) "Holds the function to sort nodes.")
 (defvar org-roam-ql--cache (make-hash-table))
 (defvar org-roam-ql--search-query-history '() "History of queries with `org-roam-ql-search'.")
 (defvar-local org-roam-ql-buffer-title nil "The current title of the buffer.")
@@ -47,8 +48,10 @@
   "Define which option to use - 'in-buffer' or 'org-roam-db'.")
 
 ;;;###autoload
-(defun org-roam-ql-nodes (source-or-query)
+(defun org-roam-ql-nodes (source-or-query &optional sort-fn)
   "Convert SOURCE-OR-QUERY to org-roam-nodes.
+if SORT-FN is provided, the returned values will be sorted with it.
+
 SOURCE-OR-QUERY can be one of the following:
 - A org-roam-ql query.
 - A `buffer-name' of a `org-roam-mode' buffer.
@@ -64,36 +67,45 @@ SOURCE-OR-QUERY can be one of the following:
   appended in the front.
 - A list of org-roam-nodes or an org-roam-node.
 - An org-roam-query.
-- A function that returns a list of org-roam-nodes."
-  (cond
-   ;; TODO: think of a better way to display the nodes in the query
-   ;; without showing it all. Perhaps use only ids?
-   ((org-roam-ql--check-if-list-of-org-roam-nodes-list source-or-query)
-    (-list source-or-query))
-   ;; get-buffer returns a buffer if source-or-query is a buffer obj
-   ;; or the name of a buffer
-   ((org-roam-ql--check-if-org-roam-ql-buffer source-or-query)
-    (cond
-     ((with-current-buffer source-or-query (derived-mode-p 'org-roam-mode))
-      (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
-     ((with-current-buffer source-or-query (derived-mode-p 'org-agenda-mode))
-      (org-roam-ql--nodes-from-agenda-buffer (get-buffer source-or-query)))))
-   ((org-roam-ql--check-if-org-roam-db-parameters source-or-query)
-    (let ((query (car source-or-query))
-          (args (cdr source-or-query)))
-      (--map (org-roam-node-from-id (car it))
-             (apply #'org-roam-db-query
-                    (if (equal :select (aref query 0))
-                        query
-                      (vconcat [:select id :from nodes :where] query))
-                    args))))
-   ((and (listp source-or-query) (org-roam-ql--check-if-valid-query source-or-query))
-    (org-roam-ql--expand-query source-or-query))
-   ((functionp source-or-query) (--when-let (funcall source-or-query)
-                                  (if (and (listp it) (-all-p #'org-roam-node-p it))
-                                      it
-                                    (user-error "Function did not expand to list of nodes"))))
-   (t (user-error "Invalid source-or-query"))))
+- A function that returns a list of org-roam-nodes.
+
+SORT-FN can be a function that takes two org-roam-nodes, and
+compatible with `seq-sort'.  Or it can be any regsitered sort
+functions."
+  (--> (cond
+        ;; TODO: think of a better way to display the nodes in the query
+        ;; without showing it all. Perhaps use only ids?
+        ((org-roam-ql--check-if-list-of-org-roam-nodes-list source-or-query)
+         (-list source-or-query))
+        ;; get-buffer returns a buffer if source-or-query is a buffer obj
+        ;; or the name of a buffer
+        ((org-roam-ql--check-if-org-roam-ql-buffer source-or-query)
+         (cond
+          ((with-current-buffer source-or-query (derived-mode-p 'org-roam-mode))
+           (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
+          ((with-current-buffer source-or-query (derived-mode-p 'org-agenda-mode))
+           (org-roam-ql--nodes-from-agenda-buffer (get-buffer source-or-query)))))
+        ((org-roam-ql--check-if-org-roam-db-parameters source-or-query)
+         (let ((query (car source-or-query))
+               (args (cdr source-or-query)))
+           (--map (org-roam-node-from-id (car it))
+                  (apply #'org-roam-db-query
+                         (if (equal :select (aref query 0))
+                             query
+                           (vconcat [:select id :from nodes :where] query))
+                         args))))
+        ((and (listp source-or-query) (org-roam-ql--check-if-valid-query source-or-query))
+         (org-roam-ql--expand-query source-or-query))
+        ((functionp source-or-query) (--when-let (funcall source-or-query)
+                                       (if (and (listp it) (-all-p #'org-roam-node-p it))
+                                           it
+                                         (user-error "Function did not expand to list of nodes"))))
+        (t (user-error "Invalid source-or-query")))
+       (if-let ((-sort-fn (when sort-fn
+                            (or (and (functionp sort-fn) sort-fn)
+                                (gethash sort-fn org-roam-ql--sort-functions)))))
+           (seq-sort -sort-fn it)
+         it)))
 
 ;; Can we make org-roam-ql aware of any changes that can happen?
 (defun org-roam-ql--nodes-cached (source-or-query)
@@ -429,6 +441,29 @@ backlinks"
 (defun org-roam-ql--predicate-funcall (value f)
   "Return the value of calling the function F with VALUE as its parameter."
   (funcall f value))
+
+;; *****************************************************************************
+;; Functions for sorting
+;; *****************************************************************************
+
+(defun org-roam-ql-register-sort-fn (function-name sort-function)
+  "Register SORT-FUNCTION with name FUNCTION-NAME.
+The function should take two org-roam-nodes and return a truth value,
+which is used to sort, i.e., if non-nil, the first node would be
+before the second node passed to the function.  Uses `seq-sort'.  If a
+sort-function with the given name already exists, it would be
+overwritten."
+  (puthash function-name sort-function org-roam-ql--sort-functions))
+
+(defun org-roam-ql--sort-function-for-slot (slot-name comparison-function-name)
+  "Add a sort function of SLOT-NAME of org-roam-node.
+COMPARISON-FUNCTION-NAME is the symbol of function."
+  (let ((getter (intern-soft
+                 (format "org-roam-node-%s" slot-name))))
+    (org-roam-ql-register-sort-fn
+     slot-name
+     `(lambda (node1 node2)
+        (,comparison-function-name (,getter node1) (,getter node2))))))
 
 ;; *****************************************************************************
 ;; org-roam-ql mode and functions to build them and operate on them
@@ -925,6 +960,18 @@ Can be used in the minibuffer or when writting querries."
            (nodes-list "List of nodes" . org-roam-ql--expansion-identity)
            (function "FUNCTION that returns list of nodes" . org-roam-ql--expansion-identity)))
   (org-roam-ql-defexpansion (car expansion-function) (cadr expansion-function) (cddr expansion-function)))
+
+(dolist (sort-function
+         '(("title" . string<)
+           ("file" . string<)
+           ("file-title" . string<)
+           ("level" . <)
+           ("point" . <)
+           ("scheduled" . time-less-p)
+           ("deadline" . time-less-p)
+           ("file-atime" . time-less-p)
+           ("file-mtime" . time-less-p)))
+  (org-roam-ql--sort-function-for-slot (car sort-function) (cdr sort-function)))
 
 (provide 'org-roam-ql)
 
