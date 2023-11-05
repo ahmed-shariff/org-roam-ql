@@ -950,14 +950,55 @@ If there are entries that do not have an ID, it will signal an error"
           (message "Query results is empty"))
       (user-error "Dynamic block needs to specify :query and :columns"))))
 
-;; Useful helper functions
+;; ;; *****************************************************************************
+;; ;; org agenda custom command
+;; ;; *****************************************************************************
+(defun org-roam-ql-agenda-block (query)
+  "Insert items for QUERY into current buffer.
+See `org-roam-ql-nodes' for more information on QUERY.  Intended to be
+used as a user-defined function in `org-agenda-custom-commands'.
+QUERY is the `match' item in the custom command form.  Currently this
+doesn't respect agenda restrict."
+  ;; Copying alot from org-ql-search-block
+  (let (narrow-p old-beg old-end strings)
+    (when-let* ((from (pcase org-agenda-restrict
+                        ('nil (org-agenda-files nil 'ifmode))
+                        (_ (prog1 org-agenda-restrict
+                             (with-current-buffer org-agenda-restrict
+			       ;; Narrow the buffer; remember to widen it later.
+			       (setf old-beg (point-min) old-end (point-max)
+                                     narrow-p t)
+			       (narrow-to-region org-agenda-restrict-begin org-agenda-restrict-end))))))
+                (nodes (org-roam-ql-nodes query)))
+      (when narrow-p
+        ;; Restore buffer's previous restrictions.
+        (with-current-buffer from
+          (narrow-to-region old-beg old-end)))
+      (org-agenda-prepare)
+      (org-agenda--insert-overriding-header (org-roam-ql--get-formatted-title nil query))
+      ;; But we do call `org-agenda-finalize-entries', which allows `org-super-agenda' to work.
+      (dolist-with-progress-reporter (node nodes)
+          (format "Processing %s nodes" (length nodes))
+        (push (org-roam-ql-view--format-node node) strings))
+      (insert (org-agenda-finalize-entries strings) "\n"))))
+
+(defun org-roam-ql-nodes-files (source-or-query)
+  "Retuns a list of files of the corresponding SOURCE-OR-QUERY.
+See `org-roam-ql-nodes' for more information on SOURCE-OR-QUERY."
+  (em (-map #'org-roam-node-file (org-roam-ql-nodes source-or-query))))
+
+;; ;; *****************************************************************************
+;; Helper functions
+;; *****************************************************************************
 (defun org-roam-ql-insert-node-title ()
   "Select a node and insert only its title.
 Can be used in the minibuffer or when writting querries."
   (interactive)
   (insert (format "\"%s\"" (org-roam-node-title (org-roam-node-read nil nil nil t)))))
 
-;; setup of org-roam-ql
+;; *****************************************************************************
+;; Setup of org-roam-ql
+;; *****************************************************************************
 (dolist (predicate
          '((file "Compare to `file' of a node" org-roam-node-file . org-roam-ql--predicate-s-match)
            (file-title "Compare to `file-title' of a node" org-roam-node-file-title . org-roam-ql--predicate-s-match)
