@@ -383,7 +383,7 @@ If EXACT, test if VALUE and REGEXP are equal strings."
 (defun org-roam-ql--predicate-property-match (value prop prop-val)
   "Return non-nil if PROP is a key in the alist PROP-VAL.
 And its value is a string equal to VALUE."
-  (-when-let (val (assoc prop value))
+  (-when-let (val (assoc-string prop value t))
     (s-match prop-val (cdr val))))
 
 (defun org-roam-ql--predicate-tags-match (values &rest tags)
