@@ -35,6 +35,16 @@
 (require 'dash)
 (require 's)
 
+(defgroup org-roam-ql nil
+  "Customization for `org-roam-ql'."
+  :group 'org
+  :link '(url-link "https://github.com/ahmed-shariff/org-roam-ql"))
+
+(defcustom org-roam-ql-default-org-roam-buffer-query
+  #'org-roam-ql--default-query-for-roam-buffer
+  "The query to use when org-roam-buffer is extended.  Can also be a function that returns a query."
+  :type '(choice function sexp))
+
 ;; FIXME: What is this docstring!
 (defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
 (defvar org-roam-ql--query-expansion-functions (make-hash-table) "Holds the function to expand a query.")
@@ -526,7 +536,9 @@ Similar to `org-roam-mode', but doesn't default to the
                 org-roam-ql-buffer-title nil
                 org-roam-ql-buffer-in nil)
           (org-roam-buffer-refresh)
-          (org-roam-ql-search `(and (backlink-to (id ,(org-roam-node-id org-roam-buffer-current-node)))
+          (org-roam-ql-search `(and ,(pcase org-roam-ql-default-org-roam-buffer-query
+                                       ((pred functionp) (funcall org-roam-ql-default-org-roam-buffer-query))
+                                       (_ org-roam-ql-default-org-roam-buffer-query))
                                     ,query)
                               title)))
     (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--roam-buffer-for-nodes)))
@@ -995,6 +1007,10 @@ See `org-roam-ql-nodes' for more information on SOURCE-OR-QUERY."
 Can be used in the minibuffer or when writting querries."
   (interactive)
   (insert (format "\"%s\"" (org-roam-node-title (org-roam-node-read nil nil nil t)))))
+
+(defun org-roam-ql--default-query-for-roam-buffer ()
+  "Function used for `org-roam-ql-default-org-roam-buffer-query'."
+  `(backlink-to (id ,(org-roam-node-id org-roam-buffer-current-node))))
 
 ;; *****************************************************************************
 ;; Setup of org-roam-ql
