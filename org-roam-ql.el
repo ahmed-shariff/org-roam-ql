@@ -356,25 +356,33 @@ Sets the history as well."
 ;; *****************************************************************************
 
 ;;;###autoload
-(defmacro org-roam-ql-defpred (name docstring extraction-function comparison-function)
+(defun org-roam-ql-defpred (name docstring extraction-function comparison-function)
   "Create a org-roam-ql predicate with the NAME.
 DOCSTRING is the docstring of the predicate.
 The COMPARISON-FUNCTION is a function that returns non-nil if this
 predicate doesn't fail for a given org-roam-node.  The first value
 passed to this function would be the value from calling the
 EXTRACTION-FUNCTION with the respective node, and the remainder of the
-arguments from the predicate itself."
-  `(puthash ,name
-            (list ,docstring ,extraction-function ,comparison-function)
-            org-roam-ql--query-comparison-functions))
+arguments from the predicate itself.
 
-(defmacro org-roam-ql-defexpansion (name docstring expansion-function)
+If any predicate or expansion function with same NAME exists, it will be
+overwritten."
+  (remhash name org-roam-ql--query-expansion-functions)
+  (puthash name
+           (list docstring extraction-function comparison-function)
+           org-roam-ql--query-comparison-functions))
+
+(defun org-roam-ql-defexpansion (name docstring expansion-function)
   "Add an EXPANSION-FUNCTION identified by NAME in an org-roam-ql query.
 DOCSTRING is the docstring of the predicate.
 The EXPANSION-FUNCTION should take the parameters
 passed in the query and return values that can be passed to
-  `org-roam-nodes'"
-  `(puthash ,name (cons ,docstring ,expansion-function) org-roam-ql--query-expansion-functions))
+  `org-roam-nodes'
+
+If any predicate or expansion function with same NAME exists, it will be
+overwritten."
+  (remhash name org-roam-ql--query-comparison-functions)
+  (puthash name (cons docstring expansion-function) org-roam-ql--query-expansion-functions))
 
 (defun org-roam-ql--predicate-s-match (value regexp &optional exact)
   "Return non-nil if there is a REGEXP match in VALUE.
