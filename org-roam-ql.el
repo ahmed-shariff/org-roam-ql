@@ -1005,7 +1005,7 @@ doesn't respect agenda restrict."
 (defun org-roam-ql-nodes-files (source-or-query)
   "Retuns a list of files of the corresponding SOURCE-OR-QUERY.
 See `org-roam-ql-nodes' for more information on SOURCE-OR-QUERY."
-  (em (-map #'org-roam-node-file (org-roam-ql-nodes source-or-query))))
+  (-map #'org-roam-node-file (org-roam-ql-nodes source-or-query)))
 
 ;; ;; *****************************************************************************
 ;; Helper functions
