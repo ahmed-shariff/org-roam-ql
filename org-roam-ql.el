@@ -453,7 +453,7 @@ backlinks"
          (--filter
           (pcase combine
             (:and (= (cadr it) query-nodes-count))
-            (:or (> (cadr it) 1))
+            (:or (>= (cadr it) 1))
             (_ (user-error "Keyword :combine should be :and or :or; got %s" combine))))
          (--map (org-roam-node-from-id (car it))))))
 
