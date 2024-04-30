@@ -519,6 +519,13 @@ DOCSTRING is the documentation string to use for the function."
      `(lambda (node1 node2)
         (,comparison-function-name (,getter node1) (,getter node2))))))
 
+(defun org-roam-ql--sort-time-less (val1 val2)
+  "Sort based on time-less-p."
+  (if (or (null val1) (null val2))
+      nil
+    (time-less-p (org-roam-ql--time-convert-to-ts val1)
+                 (org-roam-ql--time-convert-to-ts val2))))
+
 ;; *****************************************************************************
 ;; org-roam-ql mode and functions to build them and operate on them
 ;; *****************************************************************************
@@ -1087,10 +1094,10 @@ Can be used in the minibuffer or when writting querries."
            ("file-title" . string<)
            ("level" . <)
            ("point" . <)
-           ("scheduled" . time-less-p)
-           ("deadline" . time-less-p)
-           ("file-atime" . time-less-p)
-           ("file-mtime" . time-less-p)))
+           ("scheduled" . org-roam-ql--sort-time-less)
+           ("deadline" . org-roam-ql--sort-time-less)
+           ("file-atime" . org-roam-ql--sort-time-less)
+           ("file-mtime" . org-roam-ql--sort-time-less)))
   (org-roam-ql--sort-function-for-slot (car sort-function) (cdr sort-function)))
 
 (provide 'org-roam-ql)
