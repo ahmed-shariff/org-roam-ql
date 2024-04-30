@@ -465,6 +465,36 @@ backlinks"
   "Return the value of calling the function F with VALUE as its parameter."
   (funcall f value))
 
+(defun org-roam-ql--read-date-to-ts (read-date)
+  "Convert org date prompt to timestamp."
+  (time-convert
+   (encode-time (org-read-date-analyze read-date
+                                       (current-time)
+                                       (decode-time (current-time))))
+   'integer))
+
+(defun org-roam-ql--time-convert-to-ts (time)
+  "Convert TIME to ts.
+This uses `org-time-string-to-seconds' or `time-convert' based on the type."
+  (cond
+   ((stringp time) (org-time-string-to-seconds time))
+   ((and (not (null time)) (listp time)) (time-convert time 'integer))
+   (t (user-error "Unknown value for `time'"))))
+
+(defun org-roam-ql--predicate-compare-time (value comparison time-string)
+  "Compare VALUE to TIME-STRING based on COMPARISON.
+VALUE is a time-string (see `org-time-string-to-seconds' or valid value for `time-convert').
+TIME-STRING is any valid value for a org date/time prompt.
+COMPARISON can be either '< or '>"
+  (when value
+    (let* ((val1 (org-roam-ql--time-convert-to-ts value))
+           (val2 (org-roam-ql--read-date-to-ts time-string))
+           (time-less (time-less-p val1 val2)))
+      (pcase comparison
+        ('< time-less)
+        ('> (not time-less))
+        (_ (user-error "Unknown value for `comparison'. Should be '< or '>"))))))
+
 ;; *****************************************************************************
 ;; Functions for sorting
 ;; *****************************************************************************
@@ -1033,8 +1063,8 @@ Can be used in the minibuffer or when writting querries."
            (point "Compare to `point' of a node" org-roam-node-point . equal)
            (todo "Compare to `todo' of a node" org-roam-node-todo . org-roam-ql--predicate-s-match)
            (priority "Compare to `priority' of a node" org-roam-node-priority . org-roam-ql--predicate-s-match)
-           (scheduled "Compare to `scheduled' of a node"  org-roam-node-scheduled . time-less-p)
-           (deadline "Compare to `deadline' of a node"  org-roam-node-deadline . time-less-p)
+           (scheduled "Compare `scheduled' of a node to arg based on comparison parsed (< or >)"  org-roam-node-scheduled . org-roam-ql--predicate-compare-time)
+           (deadline "Compare `deadline' of a node to arg based on comparison parsed (< or >)"  org-roam-node-deadline . org-roam-ql--predicate-time-less-p)
            (title "Compare to `title' of a node" org-roam-node-title . org-roam-ql--predicate-s-match)
            (properties "Compare to `properties' of a node"
             org-roam-node-properties . org-roam-ql--predicate-property-match)

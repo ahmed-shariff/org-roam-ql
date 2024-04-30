@@ -89,8 +89,8 @@ Example configuration:
    - =level (LEVEL)= :: Tests if the ~level~ of a node is equal to ~LEVEL~.
    - =todo (REGEXP &optional EXACT)= :: Similar to ~file~, tests the todo state of a node.
    - =priority (REGEXP &optional EXACT)= :: Similar to ~file~, tests the priority of a node.
-   - =scheduled= :: TBD
-   - =deadline= :: TBD
+   - =scheduled (COMPARISON TIME-STRING)= :: Compares the ~scheduled~ of the node with ~TIME-STAMP~ based on ~COMPARISON~. ~TIME-STAMP~ is any valid value for [[https://orgmode.org/manual/The-date_002ftime-prompt.html][org date-time prompt]]. ~COMPARISON~ is either ~<~ or ~>~. Example: ~(scheduled > "-3w")~
+   - =deadline= :: Same as ~scheduled~, tests the ~deadline~ of a node.
    - =title (REGRXP &optional EXACT)= :: Similar to ~file~, tests the title of a node.
    - =properties (PROP PROP-VAL)= :: Tests if the value of the property of a node PROP is a match to PROP-VAL. PROP-VAL can be a regular expression.
    - =tags (TAG1 TAG2 ...)= :: Tests if the tags of a node have TAG1, TAG2, etc.
