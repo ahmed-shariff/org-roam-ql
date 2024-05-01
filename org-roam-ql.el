@@ -1071,7 +1071,7 @@ Can be used in the minibuffer or when writting querries."
            (todo "Compare to `todo' of a node" org-roam-node-todo . org-roam-ql--predicate-s-match)
            (priority "Compare to `priority' of a node" org-roam-node-priority . org-roam-ql--predicate-s-match)
            (scheduled "Compare `scheduled' of a node to arg based on comparison parsed (< or >)"  org-roam-node-scheduled . org-roam-ql--predicate-compare-time)
-           (deadline "Compare `deadline' of a node to arg based on comparison parsed (< or >)"  org-roam-node-deadline . org-roam-ql--predicate-time-less-p)
+           (deadline "Compare `deadline' of a node to arg based on comparison parsed (< or >)"  org-roam-node-deadline . org-roam-ql--predicate-compare-time)
            (title "Compare to `title' of a node" org-roam-node-title . org-roam-ql--predicate-s-match)
            (properties "Compare to `properties' of a node"
             org-roam-node-properties . org-roam-ql--predicate-property-match)
