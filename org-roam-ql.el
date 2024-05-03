@@ -3,7 +3,7 @@
 ;; Copyright (C) 2023 Shariff AM Faleel
 
 ;; Author: Shariff AM Faleel
-;; Version: 0.1
+;; Version: 0.2
 ;; Package-Requires: ((emacs "28") (org-roam "2.2.0") (s "1.12.0") (magit-section "3.3.0") (transient "0.4") (org-super-agenda "1.2"))
 ;; Homepage: https://github.com/ahmed-shariff/org-roam-ql
 ;; SPDX-License-Identifier: GPL-3.0-or-later
