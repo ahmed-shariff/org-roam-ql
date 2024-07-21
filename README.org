@@ -54,7 +54,7 @@ Example configuration:
 
 * Usage
 ** Commands/functions
-- =org-roam-ql-search (SOURCE-OR-QUERY &optional TITLE SORT-FN)= :: This is an *interactive* command that creates a ~org-roam-ql~ buffer with the nodes of the corresponding [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] ([[#valid-values-for-source-or-query] with ~TITLE~. An ~org-roam-ql~ buffer is functionally similar to the ~org-roam-buffer~, but allows displaying any list of nodes ([[#screen-shots][see screen-shots above]]). When called interactively, it will prompt for the ~SOURCE-OR-QUERY~ and ~TITLE~. Note that when entering queries interactively either in ~org-roam-ql-search~ or in the transient, you can get completion-at-point with ~tab~. ~SORT-FN~ is used for sorting the results. It can be a string name of a registered sort function or a predicate function that can be used to sort the nodes (should take two nodes as input and return a non-nil value if the first node should be before the second). By default the following sort function are registered:  ~file-mtime~, ~file-atime~, ~deadline~, ~scheduled~, ~point~, ~level~, ~file-title~, ~file~ and ~title~. Each corresponds to the respective slot of an org-roam-node. It is possible to register new sort functions with ~org-roam-ql-register-sort-fn~. These registered functions will also appear as options for completion in the transient.
+- =org-roam-ql-search (SOURCE-OR-QUERY &optional TITLE SORT-FN)= :: This is an *interactive* command that creates a ~org-roam-ql~ buffer with the nodes of the corresponding [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] with ~TITLE~. An ~org-roam-ql~ buffer is functionally similar to the ~org-roam-buffer~, but allows displaying any list of nodes ([[#screen-shots][see screen-shots above]]). When called interactively, it will prompt for the ~SOURCE-OR-QUERY~ and ~TITLE~. Note that when entering queries interactively either in ~org-roam-ql-search~ or in the transient, you can get completion-at-point with ~tab~. ~SORT-FN~ is used for sorting the results. It can be a string name of a registered sort function or a predicate function that can be used to sort the nodes (should take two nodes as input and return a non-nil value if the first node should be before the second). By default the following sort function are registered:  ~file-mtime~, ~file-atime~, ~deadline~, ~scheduled~, ~point~, ~level~, ~file-title~, ~file~ and ~title~. Each corresponds to the respective slot of an org-roam-node. It is possible to register new sort functions with ~org-roam-ql-register-sort-fn~. These registered functions will also appear as options for completion in the transient.
 - =org-roam-ql-nodes (SOURCE-OR-QUERY)= :: Given a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] , return a list of nodes.
 - ~org-roam-ql-agenda-block (QUERY)~ :: Meant to be used in ~org-agenda-custom-commands~ as a user-defined function. Insert items from processing ~QUERY~ (which is a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]]) into current buffer. QUERY is the `match' item in the custom command form. Currently this doesn't respect agenda restrict. Example:
   #+begin_src emacs-lisp
@@ -122,6 +122,16 @@ There are two ways to add a new predicate to org-roam-ql:
   The ~EXTRACTION-FUNCTION~ takes an org-roam-node and returns a value that will be passed as the first parameter to ~COMPARISON-FUNCTION~. The remainder of the parameters when calling the predicate is passed as remaining parameters to ~COMPARISON-FUNCTION~. When the ~COMPARISON-FUNCTION~ returns a non-nil value, it will be included in the result.
 
 - =org-roam-ql-defexpansion (NAME DOCSTRING EXPANSION-FUNCTION)= :: Adds an ~EXPANSION-FUNCTION~ which will be identified by ~NAME~ in a org-roam-ql query. The ~EXPANSION-FUNCTION~ should take the parameters passed in the query and return values that can be passed to ~org-roam-nodes~.
+
+** Adding a sorting function
+- =org-roam-ql-register-sort-fn (FUNCTION-NAME SORT-FUNCTION)= :: Registers a sort function which can be used with ~org-roam-ql-nodes~. ~FUNCTION-NAME~ is the string name used to refer to this function with. ~SORT-FUNCTION~ is a function that takes two org-roam-nodes and return a truth value, which is used to sort, i.e., if non-nil, the first node would be before the second node passed to the function.  Uses `seq-sort'.  If a sort-function with the given name already exists, it would be overwritten.
+  The following example registers a sort function named "custom-prop" which sorts the values based on the "CUSTOM-PROP" property of a node.
+  #+begin_src emacs-lisp
+    (org-roam-ql-register-sort-fn "custom-prop"
+                                  (lambda (el1 el2)
+                                    (string< (cdr (assoc "CUSTOM-PROP" (org-roam-node-properties el1)))
+                                             (cdr (assoc "CUSTOM-PROP" (org-roam-node-properties el2))))))
+  #+end_src
 
 ** Org dynamic block
 Similar to ~org-ql~, ~org-roam-ql~ also provides a dynamic block. The header parameters are as follows:
