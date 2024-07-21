@@ -1,6 +1,6 @@
 ;;; org-roam-ql.el --- Interface to query and view results from org-roam -*- lexical-binding: t -*-
 
-;; Copyright (C) 2023 Shariff AM Faleel
+;; Copyright (C) 2024 Shariff AM Faleel
 
 ;; Author: Shariff AM Faleel
 ;; Version: 0.2
@@ -375,6 +375,7 @@ overwritten."
            (list docstring extraction-function comparison-function)
            org-roam-ql--query-comparison-functions))
 
+;;;###autoload
 (defun org-roam-ql-defexpansion (name docstring expansion-function)
   "Add an EXPANSION-FUNCTION identified by NAME in an org-roam-ql query.
 DOCSTRING is the docstring of the predicate.
@@ -502,6 +503,7 @@ COMPARISON can be either '< or '>"
 ;; Functions for sorting
 ;; *****************************************************************************
 
+;;;###autoload
 (defun org-roam-ql-register-sort-fn (function-name sort-function)
   "Register SORT-FUNCTION with name FUNCTION-NAME.
 The function should take two org-roam-nodes and return a truth value,

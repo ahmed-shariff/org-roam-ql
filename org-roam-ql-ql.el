@@ -1,6 +1,6 @@
 ;;; org-roam-ql-ql.el --- Intgrating org-roam and org-ql -*- lexical-binding: t -*-
 
-;; Copyright (C) 2023 Shariff AM Faleel
+;; Copyright (C) 2024 Shariff AM Faleel
 
 ;; Author: Shariff AM Faleel
 ;; Version: 0.1
