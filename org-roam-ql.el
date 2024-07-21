@@ -82,7 +82,7 @@ SOURCE-OR-QUERY can be one of the following:
 
 SORT-FN can be a function that takes two org-roam-nodes, and
 compatible with `seq-sort'.  Or it can be any regsitered sort
-functions."
+functions with `org-roam-ql-register-sort-fn'."
   (--> (cond
         ;; TODO: think of a better way to display the nodes in the query
         ;; without showing it all. Perhaps use only ids?
@@ -114,7 +114,10 @@ functions."
         (t (user-error "Invalid source-or-query")))
        (if-let ((-sort-fn (when sort-fn
                             (or (and (functionp sort-fn) sort-fn)
-                                (gethash sort-fn org-roam-ql--sort-functions) sort-fn))))
+                                (gethash sort-fn org-roam-ql--sort-functions)
+                                (user-error (concat "SORT-FN is not a function registered"
+                                                    "as a sort-function"
+                                                    "(see `org-roam-ql-register-sort-fn')"))))))
            (seq-sort -sort-fn it)
          it)))
 
