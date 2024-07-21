@@ -56,10 +56,4 @@ endif
 
 .DEFAULT: init
 init:
-	@./makem.sh -vvv $(SANDBOX) --install-linters --install-deps -i buttercup
-
-quick:
-	@./makem.sh -vvv $(SANDBOX) --exclude evaluate-with-file-functions.el --no-compile test
-
-test:
-	@./makem.sh -vvv $(SANDBOX) --exclude evaluate-with-file-functions.el test
+	@./makem.sh $(DEBUG) $(VERBOSE) $(SANDBOX) $(INSTALL_DEPS) $(INSTALL_LINTERS)

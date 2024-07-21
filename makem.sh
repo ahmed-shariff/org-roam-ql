@@ -3,7 +3,7 @@
 # * makem.sh --- Script to aid building and testing Emacs Lisp packages
 
 # URL: https://github.com/alphapapa/makem.sh
-# Version: 0.6-pre
+# Version: 0.8-pre
 
 # * Commentary:
 
@@ -112,6 +112,12 @@ Source files are automatically discovered from git, or may be
 specified with options.  Package dependencies are discovered from
 "Package-Requires" headers in source files, from -pkg.el files, and
 from a Cask file.
+
+Checkdoc's spell checker may not recognize some words, causing the
+\`lint-checkdoc' rule to fail.  Custom words can be added in file-local
+or directory-local variables using the variable
+\`ispell-buffer-session-localwords', which should be set to a list of
+strings.
 EOF
 }
 
@@ -177,6 +183,7 @@ function elisp-checkdoc-file {
               (setq makem-checkdoc-errors-p t)
               ;; Return nil because we *are* generating a buffered list of errors.
               nil))))
+    (put 'ispell-buffer-session-localwords 'safe-local-variable #'list-of-strings-p)
     (mapcar #'checkdoc-file files)
     (when makem-checkdoc-errors-p
       (kill-emacs 1))))
@@ -211,21 +218,12 @@ function elisp-byte-compile-file {
   "Call \`byte-compile-warn', returning the number of errors and the number of warnings."
   (let ((num-warnings 0)
         (num-errors 0))
-    (cl-letf (((symbol-function 'byte-compile-warn)
-               (lambda (format &rest args)
-                 ;; Copied from \`byte-compile-warn'.
-                 (cl-incf num-warnings)
-                 (setq format (apply #'format-message format args))
-                 (byte-compile-log-warning format t :warning)))
-              ((symbol-function 'byte-compile-report-error)
-               (lambda (error-info &optional fill &rest args)
-                 (cl-incf num-errors)
-                 ;; Copied from \`byte-compile-report-error'.
-                 (setq byte-compiler-error-flag t)
-                 (byte-compile-log-warning
-                  (if (stringp error-info) error-info
-                    (error-message-string error-info))
-                  fill :error))))
+    (let ((byte-compile-log-warning-function
+           (lambda (string position fill level)
+             (pcase-exhaustive level
+               (:warning (cl-incf num-warnings))
+               (:error (cl-incf num-errors)))
+             (byte-compile--log-warning-for-byte-compile string position fill level))))
       (byte-compile-file filename load))
     (list num-errors num-warnings)))
 EOF
@@ -300,7 +298,6 @@ function elisp-package-initialize-file {
 (setq package-archives (list (cons "gnu" "https://elpa.gnu.org/packages/")
                              (cons "melpa" "https://melpa.org/packages/")
                              (cons "melpa-stable" "https://stable.melpa.org/packages/")))
-$elisp_org_package_archive
 (package-initialize)
 EOF
     echo $file
@@ -317,7 +314,6 @@ function run_emacs {
         --eval "(setq load-prefer-newer t)"
         "${args_debug[@]}"
         "${args_sandbox[@]}"
-        -l $package_initialize_file
         $arg_batch
         "${args_load_paths[@]}"
     )
@@ -379,6 +375,36 @@ function byte-compile-file {
 
 # ** Files
 
+function submodules {
+    # Echo a list of submodules's paths relative to the repo root.
+    # TODO: Parse with bash regexp instead of cut.
+    git submodule status | awk '{print $2}'
+}
+
+function project-root {
+    # Echo the root of the project (or superproject, if running from
+    # within a submodule).
+    root_dir=$(git rev-parse --show-superproject-working-tree)
+    [[ $root_dir ]] || root_dir=$(git rev-parse --show-toplevel)
+    [[ $root_dir ]] || error "Can't find repo root."
+
+    echo "$root_dir"
+}
+
+function files-project {
+    # Echo a list of files in project; or with $1, files in it
+    # matching that pattern with "git ls-files".  Excludes submodules.
+    [[ $1 ]] && pattern="/$1" || pattern="."
+
+    local excludes=()
+    for submodule in $(submodules)
+    do
+        excludes+=(":!:$submodule")
+    done
+
+    git ls-files -- "$pattern" "${excludes[@]}"
+}
+
 function dirs-project {
     # Echo list of directories to be used in load path.
     files-project-feature | dirnames
@@ -387,8 +413,8 @@ function dirs-project {
 
 function files-project-elisp {
     # Echo list of Elisp files in project.
-    git ls-files 2>/dev/null \
-        | egrep "\.el$" \
+    files-project 2>/dev/null \
+        | grep -E "\.el$" \
         | filter-files-exclude-default \
         | filter-files-exclude-args
 }
@@ -396,13 +422,13 @@ function files-project-elisp {
 function files-project-feature {
     # Echo list of Elisp files that are not tests and provide a feature.
     files-project-elisp \
-        | egrep -v "$test_files_regexp" \
+        | grep -E -v "$test_files_regexp" \
         | filter-files-feature
 }
 
 function files-project-test {
     # Echo list of Elisp test files.
-    files-project-elisp | egrep "$test_files_regexp"
+    files-project-elisp | grep -E "$test_files_regexp"
 }
 
 function dirnames {
@@ -415,7 +441,7 @@ function dirnames {
 
 function filter-files-exclude-default {
     # Filter out paths (STDIN) which should be excluded by default.
-    egrep -v "(/\.cask/|-autoloads.el|.dir-locals)"
+    grep -E -v "(/\.cask/|-autoloads\.el|\.dir-locals)"
 }
 
 function filter-files-exclude-args {
@@ -441,7 +467,7 @@ function filter-files-feature {
     # Read paths on STDIN and echo ones that (provide 'a-feature).
     while read path
     do
-        egrep "^\\(provide '" "$path" &>/dev/null \
+        grep -E "^\\(provide '" "$path" &>/dev/null \
             && echo "$path"
     done
 }
@@ -489,7 +515,7 @@ function ert-tests-p {
 
 function package-main-file {
     # Echo the package's main file.
-    file_pkg=$(git ls-files ./*-pkg.el 2>/dev/null)
+    file_pkg=$(files-project "*-pkg.el" 2>/dev/null)
 
     if [[ $file_pkg ]]
     then
@@ -512,23 +538,23 @@ function dependencies {
 
     # Search package headers.  Use -a so grep won't think that an Elisp file containing
     # control characters (rare, but sometimes necessary) is binary and refuse to search it.
-    egrep -a -i '^;; Package-Requires: ' $(files-project-feature) $(files-project-test) \
-        | egrep -o '\([^([:space:]][^)]*\)' \
-        | egrep -o '^[^[:space:])]+' \
+    grep -E -a -i '^;; Package-Requires: ' $(files-project-feature) $(files-project-test) \
+        | grep -E -o '\([^([:space:]][^)]*\)' \
+        | grep -E -o '^[^[:space:])]+' \
         | sed -r 's/\(//g' \
-        | egrep -v '^emacs$'  # Ignore Emacs version requirement.
+        | grep -E -v '^emacs$'  # Ignore Emacs version requirement.
 
     # Search Cask file.
     if [[ -r Cask ]]
     then
-        egrep '\(depends-on "[^"]+"' Cask \
+        grep -E '\(depends-on "[^"]+"' Cask \
             | sed -r -e 's/\(depends-on "([^"]+)".*/\1/g'
     fi
 
     # Search -pkg.el file.
-    if [[ $(git ls-files ./*-pkg.el 2>/dev/null) ]]
+    if [[ $(files-project "*-pkg.el" 2>/dev/null) ]]
     then
-        sed -nr 's/.*\(([-[:alnum:]]+)[[:blank:]]+"[.[:digit:]]+"\).*/\1/p' $(git ls-files ./*-pkg.el 2>/dev/null)
+        sed -nr 's/.*\(([-[:alnum:]]+)[[:blank:]]+"[.[:digit:]]+"\).*/\1/p' $(files-project- -- -pkg.el 2>/dev/null)
     fi
 }
 
@@ -570,7 +596,6 @@ function sandbox {
     args_sandbox=(
         --title "makem.sh: $(basename $(pwd)) (sandbox: $sandbox_dir)"
         --eval "(setq user-emacs-directory (file-truename \"$sandbox_dir\"))"
-        --load package
         --eval "(setq package-user-dir (expand-file-name \"elpa\" user-emacs-directory))"
         --eval "(setq user-init-file (file-truename \"$init_file\"))"
     )
@@ -580,6 +605,9 @@ function sandbox {
     then
         local deps=($(dependencies))
         debug "Installing dependencies: ${deps[@]}"
+
+        # Ensure built-in packages get upgraded to newer versions from ELPA.
+        args_sandbox_package_install+=(--eval "(setq package-install-upgrade-built-in t)")
 
         for package in "${deps[@]}"
         do
@@ -606,6 +634,8 @@ function sandbox {
         verbose 1 "Installing packages into sandbox..."
 
         run_emacs \
+            --eval "(setq package-user-dir (expand-file-name \"elpa\" user-emacs-directory))" \
+            -l "$package_initialize_file" \
             --eval "(package-refresh-contents)" \
             "${args_sandbox_package_install[@]}" \
             && success "Packages installed." \
@@ -613,6 +643,21 @@ function sandbox {
     fi
 
     verbose 2 "Sandbox initialized."
+}
+
+function args-load-path-sandbox {
+    # Echo list of Emacs arguments to add paths of packages installed
+    # in sandbox to load-path.
+    if ! [[ -d "$sandbox_dir/elpa" ]]
+    then
+        warn "Sandbox's \"elpa/\" directory not found: no packages installed."
+    else
+        for path in $(find "$sandbox_dir/elpa" -maxdepth 1 -type d -not -name "archives" -print \
+                          | tail -n+2)
+        do
+            printf -- '-L %q ' "$path"
+        done
+    fi
 }
 
 # ** Utility
@@ -714,6 +759,10 @@ function error {
 function die {
     [[ $@ ]] && error "$@"
     exit $errors
+}
+function warn {
+    echo_color yellow "WARNING ($(ts)): $@" >&2
+    ((warnings++))
 }
 function log {
     echo "LOG ($(ts)): $@" >&2
@@ -1035,6 +1084,8 @@ test_files_regexp='^((tests?|t)/)|-tests?.el$|^test-'
 
 emacs_command=("emacs")
 errors=0
+# TODO: Do something with number of warnings?
+warnings=0
 verbose=0
 compile=true
 arg_batch="--batch"
@@ -1084,21 +1135,15 @@ args_package_archives=(
     --eval "(add-to-list 'package-archives '(\"melpa\" . \"https://melpa.org/packages/\") t)"
 )
 
-args_org_package_archives=(
-    --eval "(add-to-list 'package-archives '(\"org\" . \"https://orgmode.org/elpa/\") t)"
-)
-
 args_package_init=(
     --eval "(package-initialize)"
 )
 
-elisp_org_package_archive="(add-to-list 'package-archives '(\"org\" . \"https://orgmode.org/elpa/\") t)"
-
 # * Args
 
 args=$(getopt -n "$0" \
-              -o dhce:E:i:s::vf:CO \
-              -l compile-batch,exclude:,emacs:,install-deps,install-linters,debug,debug-load-path,help,install:,verbose,file:,no-color,no-compile,no-org-repo,sandbox:: \
+              -o dhce:E:i:s::vf:C \
+              -l compile-batch,exclude:,emacs:,install-deps,install-linters,debug,debug-load-path,help,install:,verbose,file:,no-color,no-compile,sandbox:: \
               -- "$@") \
     || { usage; exit 1; }
 eval set -- "$args"
@@ -1162,9 +1207,6 @@ do
             shift
             args_files+=("$1")
             ;;
-        -O|--no-org-repo)
-            unset elisp_org_package_archive
-            ;;
         --no-color)
             unset color
             ;;
@@ -1193,6 +1235,9 @@ paths_temp+=("$package_initialize_file")
 
 trap cleanup EXIT INT TERM
 
+# Change to project root directory first.
+cd "$(project-root)"
+
 # Discover project files.
 files_project_feature=($(files-project-feature))
 files_project_test=($(files-project-test))
@@ -1219,7 +1264,6 @@ fi
 
 # Set load path.
 args_load_paths=($(args-load-path))
-debug "LOAD PATH ARGS: ${args_load_paths[@]}"
 
 # If rules include linters and sandbox-dir is unspecified, install
 # linters automatically.
@@ -1230,7 +1274,12 @@ then
 fi
 
 # Initialize sandbox.
-[[ $sandbox ]] && sandbox
+[[ $sandbox ]] && {
+    sandbox
+    args_load_paths+=($(args-load-path-sandbox))
+}
+
+debug "LOAD PATH ARGS: ${args_load_paths[@]}"
 
 # Run rules.
 for rule in "${rest[@]}"
