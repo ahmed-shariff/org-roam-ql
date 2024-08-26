@@ -513,16 +513,21 @@ sort-function with the given name already exists, it would be
 overwritten."
   (puthash function-name sort-function org-roam-ql--sort-functions))
 
-(defun org-roam-ql--sort-function-for-slot (slot-name comparison-function-name)
+(defun org-roam-ql--sort-function-for-slot (slot-name comparison-function)
   "Add a sort function of SLOT-NAME of org-roam-node.
-COMPARISON-FUNCTION-NAME is the symbol of function.
+COMPARISON-FUNCTION is the symbol of function.
 DOCSTRING is the documentation string to use for the function."
   (let ((getter (intern-soft
-                 (format "org-roam-node-%s" slot-name))))
+                 (format "org-roam-node-%s" slot-name)))
+        (reverse-slot-name (format "%s-reverse" slot-name)))
     (org-roam-ql-register-sort-fn
      slot-name
      `(lambda (node1 node2)
-        (,comparison-function-name (,getter node1) (,getter node2))))))
+        (,comparison-function (,getter node1) (,getter node2))))
+    (org-roam-ql-register-sort-fn
+     reverse-slot-name
+     `(lambda (node1 node2)
+        (,comparison-function (,getter node2) (,getter node1))))))
 
 (defun org-roam-ql--sort-time-less (val1 val2)
   "Sort based on time-less-p."
