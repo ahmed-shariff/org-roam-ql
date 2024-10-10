@@ -365,6 +365,30 @@ Sets the history as well."
                (append
                 (hash-table-keys org-roam-ql--query-comparison-functions)
                 (hash-table-keys org-roam-ql--query-expansion-functions))
+               string pred))))))
+       (t
+        (list (minibuffer-prompt-end)
+              (condition-case nil
+		  (save-excursion
+		    (goto-char pos)
+		    (forward-sexp 1)
+		    (point))
+		(scan-error pos))
+          (lambda (string pred action)
+            (cond
+             ((eq action 'metadata)
+              (cons
+               'metadata
+               `((annotation-function . ,(lambda (str)
+                                           (let* ((sym (intern-soft str)))
+                                             (when-let (saved-query (gethash sym org-roam-ql--saved-queries))
+                                               (concat (propertize " : " 'face 'shadow)
+                                                       (propertize (cdr saved-query)
+                                                                   'face 'shadow)))))))))
+             (t
+              (complete-with-action
+               action
+               (hash-table-keys org-roam-ql--saved-queries)
                string pred))))))))))
 
 ;; *****************************************************************************
