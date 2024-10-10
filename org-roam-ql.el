@@ -78,7 +78,6 @@ SOURCE-OR-QUERY can be one of the following:
   :where i.e., pass only [(= todo \"TODO\")] and the rest will get
   appended in the front.
 - A list of org-roam-nodes or an org-roam-node.
-- An org-roam-query.
 - A function that returns a list of org-roam-nodes.
 
 SORT-FN can be a function that takes two org-roam-nodes, and
@@ -176,15 +175,13 @@ internal functions"
 
 ;;;###autoload
 (defun org-roam-ql-search (source-or-query &optional title sort-fn)
-  "Basically what `org-ql-search does', but for org-roam-nodes.
-See `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be.  TITLE is a title
-to associate with the view.  DISPLAY-IN is expected to be a symbol,
-either `'org-ql' or `'org-roam'.  If its `org-ql', the results from the
-SOURCE-OR-QUERY will be displayed in `org-ql's agenda buffer.  If its
-`org-roam', will be displayed in a org-roam-ql buffer.  SORT-FN is
-used for sorting the results.  It can be a string name of a slot or a
-predicate function which can be used to sort the nodes.  See
-`org-roam-nodes' for more info on this"
+  "Get nodes that match SOURCE-OR-QUERY and display in org-roam-ql
+buffer.  See `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be.
+TITLE is a title to associate with the view.  Reesults will be
+displayed in a org-roam-ql buffer.  SORT-FN is used for sorting the
+results.  It can be a string name of a slot or a predicate function
+which can be used to sort the nodes.  See `org-roam-nodes' for more
+info on this"
   (interactive (list (let ((query (org-roam-ql--read-query)))
                        (if (vectorp query)
                            (list query)
@@ -214,23 +211,6 @@ When EXTENDED-KWD is provided, append that to the returned."
 (defun org-roam-ql--get-formatted-buffer-name (title)
   "Return the formatted buffer name from the TITLE."
   (format "*%s*" title))
-
-;; FIXME: To be performant this can be done by constructing the
-;; results instead of going through org-ql?
-;;;###autoload
-;; (defun org-roam-ql-select (source-or-query &optional ql-query action narrow sort)
-;;   "Process SOURCE-OR-QUERY with org-roam-db and pass it to org-ql to
-;; be filtered with QL-QUERY.  ACTION NARROW and SORT are passed to
-;; `org-ql-select' as is.
-
-;; See `org-roam-ql-nodes' for the values that can be passed to
-;; SOURCE-OR-QUERY."
-;;   (let* ((nodes (org-roam-ql-nodes source-or-query))
-;;          (buffers (org-roam-ql--nodes-files nodes))
-;;          (query (append `(and (org-roam-query ,source-or-query)) ql-query)))
-;;     (org-roam-ql-clear-cache)
-;;     (when buffers
-;;       (org-ql-select buffers query :action action :narrow narrow :sort sort))))
 
 (defun org-roam-ql--nodes-files (nodes)
   "Return the list of files from the list of NODES."
