@@ -49,7 +49,7 @@
 (defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
 (defvar org-roam-ql--query-expansion-functions (make-hash-table) "Holds the function to expand a query.")
 (defvar org-roam-ql--sort-functions (make-hash-table :test 'equal) "Holds the function to sort nodes.")
-(defvar org-roam-ql--saved-querries (make-hash-table :test 'equal) "Holds the saved queries.")
+(defvar org-roam-ql--saved-queries (make-hash-table :test 'equal) "Holds the saved queries.")
 (defvar org-roam-ql--cache (make-hash-table))
 (defvar org-roam-ql--search-query-history '() "History of queries with `org-roam-ql-search'.")
 (defvar-local org-roam-ql-buffer-title nil "The current title of the buffer.")
@@ -66,6 +66,8 @@ if SORT-FN is provided, the returned values will be sorted with it.
 
 SOURCE-OR-QUERY can be one of the following:
 - A org-roam-ql query.
+- A symbol or string referring to a saved query. If a string is used,
+  it will be interned to a symbol.
 - A `buffer-name' of a `org-roam-mode' buffer.
 - A list of params that can be passed to `org-roam-db-query'.  Expected
   to have the form (QUERY ARG1 ARG2 ARG3...).  `org-roam-db-query' will
@@ -90,6 +92,11 @@ functions with `org-roam-ql-register-sort-fn'."
          (-list source-or-query))
         ;; get-buffer returns a buffer if source-or-query is a buffer obj
         ;; or the name of a buffer
+        ((and (or (and (pred symbolp) (app identity query-symbol))
+                  (and (pred stringp) (app intern query-symbol)))
+              (let saved-query (gethash query-symbol org-roam-ql--saved-queries))
+              (guard saved-query))
+         (org-roam-ql--expand-query (car saved-query)))
         ((pred org-roam-ql--check-if-org-roam-ql-buffer)
          (cond
           ((with-current-buffer source-or-query (derived-mode-p 'org-roam-mode))
@@ -121,6 +128,30 @@ functions with `org-roam-ql-register-sort-fn'."
                                                     "(see `org-roam-ql-register-sort-fn')"))))))
            (seq-sort -sort-fn it)
          it)))
+
+;;;###autoload
+(defun org-roam-ql-add-saved-query (name docstring query)
+  "Create saved QUERY with NAME and DOCSTRING.
+QUERY can be an org-roam-ql query, a list of params that can be passed
+to `org-roam-db-query' (see `org-roam-ql-nodes') or a function which
+can be used with `org-roam-nodes'.
+NAME can be a string or a symbol. Under the hood, it is stored as a
+symbol. Hence if a string is passed, it will be saved with a symbol
+with name NAME."
+  (let ((query-symbol (pcase name
+                        ((pred symbolp)
+                         name)
+                        ((pred stringp)
+                         (intern name))
+                        (_ (user-error "NAME was not a string or symbol.")))))
+    (cl-assert (or (org-roam-ql--check-if-org-roam-db-parameters query)
+                   (and (listp query) (org-roam-ql--check-if-valid-query query))
+                   (functionp query))
+               t "QUERY is not valid.")
+    (remhash query-symbol org-roam-ql--saved-queries)
+    (puthash query-symbol
+             (cons query docstring)
+             org-roam-ql--saved-queries)))
 
 ;; Can we make org-roam-ql aware of any changes that can happen?
 (defun org-roam-ql--nodes-cached (source-or-query)
