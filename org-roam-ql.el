@@ -3,7 +3,7 @@
 ;; Copyright (C) 2024 Shariff AM Faleel
 
 ;; Author: Shariff AM Faleel
-;; Package-Requires: ((emacs "28") (org-roam "2.2.0") (s "1.12.0") (magit-section "3.3.0") (transient "0.4") (org-super-agenda "1.2"))
+;; Package-Requires: ((emacs "28") (org-roam "2.2.0") (s "1.12.0") (magit-section "3.3.0") (transient "0.4") (org-super-agenda "1.2") (dash "2.0"))
 ;; Version: 0.3-pre
 ;; Homepage: https://github.com/ahmed-shariff/org-roam-ql
 ;; SPDX-License-Identifier: GPL-3.0-or-later
@@ -584,11 +584,14 @@ DOCSTRING is the documentation string to use for the function."
     map)
   "Keymap for roam-buffer.  Extends `org-roam-mode-map'.")
 
+(defvar bookmark-make-record-function)
+
 (define-derived-mode org-roam-ql-mode org-roam-mode "Org-roam-ql"
   "A major mode to display a list of nodes.
 Similar to `org-roam-mode', but doesn't default to the
 `org-roam-buffer-current-node'."
-  :group 'org-roam-ql)
+  :group 'org-roam-ql
+  (setq-local bookmark-make-record-function #'org-roam-ql--bookmark-make-record))
 
 (defun org-roam-ql--refresh-buffer-with-display-function (display-function)
   "Refresh a buffer with a DISPLAY-FUNCTION."
@@ -707,6 +710,26 @@ See `org-roam-ql-nodes' for SORT-FN."
             (when (org-roam-node-section-p magit-section)
               (push (slot-value magit-section 'node) nodes))))
         nodes))))
+
+(defun org-roam-ql--bookmark-open (bookmark)
+  "Query and open org-roam-ql bookmark BOOKMARK."
+  (let ((title (bookmark-prop-get bookmark 'title))
+        (query (bookmark-prop-get bookmark 'query))
+        (sort (bookmark-prop-get bookmark 'sort)))
+    (org-roam-ql-search query title sort)))
+
+(put 'org-roam-ql--bookmark-open 'bookmark-handler-type "org-roam-ql query")
+
+(defun org-roam-ql--bookmark-make-record ()
+  "Create a bookmark record for org-roam-ql-mode buffers.
+
+See docs of `bookmark-make-record-function'."
+ (let ((bookmark (cons nil (bookmark-make-record-default 'no-file 'no-context))))
+   (bookmark-prop-set bookmark 'handler   #'org-roam-ql--bookmark-open)
+   (bookmark-prop-set bookmark 'title     org-roam-ql-buffer-title)
+   (bookmark-prop-set bookmark 'query     org-roam-ql-buffer-query)
+   (bookmark-prop-set bookmark 'sort      org-roam-ql-buffer-sort)
+   bookmark))
 
 ;; *****************************************************************************
 ;; org-roam-ql-agenda-view functions
@@ -1054,9 +1077,9 @@ If there are entries that do not have an ID, it will signal an error"
           (message "Query results is empty"))
       (user-error "Dynamic block needs to specify :query and :columns"))))
 
-;; ;; *****************************************************************************
-;; ;; org agenda custom command
-;; ;; *****************************************************************************
+;; *****************************************************************************
+;; org agenda custom command
+;; *****************************************************************************
 (defun org-roam-ql-agenda-block (query)
   "Insert items for QUERY into current buffer.
 See `org-roam-ql-nodes' for more information on QUERY.  Intended to be
@@ -1091,7 +1114,7 @@ doesn't respect agenda restrict."
 See `org-roam-ql-nodes' for more information on SOURCE-OR-QUERY."
   (-map #'org-roam-node-file (org-roam-ql-nodes source-or-query)))
 
-;; ;; *****************************************************************************
+;; *****************************************************************************
 ;; Helper functions
 ;; *****************************************************************************
 (defun org-roam-ql-insert-node-title ()
