@@ -90,13 +90,11 @@ functions with `org-roam-ql-register-sort-fn'."
         ;; without showing it all. Perhaps use only ids?
         ((pred org-roam-ql--check-if-list-of-org-roam-nodes-list)
          (-list source-or-query))
+        ((and (app (org-roam-ql--check-if-saved-query) saved-query)
+              (guard saved-query))
+         (org-roam-ql--nodes-cached saved-query))
         ;; get-buffer returns a buffer if source-or-query is a buffer obj
         ;; or the name of a buffer
-        ((and (or (and (pred symbolp) (app identity query-symbol))
-                  (and (pred stringp) (app intern query-symbol)))
-              (let saved-query (gethash query-symbol org-roam-ql--saved-queries))
-              (guard saved-query))
-         (org-roam-ql--expand-query (car saved-query)))
         ((pred org-roam-ql--check-if-org-roam-ql-buffer)
          (cond
           ((with-current-buffer source-or-query (derived-mode-p 'org-roam-mode))
@@ -119,7 +117,7 @@ functions with `org-roam-ql-register-sort-fn'."
            (if (and (listp it) (-all-p #'org-roam-node-p it))
                it
              (user-error "Function did not expand to list of nodes"))))
-        (_ (user-error "Invalid source-or-query")))
+        (_ (user-error "Invalid source-or-query. Got  %S" source-or-query)))
        (if-let ((-sort-fn (when sort-fn
                             (or (and (functionp sort-fn) sort-fn)
                                 (gethash sort-fn org-roam-ql--sort-functions)
@@ -252,6 +250,16 @@ When EXTENDED-KWD is provided, append that to the returned."
   (or (org-roam-node-p source-or-query)
       (-all-p #'org-roam-node-p source-or-query)))
 
+(defun org-roam-ql--check-if-saved-query (source-or-query)
+  "Return the query if SOURCE-OR-QUERY is a saved query.
+Otherwise return nil."
+  (let* ((query-symbol (if (stringp source-or-query)
+                           (intern source-or-query)
+                         source-or-query))
+         (saved-query (gethash query-symbol org-roam-ql--saved-queries)))
+    (when saved-query
+      (car saved-query))))
+
 (defun org-roam-ql--check-if-org-roam-ql-buffer (source-or-query)
   "Return non-nil if SOURCE-OR-QUERY is buffer org-roam-ql can understand.
 This would be either an `org-agenda' buffer or a `org-roam' like buffer."
@@ -273,6 +281,7 @@ This would be either an `org-agenda' buffer or a `org-roam' like buffer."
           (or (gethash (car s-exp) org-roam-ql--query-comparison-functions)
               (gethash (car s-exp) org-roam-ql--query-expansion-functions)))
     (or (org-roam-ql--check-if-list-of-org-roam-nodes-list s-exp)
+        (org-roam-ql--check-if-saved-query s-exp)
         (org-roam-ql--check-if-org-roam-ql-buffer s-exp)
         (org-roam-ql--check-if-org-roam-db-parameters s-exp))))
 
