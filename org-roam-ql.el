@@ -68,6 +68,7 @@ SOURCE-OR-QUERY can be one of the following:
 - A org-roam-ql query.
 - A symbol or string referring to a saved query. If a string is used,
   it will be interned to a symbol.
+- A string name of a org-roam-ql bookmark.
 - A `buffer-name' of a `org-roam-mode' buffer.
 - A list of params that can be passed to `org-roam-db-query'.  Expected
   to have the form (QUERY ARG1 ARG2 ARG3...).  `org-roam-db-query' will
@@ -93,6 +94,9 @@ functions with `org-roam-ql-register-sort-fn'."
         ((and (app (org-roam-ql--check-if-saved-query) saved-query)
               (guard saved-query))
          (org-roam-ql--nodes-cached saved-query))
+        ((and (app (org-roam-ql--check-if-bookmark) bookmark-query)
+              (guard bookmark-query))
+         (org-roam-ql--nodes-cached bookmark-query))
         ;; get-buffer returns a buffer if source-or-query is a buffer obj
         ;; or the name of a buffer
         ((pred org-roam-ql--check-if-org-roam-ql-buffer)
@@ -260,6 +264,18 @@ Otherwise return nil."
     (when saved-query
       (car saved-query))))
 
+(defun org-roam-ql--check-if-bookmark (source-or-query)
+  "Return the query if SOURCE-OR-QUERY is a org-roam-ql bookmark.
+Otherwise return nil."
+  (let ((bookmark (alist-get
+                   source-or-query
+                   (--filter
+                    (equal #'org-roam-ql--bookmark-open
+                           (bookmark-prop-get it 'handler))
+                    bookmark-alist)
+                   nil nil 'equal)))
+    (when bookmark (alist-get 'query bookmark))))
+
 (defun org-roam-ql--check-if-org-roam-ql-buffer (source-or-query)
   "Return non-nil if SOURCE-OR-QUERY is buffer org-roam-ql can understand.
 This would be either an `org-agenda' buffer or a `org-roam' like buffer."
@@ -282,6 +298,7 @@ This would be either an `org-agenda' buffer or a `org-roam' like buffer."
               (gethash (car s-exp) org-roam-ql--query-expansion-functions)))
     (or (org-roam-ql--check-if-list-of-org-roam-nodes-list s-exp)
         (org-roam-ql--check-if-saved-query s-exp)
+        (org-roam-ql--check-if-bookmark s-exp)
         (org-roam-ql--check-if-org-roam-ql-buffer s-exp)
         (org-roam-ql--check-if-org-roam-db-parameters s-exp))))
 
