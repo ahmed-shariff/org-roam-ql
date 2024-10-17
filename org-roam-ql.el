@@ -1008,7 +1008,11 @@ If there are entries that do not have an ID, it will signal an error"
   ["View"
    [("r" "Refresh" org-roam-ql-refresh-buffer)]
    [:if-derived org-roam-mode
-                ("S" "Show in agenda buffer" org-roam-ql-agenda-buffer-from-roam-buffer)]
+                ("S" "Show in agenda buffer" org-roam-ql-agenda-buffer-from-roam-buffer)
+                ("b" "Bookmark (org-roam-ql)" bookmark-set)]
+   [:if-not-derived org-roam-ql-mode
+                    ("o" "Convert to org-roam-ql buffer"
+                     org-roam-ql-convert-roam-buffer-to-roam-ql-buffer)]
    [:if-derived org-agenda-mode
                 ("S" "Show in org-roam buffer" org-roam-ql-roam-buffer-from-agenda-buffer)]])
 
@@ -1168,6 +1172,21 @@ Can be used in the minibuffer or when writting querries."
 (defun org-roam-ql--default-query-for-roam-buffer ()
   "Function used for `org-roam-ql-default-org-roam-buffer-query'."
   `(backlink-to (id ,(org-roam-node-id org-roam-buffer-current-node))))
+
+;;;###autoload
+(defun org-roam-ql-convert-roam-buffer-to-roam-ql-buffer ()
+  "Convert a `org-roam-mode' buffer to a `org-roam-ql-mode' buffer."
+  (interactive)
+  (when (and (derived-mode-p 'org-roam-mode) (not (derived-mode-p 'org-roam-ql-mode)))
+    (org-roam-ql-search
+     (pcase org-roam-ql-default-org-roam-buffer-query
+       ((pred functionp)
+        (funcall org-roam-ql-default-org-roam-buffer-query))
+       (_ org-roam-ql-default-org-roam-buffer-query))
+     (or org-roam-ql-buffer-title
+         (org-roam-ql--get-formatted-title
+          (org-roam-node-title org-roam-buffer-current-node) nil))
+     (or org-roam-ql-buffer-sort nil))))
 
 ;; *****************************************************************************
 ;; Setup of org-roam-ql
