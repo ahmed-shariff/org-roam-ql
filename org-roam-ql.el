@@ -333,6 +333,8 @@ Sets the history as well."
                                                 (list query))))
       (read query))))
 
+(defvar org-roam-ql--valid-prev-chars-for-cap nil)
+
 ;; Copied from `elisp-completion-at-point'
 (defun org-roam-ql--completion-at-point ()
   (with-syntax-table emacs-lisp-mode-syntax-table
@@ -398,29 +400,64 @@ Sets the history as well."
                 (hash-table-keys org-roam-ql--query-expansion-functions))
                string pred))))))
        (t
-        (list (minibuffer-prompt-end)
-              (condition-case nil
-		  (save-excursion
-		    (goto-char pos)
-		    (forward-sexp 1)
-		    (point))
-		(scan-error pos))
+        (let* ((beg (cond
+                     ((or (eq pos (minibuffer-prompt-end))
+                          (member (char-before pos)
+                                  org-roam-ql--valid-prev-chars-for-cap)
+                          (member (char-before pos) '(?\" ?\ )))
+                      pos)
+                     (t (condition-case nil
+	                    (save-excursion
+		              (goto-char pos)
+		              (backward-sexp 1)
+                              (skip-chars-forward
+                               (apply #'string
+                                      (append '(?\") org-roam-ql--valid-prev-chars-for-cap)))
+		              (point))
+	                  (scan-error pos)))))
+               (end (condition-case nil
+		        (save-excursion
+		          (goto-char pos)
+		          (forward-sexp 1)
+		          (point))
+		      (scan-error pos))))
+        (list beg end
           (lambda (string pred action)
-            (cond
-             ((eq action 'metadata)
-              (cons
-               'metadata
-               `((annotation-function . ,(lambda (str)
-                                           (let* ((sym (intern-soft str)))
-                                             (when-let (saved-query (gethash sym org-roam-ql--saved-queries))
-                                               (concat (propertize " : " 'face 'shadow)
-                                                       (propertize (cdr saved-query)
-                                                                   'face 'shadow)))))))))
-             (t
-              (complete-with-action
-               action
-               (hash-table-keys org-roam-ql--saved-queries)
-               string pred))))))))))
+            (let* ((wrap-in-quotes (not (eq (char-before beg) ?\")))
+                   (bookmarks (--filter (equal #'org-roam-ql--bookmark-open (bookmark-prop-get it 'handler)) bookmark-alist))
+                   (candidates (--> (append (hash-table-keys org-roam-ql--saved-queries) bookmarks)
+                                    (if wrap-in-quotes
+                                        (--map (format "\"%s\"" (if (listp it) (car it) it)) it)
+                                      it))))
+              (cond
+               ((eq action 'metadata)
+                (cons
+                 'metadata
+                 `((annotation-function . ,(lambda (str)
+                                             (let* ((str (if wrap-in-quotes
+                                                             (string-trim-left (string-trim-right str "\"") "\"")
+                                                           str))
+                                                    (sym (intern-soft str))
+                                                    (saved-query (gethash sym org-roam-ql--saved-queries))
+                                                    (bookmark (alist-get str bookmarks nil nil 'equal)))
+                                               (cond
+                                                (saved-query 
+                                                 (concat (propertize " : " 'face 'shadow)
+                                                         (propertize "saved query - " 'face  '(:inherit shadow :weight extra-bold))
+                                                         (propertize (format "%s - %s" (cdr saved-query) (car saved-query))
+                                                                     'face 'shadow)))
+                                                (bookmark
+                                                 (concat (propertize " : " 'face 'shadow)
+                                                         (propertize "bookmark - " 'face  '(:inherit shadow :weight extra-bold))
+                                                         (propertize (format "%s - %s"
+                                                                             (alist-get 'title bookmark)
+                                                                             (alist-get 'query bookmark))
+                                                                     'face 'shadow))))))))))
+               (t
+                (complete-with-action
+                 action
+                 candidates
+                 string pred))))))))))))
 
 ;; *****************************************************************************
 ;; Functions for predicates and expansions
