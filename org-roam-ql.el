@@ -59,6 +59,11 @@
 (defvar-local org-roam-ql-buffer-in nil
   "Define which option to use - 'in-buffer' or 'org-roam-db'.")
 
+;; `bookmark.el' setup
+(defvar bookmark-make-record-function)
+(defvar bookmark-alist)
+(declare-function bookmark-set "bookmark")
+
 ;;;###autoload
 (defun org-roam-ql-nodes (source-or-query &optional sort-fn)
   "Convert SOURCE-OR-QUERY to org-roam-nodes.
@@ -610,8 +615,6 @@ DOCSTRING is the documentation string to use for the function."
     map)
   "Keymap for roam-buffer.  Extends `org-roam-mode-map'.")
 
-(defvar bookmark-make-record-function)
-
 (define-derived-mode org-roam-ql-mode org-roam-mode "Org-roam-ql"
   "A major mode to display a list of nodes.
 Similar to `org-roam-mode', but doesn't default to the
@@ -751,11 +754,24 @@ See `org-roam-ql-nodes' for SORT-FN."
 
 See docs of `bookmark-make-record-function'."
  (let ((bookmark (cons nil (bookmark-make-record-default 'no-file 'no-context))))
-   (bookmark-prop-set bookmark 'handler   #'org-roam-ql--bookmark-open)
-   (bookmark-prop-set bookmark 'title     org-roam-ql-buffer-title)
-   (bookmark-prop-set bookmark 'query     org-roam-ql-buffer-query)
-   (bookmark-prop-set bookmark 'sort      org-roam-ql-buffer-sort)
-   bookmark))
+   (if (equal (buffer-name) org-roam-buffer)
+       (progn
+         (bookmark-prop-set bookmark 'handler #'org-roam-ql--bookmark-open)
+         (bookmark-prop-set bookmark 'title
+                            (or org-roam-ql-buffer-title
+                                (org-roam-ql--get-formatted-title
+                                 (org-roam-node-title org-roam-buffer-current-node) nil)))
+         (bookmark-prop-set bookmark 'query
+                            (pcase org-roam-ql-default-org-roam-buffer-query
+                              ((pred functionp)
+                               (funcall org-roam-ql-default-org-roam-buffer-query))
+                              (_ org-roam-ql-default-org-roam-buffer-query)))
+         (bookmark-prop-set bookmark 'sort (or org-roam-ql-buffer-sort "title")))
+     (bookmark-prop-set bookmark 'handler   #'org-roam-ql--bookmark-open)
+     (bookmark-prop-set bookmark 'title     org-roam-ql-buffer-title)
+     (bookmark-prop-set bookmark 'query     org-roam-ql-buffer-query)
+     (bookmark-prop-set bookmark 'sort      org-roam-ql-buffer-sort)
+     bookmark)))
 
 ;; *****************************************************************************
 ;; org-roam-ql-agenda-view functions
