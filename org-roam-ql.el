@@ -368,30 +368,32 @@ Sets the history as well."
              ((eq action 'metadata)
               (cons
                'metadata
-               `((annotation-function . ,(lambda (str)
-                                           (let* ((sym (intern-soft str)))
-                                             (let ((comparison-function (gethash sym org-roam-ql--query-comparison-functions))
-                                                   (expansion-function (gethash sym org-roam-ql--query-expansion-functions)))
-                                               (cond
-                                                (comparison-function
-                                                 (concat (propertize " : " 'face 'shadow)
-                                                         (let ((fun-doc (elisp-get-fnsym-args-string (caddr comparison-function) 0)))
-                                                           (when fun-doc
-                                                             (concat (propertize (s-replace-regexp "([^ ]* " "("
-                                                                                           fun-doc)
-                                                                         'face  '(:inherit shadow :weight extra-bold))
-                                                                     " - ")))
-                                                         (propertize (car comparison-function)
-                                                                     'face 'shadow)))
-                                                (expansion-function
-                                                 (concat (propertize " : " 'face 'shadow)
-                                                         (let ((fun-doc (elisp-get-fnsym-args-string (cdr expansion-function) 0)))
-                                                           (when fun-doc
-                                                             (concat (propertize fun-doc
-                                                                                 'face  '(:inherit shadow :weight extra-bold))
-                                                                     " - ")))
-                                                         (propertize (car expansion-function)
-                                                                     'face 'shadow)))))))))))
+               `(,(cons '
+                   annotation-function
+                   (lambda (str)
+                     (let* ((sym (intern-soft str)))
+                       (let ((comparison-function (gethash sym org-roam-ql--query-comparison-functions))
+                             (expansion-function (gethash sym org-roam-ql--query-expansion-functions)))
+                         (cond
+                          (comparison-function
+                           (concat (propertize " : " 'face 'shadow)
+                                   (let ((fun-doc (elisp-get-fnsym-args-string (caddr comparison-function) 0)))
+                                     (when fun-doc
+                                       (concat (propertize (s-replace-regexp "([^ ]* " "("
+                                                                             fun-doc)
+                                                           'face  '(:inherit shadow :weight extra-bold))
+                                               " - ")))
+                                   (propertize (car comparison-function)
+                                               'face 'shadow)))
+                          (expansion-function
+                           (concat (propertize " : " 'face 'shadow)
+                                   (let ((fun-doc (elisp-get-fnsym-args-string (cdr expansion-function) 0)))
+                                     (when fun-doc
+                                       (concat (propertize fun-doc
+                                                           'face  '(:inherit shadow :weight extra-bold))
+                                               " - ")))
+                                   (propertize (car expansion-function)
+                                               'face 'shadow)))))))))))
              (t
               (complete-with-action
                action
@@ -424,35 +426,56 @@ Sets the history as well."
         (list beg end
           (lambda (string pred action)
             (let* ((wrap-in-quotes (not (eq (char-before beg) ?\")))
-                   (bookmarks (--filter (equal #'org-roam-ql--bookmark-open (bookmark-prop-get it 'handler)) bookmark-alist))
-                   (candidates (--> (append (hash-table-keys org-roam-ql--saved-queries) bookmarks)
-                                    (if wrap-in-quotes
-                                        (--map (format "\"%s\"" (if (listp it) (car it) it)) it)
-                                      it))))
+                   (saved-queries (hash-table-keys org-roam-ql--saved-queries))
+                   (bookmarks (-non-nil
+                               (--map
+                                (when (equal #'org-roam-ql--bookmark-open (bookmark-prop-get it 'handler))
+                                  (car it))
+                                bookmark-alist)))
+                   (buffers (-non-nil
+                             (--map (with-current-buffer it
+                                      (when (derived-mode-p 'org-roam-mode)
+                                        (buffer-name)))
+                                    (buffer-list))))
+                   (candidates (--map (if wrap-in-quotes (format "\"%s\""it) it) (append saved-queries bookmarks buffers)))
+                   (width (-max (-map #'length candidates))))
               (cond
                ((eq action 'metadata)
                 (cons
                  'metadata
-                 `((annotation-function . ,(lambda (str)
-                                             (let* ((str (if wrap-in-quotes
-                                                             (string-trim-left (string-trim-right str "\"") "\"")
-                                                           str))
-                                                    (sym (intern-soft str))
-                                                    (saved-query (gethash sym org-roam-ql--saved-queries))
-                                                    (bookmark (alist-get str bookmarks nil nil 'equal)))
-                                               (cond
-                                                (saved-query 
-                                                 (concat (propertize " : " 'face 'shadow)
-                                                         (propertize "saved query - " 'face  '(:inherit shadow :weight extra-bold))
-                                                         (propertize (format "%s - %s" (cdr saved-query) (car saved-query))
-                                                                     'face 'shadow)))
-                                                (bookmark
-                                                 (concat (propertize " : " 'face 'shadow)
-                                                         (propertize "bookmark - " 'face  '(:inherit shadow :weight extra-bold))
-                                                         (propertize (format "%s - %s"
-                                                                             (alist-get 'title bookmark)
-                                                                             (alist-get 'query bookmark))
-                                                                     'face 'shadow))))))))))
+                 `(,(cons
+                     'affixation-function
+                     (lambda (cands)
+                       (--map
+                        (--> (if wrap-in-quotes
+                                 (string-trim-left (string-trim-right it "\"") "\"")
+                               it)
+                             (cond
+                              ((member (intern it) saved-queries)
+                               (let ((saved-query (gethash (intern it) org-roam-ql--saved-queries)))
+                                 (list (truncate-string-to-width it width 0 ?\ )
+                                       (propertize "(saved)    " 'face '(:inherit shadow :weight extra-bold))
+                                       (propertize (format " : %s - %s" (cdr saved-query) (car saved-query))
+                                                   'face 'shadow))))
+                              ((member it bookmarks)
+                               (let ((bookmark (alist-get it bookmark-alist nil nil 'equal)))
+                                 (list (truncate-string-to-width it width 0 ?\ )
+                                       (propertize "(bookmark) " 'face '(:inherit shadow :weight extra-bold))
+                                       (propertize (format " : %s - %s"
+                                                           (alist-get 'title bookmark)
+                                                           (alist-get 'query bookmark))
+                                                   'face 'shadow))))
+                              ((member it buffers)
+                               (list (truncate-string-to-width it width 0 ?\ )
+                                     (propertize "(buffer)   " 'face '(:inherit shadow :weight extra-bold))
+                                     (propertize (apply 'format
+                                                        (append '(" : %s - %s")
+                                                                (if (equal it org-roam-buffer)
+                                                                    (list "org-roam-buffer" org-roam-buffer)
+                                                                  (with-current-buffer it
+                                                                    (list org-roam-ql-buffer-title org-roam-ql-buffer-query)))))
+                                                 'face 'shadow)))))
+                        cands))))))
                (t
                 (complete-with-action
                  action
