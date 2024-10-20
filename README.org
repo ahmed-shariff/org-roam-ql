@@ -4,8 +4,6 @@
 
 #+TITLE: org-roam-ql - query language for org-roam
 
-*This package is under active development.*
-
 This package provides an interface to easily query and display results from your ~org-roam~ database. 
 
 * Contents
@@ -66,12 +64,15 @@ Example configuration:
     (setq org-agenda-custom-commands
           ("cr" "todo nodes" todo "TODO" ((org-agenda-files (org-roam-ql-nodes-files '(title "Node"))))))
   #+end_src
+- ~org-roam-ql-add-saved-query (NAME DOCSTRING QUERY)~ :: Stores valid [[#valid-values-for-source-or-query][QUERY]] with ~NAME~ and ~DOCSTRING~. The ~NAME~ can be used as a query in place of any other ~SOURCE-OR-QUERY~. ~NAME~ can be a string or a symbol.
 ** Valid values for ~SOURCE-OR-QUERY~
 - A list of ~org-roam-nodes~ :: This should self explanatory.
 - A list of parameters that can be passed to ~org-roam-db-query~ :: It should be a list of the form ~(QUERY ARG1 ARG2...)~. The result of calling ~org-roam-db-query~ with these parameters should return a list of records where the first element is the ID of a corresponding node. For example:
   #+begin_src emacs-lisp
   (org-roam-ql-nodes '([:select [id] :from nodes :where (= todo \"TODO\")]))
   #+end_src
+- Saved query name :: Name of a saved query (see ~org-roam-ql-add-saved-query~). This can be string or a symbol. Note that the name of the saved query is always stored as a symbol. If a string is passed, it gets interned into a symbol before looking up the query. The returned nodes will be a result of executing the query represented by the name.
+- Bookmark name :: Name of a bookmark of a org-roam-ql-buffer. This matched against the name given when ~bookmark-set~ is called from a org-roam-ql-buffer.
 - Buffer name :: A buffer or buffer-name of a ~org-roam~ buffer, a ~org-roam-ql~ buffer or an agenda-like buffer displaying a list of org-roam nodes.
 - Function :: A function that returns a list of ~org-roam-nodes~
 - A ~QUERY~ :: This is a predicate, similar to the predicates in [[https://github.com/alphapapa/org-ql][org-ql]]. Returns all nodes that pass for the given predicate. For example, consider the following call to ~org-roam-ql-nodes~:
@@ -80,28 +81,27 @@ Example configuration:
     #+end_src
     In the above example, the result would contain any nodes whose todo state is =TODO=, have tags "tag1" and "tag2" and are in the org-roam buffer.
     The following are predicates available by default in org-roam-ql:
-   - =or (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)= :: Tests if a node matches/contained-in any of the ~SOURCE-OR-QUERY~'s. 
-   - =and (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)= :: Similar to ~or~, but should satisfy all predicates or contained in all the results of ~SOURCE-OR-QUERY~'s.
-   - =not (SOURCE-OR-QUERY)= :: Tests if a node doesn't match the result or not contained in the result of ~SOURCE-OR-QUERY~.
-   - =file (REGEXP &optional EXACT)= :: Test if nodes file name matches ~REGEXP~. If ~EXACT~ is non-nil, the file slot should be an exact match to ~REGEXP~. Note the slot ~file~ of an org-roam-node would contain the absolute path.
-   - =file-title (REGEXP &optional EXACT)= :: Similar to ~file~, tests the ~file-title~ slot of a node.
-   - =id (ID)= :: Tests if the ~ID~ of a node is a match to the value passed.
-   - =level (LEVEL)= :: Tests if the ~level~ of a node is equal to ~LEVEL~.
-   - =todo (REGEXP &optional EXACT)= :: Similar to ~file~, tests the todo state of a node.
-   - =priority (REGEXP &optional EXACT)= :: Similar to ~file~, tests the priority of a node.
-   - =scheduled (COMPARISON TIME-STRING)= :: Compares the ~scheduled~ of the node with ~TIME-STAMP~ based on ~COMPARISON~. ~TIME-STAMP~ is any valid value for [[https://orgmode.org/manual/The-date_002ftime-prompt.html][org date-time prompt]]. ~COMPARISON~ is either ~<~ or ~>~. Example: ~(scheduled > "-3w")~
-   - =deadline= (COMPARISON TIME-STRING) :: Same as ~scheduled~, tests the ~deadline~ of a node.
-   - =title (REGRXP &optional EXACT)= :: Similar to ~file~, tests the title of a node.
-   - =properties (PROP PROP-VAL)= :: Tests if the value of the property of a node PROP is a match to PROP-VAL. PROP-VAL can be a regular expression.
-   - =tags (TAG1 TAG2 ...)= :: Tests if the tags of a node have TAG1, TAG2, etc.
-   - =refs (REGEXP &optional EXACT)= :: Similar to ~file~, tests the nodes refs slot.
-   - =backlink-to (SOURCE-OR-QUERY)= :: Tests if the node has a backlink to any of the nodes from the results ~SOURCE-OR-QUERY~.
-   - =backlink-from (SOURCE-OR-QUERY)= :: Similar to ~backlink-to~, tests if there are any backlinks from (aka forwardlinks) the resulting nodes from ~SOURCE-OR-QUERY~.
-   - =in-buffer (BUFFER-NAME)= :: This is similar to passing a buffer-name as ~SOURCE-OR-QUERY~. Tests if a node is in the org-roam buffer named ~BUFFER-NAME~.
-   - =nodes-list (NODES-LIST)= :: This is similar to passing a list of nodes as ~SOURCE-OR-QUERY~. Tests if a node is in the ~NODES-LIST~.
-   - =function (FUNC)= :: This is similar to passing a function as ~SOURCE-OR-QUERY~. Tests if the node is in the result of executing the function ~FUNC~.
-   - =funcall (FUNC)= :: Tests a node with the function ~FUNC~, which takes an org-roam node as parameter. Test passes if the function returns non-nil.
-
+  - =or (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)= :: Tests if a node matches/contained-in any of the ~SOURCE-OR-QUERY~'s. 
+  - =and (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)= :: Similar to ~or~, but should satisfy all predicates or contained in all the results of ~SOURCE-OR-QUERY~'s.
+  - =not (SOURCE-OR-QUERY)= :: Tests if a node doesn't match the result or not contained in the result of ~SOURCE-OR-QUERY~.
+  - =file (REGEXP &optional EXACT)= :: Test if nodes file name matches ~REGEXP~. If ~EXACT~ is non-nil, the file slot should be an exact match to ~REGEXP~. Note the slot ~file~ of an org-roam-node would contain the absolute path.
+  - =file-title (REGEXP &optional EXACT)= :: Similar to ~file~, tests the ~file-title~ slot of a node.
+  - =id (ID)= :: Tests if the ~ID~ of a node is a match to the value passed.
+  - =level (LEVEL)= :: Tests if the ~level~ of a node is equal to ~LEVEL~.
+  - =todo (REGEXP &optional EXACT)= :: Similar to ~file~, tests the todo state of a node.
+  - =priority (REGEXP &optional EXACT)= :: Similar to ~file~, tests the priority of a node.
+  - =scheduled (COMPARISON TIME-STRING)= :: Compares the ~scheduled~ of the node with ~TIME-STAMP~ based on ~COMPARISON~. ~TIME-STAMP~ is any valid value for [[https://orgmode.org/manual/The-date_002ftime-prompt.html][org date-time prompt]]. ~COMPARISON~ is either ~<~ or ~>~. Example: ~(scheduled > "-3w")~
+  - =deadline= (COMPARISON TIME-STRING) :: Same as ~scheduled~, tests the ~deadline~ of a node.
+  - =title (REGRXP &optional EXACT)= :: Similar to ~file~, tests the title of a node.
+  - =properties (PROP PROP-VAL)= :: Tests if the value of the property of a node PROP is a match to PROP-VAL. PROP-VAL can be a regular expression.
+  - =tags (TAG1 TAG2 ...)= :: Tests if the tags of a node have TAG1, TAG2, etc.
+  - =refs (REGEXP &optional EXACT)= :: Similar to ~file~, tests the nodes refs slot.
+  - =backlink-to (SOURCE-OR-QUERY)= :: Tests if the node has a backlink to any of the nodes from the results ~SOURCE-OR-QUERY~.
+  - =backlink-from (SOURCE-OR-QUERY)= :: Similar to ~backlink-to~, tests if there are any backlinks from (aka forwardlinks) the resulting nodes from ~SOURCE-OR-QUERY~.
+  - =in-buffer (BUFFER-NAME)= :: This is similar to passing a buffer-name as ~SOURCE-OR-QUERY~. Tests if a node is in the org-roam buffer named ~BUFFER-NAME~.
+  - =nodes-list (NODES-LIST)= :: This is similar to passing a list of nodes as ~SOURCE-OR-QUERY~. Tests if a node is in the ~NODES-LIST~.
+  - =function (FUNC)= :: This is similar to passing a function as ~SOURCE-OR-QUERY~. Tests if the node is in the result of executing the function ~FUNC~.
+  - =funcall (FUNC)= :: Tests a node with the function ~FUNC~, which takes an org-roam node as parameter. Test passes if the function returns non-nil.
 ** Adding new predicates
 There are two ways to add a new predicate to org-roam-ql: 
 - =org-roam-ql-defpred (NAME DOCSTRING EXTRACTION-FUNCTION COMPARISON-FUNCTION)= :: Creates a predicate that can be used as ~SOURCE-OR-QUERY~. For example, for a predicate defined as follows:

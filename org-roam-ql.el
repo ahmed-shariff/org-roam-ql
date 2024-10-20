@@ -45,8 +45,7 @@
   "The query to use when org-roam-buffer is extended.  Can also be a function that returns a query."
   :type '(choice function sexp))
 
-;; FIXME: What is this docstring!
-(defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the function to check different elements of the roam-query.")
+(defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the comparison function for a query.")
 (defvar org-roam-ql--query-expansion-functions (make-hash-table) "Holds the function to expand a query.")
 (defvar org-roam-ql--sort-functions (make-hash-table :test 'equal) "Holds the function to sort nodes.")
 (defvar org-roam-ql--saved-queries (make-hash-table :test 'equal) "Holds the saved queries.")
@@ -71,8 +70,9 @@ if SORT-FN is provided, the returned values will be sorted with it.
 
 SOURCE-OR-QUERY can be one of the following:
 - A org-roam-ql query.
-- A symbol or string referring to a saved query. If a string is used,
-  it will be interned to a symbol.
+- A symbol or string referring to a saved query registered using
+  `org-roam-ql-add-saved-query'. If a string is used, it will be
+  interned to a symbol.
 - A string name of a org-roam-ql bookmark.
 - A `buffer-name' of a `org-roam-mode' buffer.
 - A list of params that can be passed to `org-roam-db-query'.  Expected
@@ -92,8 +92,6 @@ SORT-FN can be a function that takes two org-roam-nodes, and
 compatible with `seq-sort'.  Or it can be any regsitered sort
 functions with `org-roam-ql-register-sort-fn'."
   (--> (pcase source-or-query
-        ;; TODO: think of a better way to display the nodes in the query
-        ;; without showing it all. Perhaps use only ids?
         ((pred org-roam-ql--check-if-list-of-org-roam-nodes-list)
          (-list source-or-query))
         ((and (app (org-roam-ql--check-if-saved-query) saved-query)
@@ -145,6 +143,7 @@ can be used with `org-roam-nodes'.
 NAME can be a string or a symbol. Under the hood, it is stored as a
 symbol. Hence if a string is passed, it will be saved with a symbol
 with name NAME."
+  (declare (indent defun) (doc-string 2))
   (let ((query-symbol (pcase name
                         ((pred symbolp)
                          name)
@@ -498,6 +497,7 @@ arguments from the predicate itself.
 
 If any predicate or expansion function with same NAME exists, it will be
 overwritten."
+  (declare (indent defun) (doc-string 2))
   (remhash name org-roam-ql--query-expansion-functions)
   (puthash name
            (list docstring extraction-function comparison-function)
@@ -513,6 +513,7 @@ passed in the query and return values that can be passed to
 
 If any predicate or expansion function with same NAME exists, it will be
 overwritten."
+  (declare (indent defun) (doc-string 2))
   (remhash name org-roam-ql--query-comparison-functions)
   (puthash name (cons docstring expansion-function) org-roam-ql--query-expansion-functions))
 
@@ -639,6 +640,7 @@ which is used to sort, i.e., if non-nil, the first node would be
 before the second node passed to the function.  Uses `seq-sort'.  If a
 sort-function with the given name already exists, it would be
 overwritten."
+  (declare (indent defun))
   (puthash function-name sort-function org-roam-ql--sort-functions))
 
 (defun org-roam-ql--sort-function-for-slot (slot-name comparison-function)
