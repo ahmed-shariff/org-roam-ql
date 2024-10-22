@@ -425,16 +425,29 @@ Sets the history as well."
         (list beg end
           (lambda (string pred action)
             (let* ((wrap-in-quotes (not (eq (char-before beg) ?\")))
-                   (saved-queries (hash-table-keys org-roam-ql--saved-queries))
+                   (saved-queries (--map
+                                   (propertize (format "%s" it)
+                                               'type 'query
+                                               'data (gethash it org-roam-ql--saved-queries))
+                                   (hash-table-keys org-roam-ql--saved-queries)))
                    (bookmarks (-non-nil
                                (--map
                                 (when (equal #'org-roam-ql--bookmark-open (bookmark-prop-get it 'handler))
-                                  (car it))
+                                  (propertize (car it)
+                                              'type 'bookmark
+                                              'data (cons (bookmark-prop-get it 'query)
+                                                          (bookmark-prop-get it 'title))))
                                 bookmark-alist)))
                    (buffers (-non-nil
-                             (--map (with-current-buffer it
-                                      (when (derived-mode-p 'org-roam-mode)
-                                        (buffer-name)))
+                             (--map
+                              (with-current-buffer it
+                                (when (derived-mode-p 'org-roam-mode)
+                                  (propertize (buffer-name)
+                                              'type buffer
+                                              'data (if (equal (buffer-name) org-roam-buffer)
+                                                        (cons org-roam-buffer "org-roam-buffer")
+                                                      (with-current-buffer it
+                                                        (cons org-roam-ql-buffer-query org-roam-ql-buffer-title))))))
                                     (buffer-list))))
                    (candidates (--map (if wrap-in-quotes (format "\"%s\""it) it) (append saved-queries bookmarks buffers)))
                    (width (-max (-map #'length candidates))))
@@ -449,31 +462,25 @@ Sets the history as well."
                         (--> (if wrap-in-quotes
                                  (string-trim-left (string-trim-right it "\"") "\"")
                                it)
-                             (cond
-                              ((member (intern it) saved-queries)
-                               (let ((saved-query (gethash (intern it) org-roam-ql--saved-queries)))
-                                 (list (truncate-string-to-width it width 0 ?\ )
-                                       (propertize "(saved)    " 'face '(:inherit shadow :weight extra-bold))
-                                       (propertize (format " : %s - %s" (cdr saved-query) (car saved-query))
-                                                   'face 'shadow))))
-                              ((member it bookmarks)
-                               (let ((bookmark (alist-get it bookmark-alist nil nil 'equal)))
-                                 (list (truncate-string-to-width it width 0 ?\ )
-                                       (propertize "(bookmark) " 'face '(:inherit shadow :weight extra-bold))
-                                       (propertize (format " : %s - %s"
-                                                           (alist-get 'title bookmark)
-                                                           (alist-get 'query bookmark))
-                                                   'face 'shadow))))
-                              ((member it buffers)
-                               (list (truncate-string-to-width it width 0 ?\ )
-                                     (propertize "(buffer)   " 'face '(:inherit shadow :weight extra-bold))
-                                     (propertize (apply 'format
-                                                        (append '(" : %s - %s")
-                                                                (if (equal it org-roam-buffer)
-                                                                    (list "org-roam-buffer" org-roam-buffer)
-                                                                  (with-current-buffer it
-                                                                    (list org-roam-ql-buffer-title org-roam-ql-buffer-query)))))
-                                                 'face 'shadow)))))
+                             (when-let (data (get-text-property 1 'data it))
+                               (pcase (get-text-property 1 'type it)
+                                 ('query
+                                  (let ((saved-query (gethash (intern it) org-roam-ql--saved-queries)))
+                                    (list (truncate-string-to-width it width 0 ?\ )
+                                          (propertize "(saved)    " 'face '(:inherit shadow :weight extra-bold))
+                                          (propertize (format " : %s - %s" (cdr data) (car data))
+                                                      'face 'shadow))))
+                                 ('bookmark
+                                  (let ((bookmark (alist-get it bookmark-alist nil nil 'equal)))
+                                    (list (truncate-string-to-width it width 0 ?\ )
+                                          (propertize "(bookmark) " 'face '(:inherit shadow :weight extra-bold))
+                                          (propertize (format " : %s - %s" (cdr data) (car data))
+                                                      'face 'shadow))))
+                                 ('buffer
+                                  (list (truncate-string-to-width it width 0 ?\ )
+                                        (propertize "(buffer)   " 'face '(:inherit shadow :weight extra-bold))
+                                        (propertize (format " : %s - %s" (cdr data) (car data)))
+                                                    'face 'shadow)))))
                         cands))))))
                (t
                 (complete-with-action
