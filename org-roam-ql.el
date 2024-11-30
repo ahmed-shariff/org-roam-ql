@@ -50,6 +50,7 @@
 (defvar org-roam-ql--sort-functions (make-hash-table :test 'equal) "Holds the function to sort nodes.")
 (defvar org-roam-ql--saved-queries (make-hash-table :test 'equal) "Holds the saved queries.")
 (defvar org-roam-ql--cache (make-hash-table))
+(defvar org-roam-ql--db-mtime nil)
 (defvar org-roam-ql--search-query-history '() "History of queries with `org-roam-ql-search'.")
 (defvar-local org-roam-ql-buffer-title nil "The current title of the buffer.")
 (defvar-local org-roam-ql-buffer-query nil "The current query of the buffer.")
@@ -166,6 +167,13 @@ See `org-roam-ql-nodes' for information on SOURCE-OR-QUERY.
 Not caching or invalidating in the top level function as the
 database/buffers can change.  Currently this is only used by the
 internal functions"
+  (let ((db-mtime (time-convert
+                  (file-attribute-modification-time
+                   (file-attributes (file-truename org-roam-db-location)))
+                  'integer)))
+    (unless (equal db-mtime org-roam-ql--db-mtime)
+      (org-roam-ql-clear-cache)
+      (setq org-roam-ql--db-mtime db-mtime)))
   (let ((cached-value (gethash source-or-query org-roam-ql--cache)))
     (if cached-value
         cached-value
