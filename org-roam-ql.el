@@ -196,10 +196,9 @@ The nodes are considerered equal when they have the same id."
   (let ((-compare-fn #'org-roam-ql--compare-nodes))
     (if (and (listp query) (member (car query) '(or and not)))
         (if (eq (car query) 'not)
-            (-difference
-             ;; Caching values
-             (org-roam-ql--nodes-cached (org-roam-node-list))
-             (org-roam-ql--expand-query (cadr query)))
+            (org-roam-ql--nodes-cached
+             (list [id :not :in $v1]
+                   `[,@(-map #'org-roam-node-id (org-roam-ql--expand-query (cadr query)))]))
           (funcall
            #'-reduce
            (pcase (car query)
