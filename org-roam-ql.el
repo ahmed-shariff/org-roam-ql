@@ -192,10 +192,9 @@ internal functions"
       (let ((-compare-fn (lambda (node1 node2)
                            (s-equals-p (org-roam-node-id node1) (org-roam-node-id node2)))))
         (if (eq (car query) 'not)
-            (-difference
-             ;; Caching values
-             (org-roam-ql--nodes-cached (org-roam-node-list))
-             (org-roam-ql--expand-query (cadr query)))
+            (org-roam-ql--nodes-cached
+             (list [id :not :in $v1]
+                   `[,@(-map #'org-roam-node-id (org-roam-ql--expand-query (cadr query)))]))
           (funcall
            #'-reduce
            (pcase (car query)
