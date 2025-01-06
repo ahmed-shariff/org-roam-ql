@@ -543,10 +543,24 @@ If EXACT, test if VALUE and REGEXP are equal strings."
         (s-equals-p value regexp)
       (s-match regexp value))))
 
+(defun org-roam-ql--expand-s-like-function (slot-name-symbol)
+  "Return a function that can expand for string match using sql LIKE."
+  (lambda (like-string &optional exact)
+    `([:select id :from nodes :where (like ,slot-name-symbol $s1)]
+      ,(if exact
+           like-string
+         (format "%%%s%%" like-string)))))
+
 (defun org-roam-ql--predicate-s-equals-p (value other)
   "Return non-nil if VALUE and OTHER are equal strings."
   (when (and value other)
     (s-equals-p value other)))
+
+(defun org-roam-ql--expand-comparison-function (comparison-operator slot-name-symbol)
+  "Return a function that can expand for match using sql =."
+  (lambda (match &optional exact)
+    `([:select id :from nodes :where (,comparison-operator ,slot-name-symbol $s1)]
+      ,match)))
 
 ;; TODO: Multivalue properties
 (defun org-roam-ql--predicate-property-match (value prop prop-val)
@@ -646,6 +660,18 @@ COMPARISON can be either '< or '>"
         ('< time-less)
         ('> (not time-less))
         (_ (user-error "Unknown value for `comparison'. Should be '< or '>"))))))
+
+(defun org-roam-ql--predicate-time< (value comparison time-string)
+  "Check if VALUE less than TIME-STRING.
+VALUE is a time-string (see `org-time-string-to-seconds' or valid value for `time-convert').
+TIME-STRING is any valid value for a org date/time prompt."
+  (org-roam-ql--predicate-compare-time value '< time-string))
+
+(defun org-roam-ql--predicate-time> (value comparison time-string)
+  "Check if VALUE less than TIME-STRING.
+VALUE is a time-string (see `org-time-string-to-seconds' or valid value for `time-convert').
+TIME-STRING is any valid value for a org date/time prompt."
+  (org-roam-ql--predicate-compare-time value '> time-string))
 
 ;; *****************************************************************************
 ;; Functions for sorting
@@ -1273,27 +1299,47 @@ Can be used in the minibuffer or when writting querries."
 ;; Setup of org-roam-ql
 ;; *****************************************************************************
 (dolist (predicate
-         '((file "Compare to `file' of a node" org-roam-node-file . org-roam-ql--predicate-s-match)
-           (file-title "Compare to `file-title' of a node" org-roam-node-file-title . org-roam-ql--predicate-s-match)
+         '((file-regexp "Compare to `file' of a node" org-roam-node-file . org-roam-ql--predicate-s-match)
+           (file-title-regexp "Compare to `file-title' of a node" org-roam-node-file-title . org-roam-ql--predicate-s-match)
+           ;; TODO: revise this
            (file-atime "Compare to `file-atime' of a node" org-roam-node-file-atime . time-equal-p)
+           ;; TODO: revise this
            (file-mtime "Compare to `file-mtime' of a node" org-roam-node-file-mtime . time-equal-p)
-           (id "Compare to `id' of a node" org-roam-node-id . org-roam-ql--predicate-s-equals-p)
-           (level "Compare to `level' of a node" org-roam-node-level . equal)
-           (point "Compare to `point' of a node" org-roam-node-point . equal)
-           (todo "Compare to `todo' of a node" org-roam-node-todo . org-roam-ql--predicate-s-match)
-           (priority "Compare to `priority' of a node" org-roam-node-priority . org-roam-ql--predicate-s-match)
+           (todo-regexp "Compare to `todo' of a node" org-roam-node-todo . org-roam-ql--predicate-s-match)
+           (title-regexp "Compare to `title' of a node" org-roam-node-title . org-roam-ql--predicate-s-match)
+           (refs-regexp "Compare to `refs' of a node" org-roam-node-refs . org-roam-ql--predicate-s-match)
+           (priority-regexp "Compare to `priority' of a node" org-roam-node-priority . org-roam-ql--predicate-s-match)
+           ;; TODO: sql query
            (scheduled "Compare `scheduled' of a node to arg based on comparison parsed (< or >)"  org-roam-node-scheduled . org-roam-ql--predicate-compare-time)
+           (scheduled< "Check if `scheduled' of a node is less than arg"  org-roam-node-scheduled . org-roam-ql--predicate-time<)
+           (scheduled> "Check if `scheduled' of a node is greated than arg"  org-roam-node-scheduled . org-roam-ql--predicate-time>)
+           ;; TODO: sql query
            (deadline "Compare `deadline' of a node to arg based on comparison parsed (< or >)"  org-roam-node-deadline . org-roam-ql--predicate-compare-time)
-           (title "Compare to `title' of a node" org-roam-node-title . org-roam-ql--predicate-s-match)
+           (deadline< "Check if `deadline' of a node is less than arg"  org-roam-node-deadline . org-roam-ql--predicate-time<)
+           (deadline> "Check if `deadline' of a node is less than arg"  org-roam-node-deadline . org-roam-ql--predicate-time>)
            (properties "Compare to `properties' of a node"
             org-roam-node-properties . org-roam-ql--predicate-property-match)
+           ;; TODO: sql query
            (tags "Compare to `tags' of a node" org-roam-node-tags . org-roam-ql--predicate-tags-match)
-           (refs "Compare to `refs' of a node" org-roam-node-refs . org-roam-ql--predicate-s-match)
            (funcall "Function to test with a node" identity . org-roam-ql--predicate-funcall)))
   (org-roam-ql-defpred (car predicate) (cadr predicate) (caddr predicate) (cdddr predicate)))
 
 (dolist (expansion-function
-         '((backlink-to "Backlinks to results of QUERY." . org-roam-ql--expand-backlinks)
+         `((id "Check if value is equal to `id' of a node" . ,(org-roam-ql--expand-comparison-function '= 'id))
+           (level= "Check if value is equal to `level' of a node" . ,(org-roam-ql--expand-comparison-function '= 'level))
+           (level< "Check if `level' of a node is less than value" . ,(org-roam-ql--expand-comparison-function '< 'level))
+           (level> "Check if `level' of a node is greater than value" . ,(org-roam-ql--expand-comparison-function '> 'level))
+           (level<> "Check if `level' of a node is not equal to value" . ,(org-roam-ql--expand-comparison-function '<> 'level))
+           (point= "Check if value is equal to `point' of a node" . ,(org-roam-ql--expand-comparison-function '= 'point))
+           (point< "Check if `point' of a node is less than value" . ,(org-roam-ql--expand-comparison-function '< 'point))
+           (point> "Check if `point' of a node is greater than value" . ,(org-roam-ql--expand-comparison-function '> 'point))
+           (point<> "Check if `point' of a node is not equal to value" . ,(org-roam-ql--expand-comparison-function '<> 'point))
+           (file-like "Check if `file' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'file))
+           (file-title-like "Check if `file-title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'file-title))
+           (todo-like "Check if `todo' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'todo))
+           (title-like "Check if `title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'title))
+           (refs-like "Check if `refs' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'refs))
+           (backlink-to "Backlinks to results of QUERY." . org-roam-ql--expand-backlinks)
            (backlink-from "Forewardlinks to results of QUERY" . org-roam-ql--expand-forwardlinks)
            (in-buffer "In BUFFER" . org-roam-ql--expansion-identity)
            (nodes-list "List of nodes" . org-roam-ql--expansion-identity)

@@ -36,12 +36,14 @@
   (org-roam-db-sync)
   (describe "Test the s-exp query"
     (it "with the todo"
-      (expect (org-roam-ql--check-if-valid-query '(todo "TODO"))
-      :not :to-be nil))
+      (expect (org-roam-ql--check-if-valid-query '(todo-like "TODO"))
+              :not :to-be nil)
+      (expect (org-roam-ql--check-if-valid-query '(todo-regexp "TODO"))
+              :not :to-be nil))
     (it "with nested 'and and 'or"
-      (expect (org-roam-ql--check-if-valid-query '(or (todo "done") (and (todo "todo") (scheduled "something")))) :not :to-be nil))
+      (expect (org-roam-ql--check-if-valid-query '(or (todo-like "done") (and (todo-regexp "todo") (scheduled "something")))) :not :to-be nil))
     (it "fails when unexpected term in query"
-      (expect (org-roam-ql--check-if-valid-query '(or (todo "DONE") (and (todo "TODO") (what-is-this "something")))) :to-be nil)))
+      (expect (org-roam-ql--check-if-valid-query '(or (todo-like "DONE") (and (todo-regexp "TODO") (what-is-this "something")))) :to-be nil)))
 
   (describe "Test org-roam-ql-nodes"
     (it "with list of nodes"
@@ -54,9 +56,10 @@
       (expect (org-roam-ql-nodes '([(like title "%Node a%")])) :to-equal (--filter (s-match "Node a" (org-roam-node-title it)) (org-roam-node-list))))
     (describe "with roam predicate"
       (it "todo (cannot be interpreted as function)"
-        (expect (org-roam-ql-nodes '(todo "DONE")) :to-equal (--filter (--when-let (org-roam-node-todo it) (s-match "DONE" it)) (org-roam-node-list))))
+        (expect (org-roam-ql-nodes '(todo-regexp "DONE")) :to-equal (--filter (--when-let (org-roam-node-todo it) (s-match "DONE" it)) (org-roam-node-list)))
+        (expect (org-roam-ql-nodes '(todo-like "DONE")) :to-equal (--filter (--when-let (org-roam-node-todo it) (s-match "DONE" it)) (org-roam-node-list))))
       (it "or (could be interpreted as function)"
-        (expect (sort (-map #'org-roam-node-id (org-roam-ql-nodes '(or (tags "interesting") (todo "DONE")))) #'string>)
+        (expect (sort (-map #'org-roam-node-id (org-roam-ql-nodes '(or (tags "interesting") (todo-like "DONE")))) #'string>)
                 :to-equal (sort (-map #'org-roam-node-id
                                       (--filter
                                        (let ((todo-state (org-roam-node-todo it))
@@ -111,7 +114,7 @@
         (expect (org-roam-ql-nodes "a random string") :to-throw 'user-error))))
 
   (describe "Test displaying content"
-    :var* ((query '(or (todo "DONE") (tags "interesting")))
+    :var* ((query '(or (todo-like "DONE") (tags "interesting")))
            (query-result (org-roam-ql-nodes query))
            (query-result-ids (-map #'org-roam-node-id query-result)))
     (it "in agenda buffer"
@@ -140,11 +143,11 @@
 
   (describe "Test org-roam-ql-ql--get-roam-queries"
     (it "without any ql-queries"
-      (expect (org-roam-ql-ql--get-roam-queries '(or (todo "TODO") (tags "tag1" "tag2") (and (title "a") (tags "tag3"))))
+      (expect (org-roam-ql-ql--get-roam-queries '(or (todo-like "TODO") (tags "tag1" "tag2") (and (title-like "a") (tags "tag3"))))
               :to-equal nil))
     (it "with multiple nested queries"
-      (expect (org-roam-ql-ql--get-roam-queries '(or (org-roam-query (todo "TODO")) (and (org-roam-query (tags "tag1" "tag2")) (scheduled "something"))))
-              :to-equal '((org-roam-query (todo "TODO")) (org-roam-query (tags "tag1" "tag2"))))))
+      (expect (org-roam-ql-ql--get-roam-queries '(or (org-roam-query (todo-like "TODO")) (and (org-roam-query (tags "tag1" "tag2")) (scheduled "something"))))
+              :to-equal '((org-roam-query (todo-like "TODO")) (org-roam-query (tags "tag1" "tag2"))))))
 
 
   ;; (describe "Tets query expansion"
