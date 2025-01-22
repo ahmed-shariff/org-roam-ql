@@ -1302,21 +1302,26 @@ Can be used in the minibuffer or when writting querries."
          '((file-regexp "Compare to `file' of a node" org-roam-node-file . org-roam-ql--predicate-s-match)
            (file-title-regexp "Compare to `file-title' of a node" org-roam-node-file-title . org-roam-ql--predicate-s-match)
            ;; TODO: revise this
-           (file-atime "Compare to `file-atime' of a node" org-roam-node-file-atime . time-equal-p)
+           (file-atime "Compare to `file-atime' of a node to arg based on comparison parsed (< or >)"  org-roam-node-file-atime . org-roam-ql--predicate-compare-time)
+           (file-atime-is-before "Check if `file-atime' of a node is earlier (less) than arg"  org-roam-node-file-atime . org-roam-ql--predicate-time<)
+           (file-atime-is-after "Check if `file-atime' of a node is later (greater) than arg"  org-roam-node-file-atime . org-roam-ql--predicate-time>)
            ;; TODO: revise this
-           (file-mtime "Compare to `file-mtime' of a node" org-roam-node-file-mtime . time-equal-p)
+           (file-mtime "Compare to `file-mtime' of a node to arg based on comparison parsed (< or >)"  org-roam-node-file-mtime . org-roam-ql--predicate-compare-time)
+           (file-mtime-is-before "Check if `file-mtime' of a node is earlier (less) than arg"  org-roam-node-file-mtime . org-roam-ql--predicate-time<)
+           (file-mtime-is-after "Check if `file-mtime' of a node is later (greater) than arg"  org-roam-node-file-mtime . org-roam-ql--predicate-time>)
+
            (todo-regexp "Compare to `todo' of a node" org-roam-node-todo . org-roam-ql--predicate-s-match)
            (title-regexp "Compare to `title' of a node" org-roam-node-title . org-roam-ql--predicate-s-match)
            (refs-regexp "Compare to `refs' of a node" org-roam-node-refs . org-roam-ql--predicate-s-match)
            (priority-regexp "Compare to `priority' of a node" org-roam-node-priority . org-roam-ql--predicate-s-match)
            ;; TODO: sql query
            (scheduled "Compare `scheduled' of a node to arg based on comparison parsed (< or >)"  org-roam-node-scheduled . org-roam-ql--predicate-compare-time)
-           (scheduled< "Check if `scheduled' of a node is less than arg"  org-roam-node-scheduled . org-roam-ql--predicate-time<)
-           (scheduled> "Check if `scheduled' of a node is greated than arg"  org-roam-node-scheduled . org-roam-ql--predicate-time>)
+           (scheduled-is-before "Check if `scheduled' of a node is earlier (less) than arg"  org-roam-node-scheduled . org-roam-ql--predicate-time<)
+           (scheduled-is-after "Check if `scheduled' of a node is later (greater) than arg"  org-roam-node-scheduled . org-roam-ql--predicate-time>)
            ;; TODO: sql query
            (deadline "Compare `deadline' of a node to arg based on comparison parsed (< or >)"  org-roam-node-deadline . org-roam-ql--predicate-compare-time)
-           (deadline< "Check if `deadline' of a node is less than arg"  org-roam-node-deadline . org-roam-ql--predicate-time<)
-           (deadline> "Check if `deadline' of a node is less than arg"  org-roam-node-deadline . org-roam-ql--predicate-time>)
+           (deadline-is-before "Check if `deadline' of a node is earlier (less) than arg"  org-roam-node-deadline . org-roam-ql--predicate-time<)
+           (deadline-is-after "Check if `deadline' of a node is later (greater) than arg"  org-roam-node-deadline . org-roam-ql--predicate-time>)
            (properties "Compare to `properties' of a node"
             org-roam-node-properties . org-roam-ql--predicate-property-match)
            ;; TODO: sql query
