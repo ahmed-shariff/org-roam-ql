@@ -661,13 +661,13 @@ COMPARISON can be either '< or '>"
         ('> (not time-less))
         (_ (user-error "Unknown value for `comparison'. Should be '< or '>"))))))
 
-(defun org-roam-ql--predicate-time< (value comparison time-string)
+(defun org-roam-ql--predicate-time< (value time-string)
   "Check if VALUE less than TIME-STRING.
 VALUE is a time-string (see `org-time-string-to-seconds' or valid value for `time-convert').
 TIME-STRING is any valid value for a org date/time prompt."
   (org-roam-ql--predicate-compare-time value '< time-string))
 
-(defun org-roam-ql--predicate-time> (value comparison time-string)
+(defun org-roam-ql--predicate-time> (value time-string)
   "Check if VALUE less than TIME-STRING.
 VALUE is a time-string (see `org-time-string-to-seconds' or valid value for `time-convert').
 TIME-STRING is any valid value for a org date/time prompt."
