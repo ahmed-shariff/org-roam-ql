@@ -625,7 +625,8 @@ backlinks"
   "Convert TIME to ts.
 This uses `org-time-string-to-seconds' or `time-convert' based on the type."
   (cond
-   ((stringp time) (org-time-string-to-seconds time))
+   ((stringp time) (org-roam-ql--time-convert-to-ts
+                    (encode-time (parse-time-string time))))
    ((and (not (null time)) (listp time)) (time-convert time 'integer))
    (t (user-error "Unknown value for `time'"))))
 
