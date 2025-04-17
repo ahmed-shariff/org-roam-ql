@@ -185,12 +185,16 @@ internal functions"
   "Clear the org-roam-ql cache."
   (setq org-roam-ql--cache (make-hash-table)))
 
+(defun org-roam-ql--compare-nodes (node1 node2)
+  "Comparison function for nodes.
+The nodes are considerered equal when they have the same id."
+  (s-equals-p (org-roam-node-id node1) (org-roam-node-id node2)))
+
 (defun org-roam-ql--expand-query (query)
   "Expand a org-roam-ql QUERY."
-  (if (and (listp query) (member (car query) '(or and not)))
-      ;; FIXME: two nodes are not equal? using this -compare-fn as workaround
-      (let ((-compare-fn (lambda (node1 node2)
-                           (s-equals-p (org-roam-node-id node1) (org-roam-node-id node2)))))
+  ;; FIXME: two nodes are not equal? using this -compare-fn as workaround
+  (let ((-compare-fn #'org-roam-ql--compare-nodes))
+    (if (and (listp query) (member (car query) '(or and not)))
         (if (eq (car query) 'not)
             (-difference
              ;; Caching values
@@ -201,22 +205,22 @@ internal functions"
            (pcase (car query)
              ('or #'-union)
              ('and #'-intersection))
-           (--map (org-roam-ql--expand-query it) (cdr query)))))
-    (let* ((query-key (and (listp query) (car query)))
-           (query-expansion-function-info (gethash query-key org-roam-ql--query-expansion-functions))
-           (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
-      (cond
-       ((and query-key query-expansion-function-info)
-        (org-roam-ql--nodes-cached (apply (cdr query-expansion-function-info) (cdr query))))
-       ;; FIXME: Think of a better way to to this
-       ((and query-key query-comparison-function-info)
-        (--filter (let ((val (funcall (cadr query-comparison-function-info) it)))
-                    (and val
-                         (apply (caddr query-comparison-function-info) (append (list val) (cdr query)))))
-                  ;; Caching values
-                  (org-roam-ql--nodes-cached (org-roam-node-list))))
-       ;; `org-roam-ql-nodes' will error if query is invalid
-       (t (org-roam-ql--nodes-cached query))))))
+           (--map (org-roam-ql--expand-query it) (cdr query))))
+      (let* ((query-key (and (listp query) (car query)))
+             (query-expansion-function-info (gethash query-key org-roam-ql--query-expansion-functions))
+             (query-comparison-function-info (gethash query-key org-roam-ql--query-comparison-functions)))
+        (cond
+         ((and query-key query-expansion-function-info)
+          (org-roam-ql--nodes-cached (apply (cdr query-expansion-function-info) (cdr query))))
+         ;; FIXME: Think of a better way to to this
+         ((and query-key query-comparison-function-info)
+          (--filter (let ((val (funcall (cadr query-comparison-function-info) it)))
+                      (and val
+                           (apply (caddr query-comparison-function-info) (append (list val) (cdr query)))))
+                    ;; Caching values
+                    (org-roam-ql--nodes-cached (org-roam-node-list))))
+         ;; `org-roam-ql-nodes' will error if query is invalid
+         (t (org-roam-ql--nodes-cached query)))))))
 
 ;;;###autoload
 (defun org-roam-ql-search (source-or-query &optional title sort-fn)
@@ -582,8 +586,8 @@ COMBINE can be :and or :or.  If :and, only nodes that have backlinks
 to all results of source-or-query, else if have backlinks to any of
 them.  If is-backlink is nil, return forward links, else return
 backlinks"
-  (let* ((query-nodes
-          ;; NOTE: -compare-fn is set in the `org-roam-ql--expand-query'
+  (let* ((-compare-fn #'org-roam-ql--compare-nodes)
+         (query-nodes
           (-uniq
            (org-roam-ql--nodes-cached source-or-query)))
          (query-nodes-count (length query-nodes))
