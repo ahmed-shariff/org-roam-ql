@@ -1311,7 +1311,7 @@ Can be used in the minibuffer or when writting querries."
            (file-mtime-is-after "Check if `file-mtime' of a node is later (greater) than arg"  org-roam-node-file-mtime . org-roam-ql--predicate-time>)
 
            (todo-regexp "Compare to `todo' of a node" org-roam-node-todo . org-roam-ql--predicate-s-match)
-           (title-regexp "Compare to `title' of a node" org-roam-node-title . org-roam-ql--predicate-s-match)
+           (title-or-alias-regexp "Compare to `title' or `aliases' of a node" org-roam-node-title . org-roam-ql--predicate-s-match)
            (refs-regexp "Compare to `refs' of a node" org-roam-node-refs . org-roam-ql--predicate-s-match)
            (priority-regexp "Compare to `priority' of a node" org-roam-node-priority . org-roam-ql--predicate-s-match)
            ;; TODO: sql query
