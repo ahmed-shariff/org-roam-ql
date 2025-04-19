@@ -42,7 +42,8 @@
 
 (defcustom org-roam-ql-default-org-roam-buffer-query
   #'org-roam-ql--default-query-for-roam-buffer
-  "The query to use when org-roam-buffer is extended.  Can also be a function that returns a query."
+  "The query to use when org-roam-buffer is extended.  Can also be a
+function that returns a query."
   :type '(choice function sexp))
 
 (defvar org-roam-ql--query-comparison-functions (make-hash-table) "Holds the comparison function for a query.")
@@ -57,7 +58,7 @@
 (defvar-local org-roam-ql-buffer-sort nil "The current sort function of the buffer.")
 (defvar-local org-roam-ql--buffer-displayed-query nil "The query which produced the results of the buffer.")
 (defvar-local org-roam-ql-buffer-in nil
-  "Define which option to use - 'in-buffer' or 'org-roam-db'.")
+  "Define which option to use - `in-buffer' or `org-roam-db'.")
 
 ;; `bookmark.el' setup
 (defvar bookmark-make-record-function)
@@ -93,39 +94,39 @@ SORT-FN can be a function that takes two org-roam-nodes, and
 compatible with `seq-sort'.  Or it can be any regsitered sort
 functions with `org-roam-ql-register-sort-fn'."
   (--> (pcase source-or-query
-        ((pred org-roam-ql--check-if-list-of-org-roam-nodes-list)
-         (-list source-or-query))
-        ((and (app (org-roam-ql--check-if-saved-query) saved-query)
-              (guard saved-query))
-         (org-roam-ql--nodes-cached saved-query))
-        ((and (app (org-roam-ql--check-if-bookmark) bookmark-query)
-              (guard bookmark-query))
-         (org-roam-ql--nodes-cached bookmark-query))
-        ;; get-buffer returns a buffer if source-or-query is a buffer obj
-        ;; or the name of a buffer
-        ((pred org-roam-ql--check-if-org-roam-ql-buffer)
-         (cond
-          ((with-current-buffer source-or-query (derived-mode-p 'org-roam-mode))
-           (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
-          ((with-current-buffer source-or-query (derived-mode-p 'org-agenda-mode))
-           (org-roam-ql--nodes-from-agenda-buffer (get-buffer source-or-query)))))
-        ((pred org-roam-ql--check-if-org-roam-db-parameters)
-         (let ((query (car source-or-query))
-               (args (cdr source-or-query)))
-           (--map (org-roam-node-from-id (car it))
-                  (apply #'org-roam-db-query
-                         (if (equal :select (aref query 0))
-                             query
-                           (vconcat [:select id :from nodes :where] query))
-                         args))))
-        ((and (pred listp) (pred org-roam-ql--check-if-valid-query))
-         (org-roam-ql--expand-query source-or-query))
-        ((pred functionp)
-         (--when-let (funcall source-or-query)
-           (if (and (listp it) (-all-p #'org-roam-node-p it))
-               it
-             (user-error "Function did not expand to list of nodes"))))
-        (_ (user-error "Invalid source-or-query. Got  %S" source-or-query)))
+         ((pred org-roam-ql--check-if-list-of-org-roam-nodes-list)
+          (-list source-or-query))
+         ((and (app (org-roam-ql--check-if-saved-query) saved-query)
+               (guard saved-query))
+          (org-roam-ql--nodes-cached saved-query))
+         ((and (app (org-roam-ql--check-if-bookmark) bookmark-query)
+               (guard bookmark-query))
+          (org-roam-ql--nodes-cached bookmark-query))
+         ;; get-buffer returns a buffer if source-or-query is a buffer obj
+         ;; or the name of a buffer
+         ((pred org-roam-ql--check-if-org-roam-ql-buffer)
+          (cond
+           ((with-current-buffer source-or-query (derived-mode-p 'org-roam-mode))
+            (org-roam-ql--nodes-from-roam-buffer (get-buffer source-or-query)))
+           ((with-current-buffer source-or-query (derived-mode-p 'org-agenda-mode))
+            (org-roam-ql--nodes-from-agenda-buffer (get-buffer source-or-query)))))
+         ((pred org-roam-ql--check-if-org-roam-db-parameters)
+          (let ((query (car source-or-query))
+                (args (cdr source-or-query)))
+            (--map (org-roam-node-from-id (car it))
+                   (apply #'org-roam-db-query
+                          (if (equal :select (aref query 0))
+                              query
+                            (vconcat [:select id :from nodes :where] query))
+                          args))))
+         ((and (pred listp) (pred org-roam-ql--check-if-valid-query))
+          (org-roam-ql--expand-query source-or-query))
+         ((pred functionp)
+          (--when-let (funcall source-or-query)
+            (if (and (listp it) (-all-p #'org-roam-node-p it))
+                it
+              (user-error "Function did not expand to list of nodes"))))
+         (_ (user-error "Invalid source-or-query. Got  %S" source-or-query)))
        (if-let ((-sort-fn (when sort-fn
                             (or (and (functionp sort-fn) sort-fn)
                                 (gethash sort-fn org-roam-ql--sort-functions)
@@ -168,9 +169,9 @@ Not caching or invalidating in the top level function as the
 database/buffers can change.  Currently this is only used by the
 internal functions"
   (let ((db-mtime (time-convert
-                  (file-attribute-modification-time
-                   (file-attributes (file-truename org-roam-db-location)))
-                  'integer)))
+                   (file-attribute-modification-time
+                    (file-attributes (file-truename org-roam-db-location)))
+                   'integer)))
     (unless (equal db-mtime org-roam-ql--db-mtime)
       (org-roam-ql-clear-cache)
       (setq org-roam-ql--db-mtime db-mtime)))
@@ -373,44 +374,44 @@ Sets the history as well."
        ;; predicates
        ((and end funpos)
         (list beg end
-          (lambda (string pred action)
-            (cond
-             ((eq action 'metadata)
-              (cons
-               'metadata
-               `(,(cons '
-                   annotation-function
-                   (lambda (str)
-                     (let* ((sym (intern-soft str)))
-                       (let ((comparison-function (gethash sym org-roam-ql--query-comparison-functions))
-                             (expansion-function (gethash sym org-roam-ql--query-expansion-functions)))
-                         (cond
-                          (comparison-function
-                           (concat (propertize " : " 'face 'shadow)
-                                   (let ((fun-doc (elisp-get-fnsym-args-string (caddr comparison-function) 0)))
-                                     (when fun-doc
-                                       (concat (propertize (s-replace-regexp "([^ ]* " "("
-                                                                             fun-doc)
-                                                           'face  '(:inherit shadow :weight extra-bold))
-                                               " - ")))
-                                   (propertize (car comparison-function)
-                                               'face 'shadow)))
-                          (expansion-function
-                           (concat (propertize " : " 'face 'shadow)
-                                   (let ((fun-doc (elisp-get-fnsym-args-string (cdr expansion-function) 0)))
-                                     (when fun-doc
-                                       (concat (propertize fun-doc
-                                                           'face  '(:inherit shadow :weight extra-bold))
-                                               " - ")))
-                                   (propertize (car expansion-function)
-                                               'face 'shadow)))))))))))
-             (t
-              (complete-with-action
-               action
-               (append
-                (hash-table-keys org-roam-ql--query-comparison-functions)
-                (hash-table-keys org-roam-ql--query-expansion-functions))
-               string pred))))))
+              (lambda (string pred action)
+                (cond
+                 ((eq action 'metadata)
+                  (cons
+                   'metadata
+                   `(,(cons '
+                       annotation-function
+                       (lambda (str)
+                         (let* ((sym (intern-soft str)))
+                           (let ((comparison-function (gethash sym org-roam-ql--query-comparison-functions))
+                                 (expansion-function (gethash sym org-roam-ql--query-expansion-functions)))
+                             (cond
+                              (comparison-function
+                               (concat (propertize " : " 'face 'shadow)
+                                       (let ((fun-doc (elisp-get-fnsym-args-string (caddr comparison-function) 0)))
+                                         (when fun-doc
+                                           (concat (propertize (s-replace-regexp "([^ ]* " "("
+                                                                                 fun-doc)
+                                                               'face  '(:inherit shadow :weight extra-bold))
+                                                   " - ")))
+                                       (propertize (car comparison-function)
+                                                   'face 'shadow)))
+                              (expansion-function
+                               (concat (propertize " : " 'face 'shadow)
+                                       (let ((fun-doc (elisp-get-fnsym-args-string (cdr expansion-function) 0)))
+                                         (when fun-doc
+                                           (concat (propertize fun-doc
+                                                               'face  '(:inherit shadow :weight extra-bold))
+                                                   " - ")))
+                                       (propertize (car expansion-function)
+                                                   'face 'shadow)))))))))))
+                 (t
+                  (complete-with-action
+                   action
+                   (append
+                    (hash-table-keys org-roam-ql--query-comparison-functions)
+                    (hash-table-keys org-roam-ql--query-expansion-functions))
+                   string pred))))))
        (t
         (let* ((beg (cond
                      ((or (eq pos (minibuffer-prompt-end))
@@ -433,71 +434,69 @@ Sets the history as well."
 		          (forward-sexp 1)
 		          (point))
 		      (scan-error pos))))
-        (list beg end
-          (lambda (string pred action)
-            (let* ((wrap-in-quotes (not (eq (char-before beg) ?\")))
-                   (saved-queries (--map
-                                   (propertize (format "%s" it)
-                                               'type 'query
-                                               'data (gethash it org-roam-ql--saved-queries))
-                                   (hash-table-keys org-roam-ql--saved-queries)))
-                   (bookmarks (-non-nil
-                               (--map
-                                (when (equal #'org-roam-ql--bookmark-open (bookmark-prop-get it 'handler))
-                                  (propertize (car it)
-                                              'type 'bookmark
-                                              'data (cons (bookmark-prop-get it 'query)
-                                                          (bookmark-prop-get it 'title))))
-                                bookmark-alist)))
-                   (buffers (-non-nil
-                             (--map
-                              (with-current-buffer it
-                                (when (derived-mode-p 'org-roam-mode)
-                                  (propertize (buffer-name)
-                                              'type buffer
-                                              'data (if (equal (buffer-name) org-roam-buffer)
-                                                        (cons org-roam-buffer "org-roam-buffer")
-                                                      (with-current-buffer it
-                                                        (cons org-roam-ql-buffer-query org-roam-ql-buffer-title))))))
+          (list beg end
+                (lambda (string pred action)
+                  (let* ((wrap-in-quotes (not (eq (char-before beg) ?\")))
+                         (saved-queries (--map
+                                         (propertize (format "%s" it)
+                                                     'type 'query
+                                                     'data (gethash it org-roam-ql--saved-queries))
+                                         (hash-table-keys org-roam-ql--saved-queries)))
+                         (bookmarks (-non-nil
+                                     (--map
+                                      (when (equal #'org-roam-ql--bookmark-open (bookmark-prop-get it 'handler))
+                                        (propertize (car it)
+                                                    'type 'bookmark
+                                                    'data (cons (bookmark-prop-get it 'query)
+                                                                (bookmark-prop-get it 'title))))
+                                      bookmark-alist)))
+                         (buffers (-non-nil
+                                   (--map
+                                    (with-current-buffer it
+                                      (when (derived-mode-p 'org-roam-mode)
+                                        (propertize (buffer-name)
+                                                    'type 'buffer
+                                                    'data (if (equal (buffer-name) org-roam-buffer)
+                                                              (cons org-roam-buffer "org-roam-buffer")
+                                                            (with-current-buffer it
+                                                              (cons org-roam-ql-buffer-query org-roam-ql-buffer-title))))))
                                     (buffer-list))))
-                   (candidates (--map (if wrap-in-quotes (format "\"%s\""it) it) (append saved-queries bookmarks buffers)))
-                   (width (-max (-map #'length candidates))))
-              (cond
-               ((eq action 'metadata)
-                (cons
-                 'metadata
-                 `(,(cons
-                     'affixation-function
-                     (lambda (cands)
-                       (--map
-                        (--> (if wrap-in-quotes
-                                 (string-trim-left (string-trim-right it "\"") "\"")
-                               it)
-                             (when-let (data (get-text-property 1 'data it))
-                               (pcase (get-text-property 1 'type it)
-                                 ('query
-                                  (let ((saved-query (gethash (intern it) org-roam-ql--saved-queries)))
-                                    (list (truncate-string-to-width it width 0 ?\ )
-                                          (propertize "(saved)    " 'face '(:inherit shadow :weight extra-bold))
-                                          (propertize (format " : %s - %s" (cdr data) (car data))
-                                                      'face 'shadow))))
-                                 ('bookmark
-                                  (let ((bookmark (alist-get it bookmark-alist nil nil 'equal)))
-                                    (list (truncate-string-to-width it width 0 ?\ )
-                                          (propertize "(bookmark) " 'face '(:inherit shadow :weight extra-bold))
-                                          (propertize (format " : %s - %s" (cdr data) (car data))
-                                                      'face 'shadow))))
-                                 ('buffer
-                                  (list (truncate-string-to-width it width 0 ?\ )
-                                        (propertize "(buffer)   " 'face '(:inherit shadow :weight extra-bold))
-                                        (propertize (format " : %s - %s" (cdr data) (car data)))
-                                                    'face 'shadow)))))
-                        cands))))))
-               (t
-                (complete-with-action
-                 action
-                 candidates
-                 string pred))))))))))))
+                         (candidates (--map (if wrap-in-quotes (format "\"%s\""it) it) (append saved-queries bookmarks buffers)))
+                         (width (-max (-map #'length candidates))))
+                    (cond
+                     ((eq action 'metadata)
+                      (cons
+                       'metadata
+                       `(,(cons
+                           'affixation-function
+                           (lambda (cands)
+                             (--map
+                              (--> (if wrap-in-quotes
+                                       (string-trim-left (string-trim-right it "\"") "\"")
+                                     it)
+                                   (when-let (data (get-text-property 1 'data it))
+                                     (pcase (get-text-property 1 'type it)
+                                       ('query
+                                        (list (truncate-string-to-width it width 0 ?\ )
+                                              (propertize "(saved)    " 'face '(:inherit shadow :weight extra-bold))
+                                              (propertize (format " : %s - %s" (cdr data) (car data))
+                                                          'face 'shadow)))
+                                       ('bookmark
+                                        (list (truncate-string-to-width it width 0 ?\ )
+                                              (propertize "(bookmark) " 'face '(:inherit shadow :weight extra-bold))
+                                              (propertize (format " : %s - %s" (cdr data) (car data))
+                                                          'face 'shadow)))
+                                       ('buffer
+                                        (list (truncate-string-to-width it width 0 ?\ )
+                                              (propertize "(buffer)   " 'face '(:inherit shadow :weight extra-bold))
+                                              (propertize (format " : %s - %s" (cdr data) (car data))
+                                                          'face 'shadow))))))
+                              cands))))))
+                     (t
+                      (complete-with-action
+                       action
+                       candidates
+                       string pred))))))))))))
 
 ;; *****************************************************************************
 ;; Functions for predicates and expansions
@@ -558,7 +557,7 @@ If EXACT, test if VALUE and REGEXP are equal strings."
 
 (defun org-roam-ql--expand-comparison-function (comparison-operator slot-name-symbol)
   "Return a function that can expand for match using sql =."
-  (lambda (match &optional exact)
+  (lambda (match)
     `([:select id :from nodes :where (,comparison-operator ,slot-name-symbol $s1)]
       ,match)))
 
@@ -649,7 +648,8 @@ This uses `org-time-string-to-seconds' or `time-convert' based on the type."
 
 (defun org-roam-ql--predicate-compare-time (value comparison time-string)
   "Compare VALUE to TIME-STRING based on COMPARISON.
-VALUE is a time-string (see `org-time-string-to-seconds' or valid value for `time-convert').
+VALUE is a time-string (see `org-time-string-to-seconds' or valid
+value for `time-convert').
 TIME-STRING is any valid value for a org date/time prompt.
 COMPARISON can be either '< or '>"
   (when value
@@ -663,13 +663,15 @@ COMPARISON can be either '< or '>"
 
 (defun org-roam-ql--predicate-time< (value time-string)
   "Check if VALUE less than TIME-STRING.
-VALUE is a time-string (see `org-time-string-to-seconds' or valid value for `time-convert').
+VALUE is a time-string (see `org-time-string-to-seconds' or valid
+value for `time-convert').
 TIME-STRING is any valid value for a org date/time prompt."
   (org-roam-ql--predicate-compare-time value '< time-string))
 
 (defun org-roam-ql--predicate-time> (value time-string)
   "Check if VALUE less than TIME-STRING.
-VALUE is a time-string (see `org-time-string-to-seconds' or valid value for `time-convert').
+VALUE is a time-string (see `org-time-string-to-seconds' or valid
+value for `time-convert').
 TIME-STRING is any valid value for a org date/time prompt."
   (org-roam-ql--predicate-compare-time value '> time-string))
 
@@ -696,13 +698,13 @@ DOCSTRING is the documentation string to use for the function."
                  (format "org-roam-node-%s" slot-name)))
         (reverse-slot-name (format "%s-reverse" slot-name)))
     (org-roam-ql-register-sort-fn
-     slot-name
-     `(lambda (node1 node2)
-        (,comparison-function (,getter node1) (,getter node2))))
+      slot-name
+      `(lambda (node1 node2)
+         (,comparison-function (,getter node1) (,getter node2))))
     (org-roam-ql-register-sort-fn
-     reverse-slot-name
-     `(lambda (node1 node2)
-        (,comparison-function (,getter node2) (,getter node1))))))
+      reverse-slot-name
+      `(lambda (node1 node2)
+         (,comparison-function (,getter node2) (,getter node1))))))
 
 (defun org-roam-ql--sort-time-less (val1 val2)
   "Sort based on time-less-p."
@@ -776,8 +778,9 @@ Similar to `org-roam-mode', but doesn't default to the
 
 (defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query sort-fn)
   "Render SECTIONS (list of functions) in an org-roam-ql buffer.
-TITLE is the title, BUFFER-NAME is the name for the buffer.  See
-`org-roam-nodes' for information on SOURCE-OR-QUERY. See `org-roam-ql-nodes' for SORT-FN."
+TITLE is the title, BUFFER-NAME is the name for the buffer.
+See `org-roam-nodes' for information on SOURCE-OR-QUERY.
+See `org-roam-ql-nodes' for SORT-FN."
   ;; copied  from `org-roam-buffer-render-contents'
   (with-current-buffer (get-buffer-create buffer-name)
     (let ((inhibit-read-only t))
@@ -860,25 +863,25 @@ See `org-roam-ql-nodes' for SORT-FN."
   "Create a bookmark record for org-roam-ql-mode buffers.
 
 See docs of `bookmark-make-record-function'."
- (let ((bookmark (cons nil (bookmark-make-record-default 'no-file 'no-context))))
-   (if (equal (buffer-name) org-roam-buffer)
-       (progn
-         (bookmark-prop-set bookmark 'handler #'org-roam-ql--bookmark-open)
-         (bookmark-prop-set bookmark 'title
-                            (or org-roam-ql-buffer-title
-                                (org-roam-ql--get-formatted-title
-                                 (org-roam-node-title org-roam-buffer-current-node) nil)))
-         (bookmark-prop-set bookmark 'query
-                            (pcase org-roam-ql-default-org-roam-buffer-query
-                              ((pred functionp)
-                               (funcall org-roam-ql-default-org-roam-buffer-query))
-                              (_ org-roam-ql-default-org-roam-buffer-query)))
-         (bookmark-prop-set bookmark 'sort (or org-roam-ql-buffer-sort "title")))
-     (bookmark-prop-set bookmark 'handler   #'org-roam-ql--bookmark-open)
-     (bookmark-prop-set bookmark 'title     org-roam-ql-buffer-title)
-     (bookmark-prop-set bookmark 'query     org-roam-ql-buffer-query)
-     (bookmark-prop-set bookmark 'sort      org-roam-ql-buffer-sort)
-     bookmark)))
+  (let ((bookmark (cons nil (bookmark-make-record-default 'no-file 'no-context))))
+    (if (equal (buffer-name) org-roam-buffer)
+        (progn
+          (bookmark-prop-set bookmark 'handler #'org-roam-ql--bookmark-open)
+          (bookmark-prop-set bookmark 'title
+                             (or org-roam-ql-buffer-title
+                                 (org-roam-ql--get-formatted-title
+                                  (org-roam-node-title org-roam-buffer-current-node) nil)))
+          (bookmark-prop-set bookmark 'query
+                             (pcase org-roam-ql-default-org-roam-buffer-query
+                               ((pred functionp)
+                                (funcall org-roam-ql-default-org-roam-buffer-query))
+                               (_ org-roam-ql-default-org-roam-buffer-query)))
+          (bookmark-prop-set bookmark 'sort (or org-roam-ql-buffer-sort "title")))
+      (bookmark-prop-set bookmark 'handler   #'org-roam-ql--bookmark-open)
+      (bookmark-prop-set bookmark 'title     org-roam-ql-buffer-title)
+      (bookmark-prop-set bookmark 'query     org-roam-ql-buffer-query)
+      (bookmark-prop-set bookmark 'sort      org-roam-ql-buffer-sort)
+      bookmark)))
 
 ;; *****************************************************************************
 ;; org-roam-ql-agenda-view functions
@@ -1323,7 +1326,7 @@ Can be used in the minibuffer or when writting querries."
            (deadline-is-before "Check if `deadline' of a node is earlier (less) than arg"  org-roam-node-deadline . org-roam-ql--predicate-time<)
            (deadline-is-after "Check if `deadline' of a node is later (greater) than arg"  org-roam-node-deadline . org-roam-ql--predicate-time>)
            (properties "Compare to `properties' of a node"
-            org-roam-node-properties . org-roam-ql--predicate-property-match)
+                       org-roam-node-properties . org-roam-ql--predicate-property-match)
            ;; TODO: sql query
            (tags "Compare to `tags' of a node" org-roam-node-tags . org-roam-ql--predicate-tags-match)
            (funcall "Function to test with a node" identity . org-roam-ql--predicate-funcall)))
