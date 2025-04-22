@@ -583,7 +583,7 @@ And its value is a string equal to VALUE."
 
 (defun org-roam-ql--predicate-tags-match (values &rest tags)
   "Return non-nil if all strings in VALUES are in the list of strings TAGS."
-  (--all-p (member it values) (-list tags)))
+  (--all-p (member it values) (-flatten (-list tags))))
 
 (cl-defun org-roam-ql--expand-forwardlinks (source-or-query &key (type "id") (combine :and))
   "Expansion function for forwardlinks.
