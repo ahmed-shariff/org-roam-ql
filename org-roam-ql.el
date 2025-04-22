@@ -34,6 +34,7 @@
 (require 'org-roam-node)
 (require 'dash)
 (require 's)
+(require 'bookmark)
 
 (defgroup org-roam-ql nil
   "Customization for `org-roam-ql'."
