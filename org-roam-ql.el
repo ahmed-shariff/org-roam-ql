@@ -214,13 +214,21 @@ The nodes are considerered equal when they have the same id."
           (org-roam-ql--nodes-cached (apply (cdr query-expansion-function-info) (cdr query))))
          ;; FIXME: Think of a better way to to this
          ((and query-key query-comparison-function-info)
-          (--filter (let ((val (funcall (cadr query-comparison-function-info) it)))
-                      (and val
-                           (apply (caddr query-comparison-function-info) (append (list val) (cdr query)))))
-                    ;; Caching values
-                    (org-roam-ql--nodes-cached (org-roam-node-list))))
+          (org-roam-ql--process-comparison-function (cadr query-comparison-function-info)
+                                                    (caddr query-comparison-function-info)
+                                                    (cdr query)))
          ;; `org-roam-ql-nodes' will error if query is invalid
          (t (org-roam-ql--nodes-cached query)))))))
+
+(defun org-roam-ql--process-comparison-function (extraction-function comparison-function query)
+  "Process a predicate. See `org-roam-ql-defpred' for more info on
+EXTRACTION-FUNCTION and COMPARISON-FUNCTION. QUERY will be passed to
+the COMPARISON-FUNCTION."
+  (--filter (let ((val (funcall extraction-function it)))
+              (and val
+                   (apply comparison-function (append (list val) (list query)))))
+            ;; Caching values
+            (org-roam-ql--nodes-cached (org-roam-node-list))))
 
 ;;;###autoload
 (defun org-roam-ql-search (source-or-query &optional title sort-fn)
@@ -542,13 +550,18 @@ If EXACT, test if VALUE and REGEXP are equal strings."
         (s-equals-p value regexp)
       (s-match regexp value))))
 
-(defun org-roam-ql--expand-s-like-function (slot-name-symbol)
-  "Return a function that can expand for string match using sql LIKE."
-  (lambda (like-string &optional exact)
-    `([:select id :from nodes :where (like ,slot-name-symbol $s1)]
-      ,(if exact
-           like-string
-         (format "%%%s%%" like-string)))))
+(defun org-roam-ql--expand-s-like-function (slot-name-symbol extraction-function)
+  "Return a function that can expand for string match using sql LIKE
+or fallback to using predicate function if `use-regexp' is used."
+  (lambda (match-string &optional exact use-regexp)
+    (if use-regexp
+        (org-roam-ql--process-comparison-function extraction-function
+                                                  #'org-roam-ql--predicate-s-match
+                                                  match-string)
+      `([:select id :from nodes :where (like ,slot-name-symbol $s1)]
+        ,(if exact
+             match-string
+           (format "%%%s%%" match-string))))))
 
 (defun org-roam-ql--predicate-s-equals-p (value other)
   "Return non-nil if VALUE and OTHER are equal strings."
@@ -1302,8 +1315,7 @@ Can be used in the minibuffer or when writting querries."
 ;; Setup of org-roam-ql
 ;; *****************************************************************************
 (dolist (predicate
-         '((file-regexp "Compare to `file' of a node" org-roam-node-file . org-roam-ql--predicate-s-match)
-           (file-title-regexp "Compare to `file-title' of a node" org-roam-node-file-title . org-roam-ql--predicate-s-match)
+         '(
            ;; TODO: revise this
            (file-atime "Compare to `file-atime' of a node to arg based on comparison parsed (< or >)"  org-roam-node-file-atime . org-roam-ql--predicate-compare-time)
            (file-atime-is-before "Check if `file-atime' of a node is earlier (less) than arg"  org-roam-node-file-atime . org-roam-ql--predicate-time<)
@@ -1312,11 +1324,7 @@ Can be used in the minibuffer or when writting querries."
            (file-mtime "Compare to `file-mtime' of a node to arg based on comparison parsed (< or >)"  org-roam-node-file-mtime . org-roam-ql--predicate-compare-time)
            (file-mtime-is-before "Check if `file-mtime' of a node is earlier (less) than arg"  org-roam-node-file-mtime . org-roam-ql--predicate-time<)
            (file-mtime-is-after "Check if `file-mtime' of a node is later (greater) than arg"  org-roam-node-file-mtime . org-roam-ql--predicate-time>)
-
-           (todo-regexp "Compare to `todo' of a node" org-roam-node-todo . org-roam-ql--predicate-s-match)
-           (title-or-alias-regexp "Compare to `title' or `aliases' of a node" org-roam-node-title . org-roam-ql--predicate-s-match)
-           (refs-regexp "Compare to `refs' of a node" org-roam-node-refs . org-roam-ql--predicate-s-match)
-           (priority-regexp "Compare to `priority' of a node" org-roam-node-priority . org-roam-ql--predicate-s-match)
+           (title-or-alias "Compare to `title' or `aliases' of a node" org-roam-node-title . org-roam-ql--predicate-s-match)
            ;; TODO: sql query
            (scheduled "Compare `scheduled' of a node to arg based on comparison parsed (< or >)"  org-roam-node-scheduled . org-roam-ql--predicate-compare-time)
            (scheduled-is-before "Check if `scheduled' of a node is earlier (less) than arg"  org-roam-node-scheduled . org-roam-ql--predicate-time<)
@@ -1342,11 +1350,11 @@ Can be used in the minibuffer or when writting querries."
            (point< "Check if `point' of a node is less than value" . ,(org-roam-ql--expand-comparison-function '< 'point))
            (point> "Check if `point' of a node is greater than value" . ,(org-roam-ql--expand-comparison-function '> 'point))
            (point<> "Check if `point' of a node is not equal to value" . ,(org-roam-ql--expand-comparison-function '<> 'point))
-           (file-like "Check if `file' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'file))
-           (file-title-like "Check if `file-title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'file-title))
-           (todo-like "Check if `todo' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'todo))
-           (title-like "Check if `title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'title))
-           (refs-like "Check if `refs' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'refs))
+           (file "Check if `file' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'file #'org-roam-node-file))
+           (file-title "Check if `file-title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'file-title #'org-roam-node-file-title))
+           (todo "Check if `todo' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'todo #'org-roam-node-todo))
+           (title "Check if `title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'title #'org-roam-node-title))
+           (refs "Check if `refs' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'refs #'org-roam-node-refs))
            (backlink-to "Backlinks to results of QUERY." . org-roam-ql--expand-backlinks)
            (backlink-from "Forewardlinks to results of QUERY" . org-roam-ql--expand-forwardlinks)
            (in-buffer "In BUFFER" . org-roam-ql--expansion-identity)
