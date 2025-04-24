@@ -1,6 +1,6 @@
 ;;; org-roam-ql.el --- Tests for org-roam-ql -*- lexical-binding: t -*-
 
-;; Copyright (C) 2023 Shariff AM Faleel
+;; Copyright (C) 2025 Shariff AM Faleel
 
 ;; Author: Shariff AM Faleel
 ;; Package-Requires: ((buttercup))
@@ -74,6 +74,16 @@
                                  (or (and todo-state
                                           (s-match "DONE" todo-state))
                                      (member "interesting" tags)))
+                               (-uniq (org-roam-node-list))))
+                        #'string>))))
+      (it "properties (uses comparison function)"
+        (expect (sort (-map #'org-roam-node-id (org-roam-ql-nodes '(properties "TEST" "test value 2"))) #'string>)
+                :to-equal
+                (let ((-compare-fn #'org-roam-ql--compare-nodes))
+                  (sort (-map #'org-roam-node-id
+                              (--filter
+                               (string= (alist-get "TEST" (org-roam-node-properties it) nil nil #'string=)
+                                        "test value 2")
                                (-uniq (org-roam-node-list))))
                         #'string>))))
       (it "not"

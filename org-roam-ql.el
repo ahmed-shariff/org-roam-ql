@@ -227,7 +227,7 @@ EXTRACTION-FUNCTION and COMPARISON-FUNCTION. QUERY will be passed to
 the COMPARISON-FUNCTION."
   (--filter (let ((val (funcall extraction-function it)))
               (and val
-                   (apply comparison-function (append (list val) (list query)))))
+                   (apply comparison-function (append (list val) query))))
             ;; Caching values
             (org-roam-ql--nodes-cached (org-roam-node-list))))
 
