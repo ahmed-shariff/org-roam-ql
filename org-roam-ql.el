@@ -1,6 +1,6 @@
 ;;; org-roam-ql.el --- Interface to query and view results from org-roam -*- lexical-binding: t -*-
 
-;; Copyright (C) 2024 Shariff AM Faleel
+;; Copyright (C) 2025 Shariff AM Faleel
 
 ;; Author: Shariff AM Faleel
 ;; Package-Requires: ((emacs "28") (org-roam "2.2.0") (s "1.12.0") (magit-section "3.3.0") (transient "0.4") (org-super-agenda "1.2") (dash "2.0"))
