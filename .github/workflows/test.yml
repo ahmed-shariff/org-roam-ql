@@ -40,9 +40,11 @@ jobs:
       fail-fast: false
       matrix:
         emacs_version:
-          - 28.1
+          # TODO: Bootstrap sqlite for older versions of emacs & magit requirement for seq >=2.24
+          # - 28.1
           - 29.2
           - 29.4
+          - 30.1
           - snapshot
     steps:
     - uses: purcell/setup-emacs@master
