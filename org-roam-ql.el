@@ -187,6 +187,103 @@ internal functions"
   "Clear the org-roam-ql cache."
   (setq org-roam-ql--cache (make-hash-table)))
 
+
+(defun org-roam-ql--node-list ()
+  "Return all nodes stored as a list of `org-roam-node's.
+
+Same as `org-roam-node-list', but doesn't treat the aliases as titles.
+"
+  (let ((rows (org-roam-db-query
+               "SELECT
+  id,
+  file,
+  filetitle,
+  \"level\",
+  todo,
+  pos,
+  priority ,
+  scheduled ,
+  deadline ,
+  title,
+  properties ,
+  olp,
+  atime,
+  mtime,
+  '(' || group_concat(tags, ' ') || ')' as tags,
+  aliases,
+  refs
+FROM
+  (
+  SELECT
+    id,
+    file,
+    filetitle,
+    \"level\",
+    todo,
+    pos,
+    priority ,
+    scheduled ,
+    deadline ,
+    title,
+    properties ,
+    olp,
+    atime,
+    mtime,
+    tags,
+    '(' || group_concat(aliases, ' ') || ')' as aliases,
+    refs
+  FROM
+    (
+    SELECT
+      nodes.id as id,
+      nodes.file as file,
+      nodes.\"level\" as \"level\",
+      nodes.todo as todo,
+      nodes.pos as pos,
+      nodes.priority as priority,
+      nodes.scheduled as scheduled,
+      nodes.deadline as deadline,
+      nodes.title as title,
+      nodes.properties as properties,
+      nodes.olp as olp,
+      files.atime as atime,
+      files.mtime as mtime,
+      files.title as filetitle,
+      tags.tag as tags,
+      aliases.alias as aliases,
+      '(' || group_concat(RTRIM (refs.\"type\", '\"') || ':' || LTRIM(refs.ref, '\"'), ' ') || ')' as refs
+    FROM nodes
+    LEFT JOIN files ON files.file = nodes.file
+    LEFT JOIN tags ON tags.node_id = nodes.id
+    LEFT JOIN aliases ON aliases.node_id = nodes.id
+    LEFT JOIN refs ON refs.node_id = nodes.id
+    GROUP BY nodes.id, tags.tag, aliases.alias )
+  GROUP BY id, tags )
+GROUP BY id")))
+    (cl-loop for row in rows
+             collect (pcase-let* ((`(
+                                    ,id ,file ,file-title ,level ,todo ,pos ,priority ,scheduled ,deadline
+                                    ,title ,properties ,olp ,atime ,mtime ,tags ,aliases ,refs)
+                                  row)
+                                 (all-titles (cons title aliases)))
+                      (org-roam-node-create :id id
+                                            :file file
+                                            :file-title file-title
+                                            :file-atime atime
+                                            :file-mtime mtime
+                                            :level level
+                                            :point pos
+                                            :todo todo
+                                            :priority priority
+                                            :scheduled scheduled
+                                            :deadline deadline
+                                            :title title
+                                            :aliases aliases
+                                            :properties properties
+                                            :olp olp
+                                            :tags tags
+                                            :refs refs)))))
+
 (defun org-roam-ql--compare-nodes (node1 node2)
   "Comparison function for nodes.
 The nodes are considerered equal when they have the same id."
@@ -229,7 +326,7 @@ the COMPARISON-FUNCTION."
               (and val
                    (apply comparison-function (append (list val) query))))
             ;; Caching values
-            (org-roam-ql--nodes-cached (org-roam-node-list))))
+            (org-roam-ql--nodes-cached (org-roam-ql--node-list))))
 
 ;;;###autoload
 (defun org-roam-ql-search (source-or-query &optional title sort-fn)
@@ -582,9 +679,14 @@ And its value is a string equal to VALUE."
   (-when-let (val (assoc-string prop value t))
     (s-match prop-val (cdr val))))
 
-(defun org-roam-ql--predicate-tags-match (values &rest tags)
-  "Return non-nil if all strings in VALUES are in the list of strings TAGS."
-  (--all-p (member it values) (-flatten (-list tags))))
+(defun org-roam-ql--predicate-list-match (values &rest str-list)
+  "Return non-nil if all strings in VALUES are in STR-LIST."
+  (--all-p (member it values) (-flatten (-list str-list))))
+
+(defun org-roam-ql--title-and-aliased-of-node (node)
+  "Return the title and aliases of NODE as a list."
+  `(,(org-roam-node-title node)
+    ,@(org-roam-node-aliases node)))
 
 (cl-defun org-roam-ql--expand-forwardlinks (source-or-query &key (type "id") (combine :and))
   "Expansion function for forwardlinks.
@@ -1325,7 +1427,7 @@ Can be used in the minibuffer or when writting querries."
            (file-mtime "Compare to `file-mtime' of a node to arg based on comparison parsed (< or >)"  org-roam-node-file-mtime . org-roam-ql--predicate-compare-time)
            (file-mtime-is-before "Check if `file-mtime' of a node is earlier (less) than arg"  org-roam-node-file-mtime . org-roam-ql--predicate-time<)
            (file-mtime-is-after "Check if `file-mtime' of a node is later (greater) than arg"  org-roam-node-file-mtime . org-roam-ql--predicate-time>)
-           (title-or-alias "Compare to `title' or `aliases' of a node" org-roam-node-title . org-roam-ql--predicate-s-match)
+           (title-or-alias "Compare to `title' or `aliases' of a node" org-roam-ql--title-and-aliased-of-node . org-roam-ql--predicate-list-match)
            ;; TODO: sql query
            (scheduled "Compare `scheduled' of a node to arg based on comparison parsed (< or >)"  org-roam-node-scheduled . org-roam-ql--predicate-compare-time)
            (scheduled-is-before "Check if `scheduled' of a node is earlier (less) than arg"  org-roam-node-scheduled . org-roam-ql--predicate-time<)
@@ -1337,7 +1439,7 @@ Can be used in the minibuffer or when writting querries."
            (properties "Compare to `properties' of a node"
                        org-roam-node-properties . org-roam-ql--predicate-property-match)
            ;; TODO: sql query
-           (tags "Compare to `tags' of a node" org-roam-node-tags . org-roam-ql--predicate-tags-match)
+           (tags "Compare to `tags' of a node" org-roam-node-tags . org-roam-ql--predicate-list-match)
            (funcall "Function to test with a node" identity . org-roam-ql--predicate-funcall)))
   (org-roam-ql-defpred (car predicate) (cadr predicate) (caddr predicate) (cdddr predicate)))
 
