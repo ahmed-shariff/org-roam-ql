@@ -661,6 +661,21 @@ or fallback to using predicate function if `use-regexp' is used."
              match-string
            (format "%%%s%%" match-string))))))
 
+(defun org-roam-ql--aliases-expansion-function (match-string &optional exact use-regexp)
+  "Expand to nodes with alias that MATCH-STRING. If EXACT is non-nil,
+then will only do exact matches. If USE-REGEXP, then use predicate
+function else use sql LIKE."
+  (if use-regexp
+      (org-roam-ql--process-comparison-function #'org-roam-node-aliases
+                                                (lambda (extracted-value matchcc)
+                                                  (--any-p (org-roam-ql--predicate-s-match it match-string exact)
+                                                           extracted-value))
+                                                (list match-string))
+    `([:select node-id :from aliases :where (like alias $s1) :group-by node-id]
+      ,(if exact
+           match-string
+         (format "%%%s%%" match-string)))))
+
 (defun org-roam-ql--predicate-s-equals-p (value other)
   "Return non-nil if VALUE and OTHER are equal strings."
   (when (and value other)
@@ -1457,6 +1472,7 @@ Can be used in the minibuffer or when writting querries."
            (file-title "Check if `file-title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'file-title #'org-roam-node-file-title))
            (todo "Check if `todo' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'todo #'org-roam-node-todo))
            (title "Check if `title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'title #'org-roam-node-title))
+           (aliases "Check if `aliases' of a node is LIKE the value" . org-roam-ql--aliases-expansion-function)
            (refs "Check if `refs' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'refs #'org-roam-node-refs))
            (backlink-to "Backlinks to results of QUERY." . org-roam-ql--expand-backlinks)
            (backlink-from "Forewardlinks to results of QUERY" . org-roam-ql--expand-forwardlinks)
