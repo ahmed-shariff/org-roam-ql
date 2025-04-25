@@ -655,7 +655,7 @@ or fallback to using predicate function if `use-regexp' is used."
     (if use-regexp
         (org-roam-ql--process-comparison-function extraction-function
                                                   #'org-roam-ql--predicate-s-match
-                                                  match-string)
+                                                  (list match-string))
       `([:select id :from nodes :where (like ,slot-name-symbol $s1)]
         ,(if exact
              match-string

@@ -56,13 +56,23 @@
     (it "with sql-db query"
       (expect (org-roam-ql-nodes '([(like title "%Node a%")])) :to-equal (--filter (s-match "Node a" (org-roam-node-title it)) (org-roam-node-list))))
     (describe "with roam predicate"
-      (it "todo (cannot be interpreted as function)"
-        (expect (org-roam-ql-nodes '(todo "DONE"))
-                :to-equal
-                (let ((-compare-fn #'org-roam-ql--compare-nodes))
-                  (--filter (--when-let (org-roam-node-todo it)
-                              (s-match "DONE" it))
-                            (-uniq (org-roam-node-list))))))
+      (describe "todo (cannot be interpreted as function & uses string-comparison)"
+        :var (target-nodes (let ((-compare-fn #'org-roam-ql--compare-nodes))
+                             (--filter (--when-let (org-roam-node-todo it)
+                                         (s-match "DONE" it))
+                                       (-uniq (org-roam-node-list)))))
+        (it "LIKE not EXACT"
+          (expect (org-roam-ql-nodes '(todo "DONE"))
+                  :to-equal target-nodes))
+        (it "LIKE and EXACT"
+          (expect (org-roam-ql-nodes '(todo "DONE" t))
+                  :to-equal target-nodes))
+        (it "REGEX not EXACT"
+          (expect (org-roam-ql-nodes '(todo "DONE" nil t))
+                  :to-equal target-nodes))
+        (it "REGEX and EXACT"
+          (expect (org-roam-ql-nodes '(todo "DONE" t t ))
+                  :to-equal target-nodes)))
       (it "or (could be interpreted as function)"
         (expect (sort (-map #'org-roam-node-id (org-roam-ql-nodes '(or (tags "interesting") (todo "DONE")))) #'string>)
                 :to-equal
