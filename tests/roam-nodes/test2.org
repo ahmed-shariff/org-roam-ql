@@ -6,6 +6,7 @@
 :PROPERTIES:
 :ID:       97e2931f-e80f-476d-9dc9-6f771ce661e4
 :TEST_PROP: c
+:ROAM_ALIASES: C c-node
 :END:
 - Link to [[id:15b0204a-0bcc-4ad9-b7c1-addd9119d23c][Node b]]
 
@@ -24,5 +25,6 @@
 * Node f
 :PROPERTIES:
 :ID:       8caba75f-5cde-470e-a4bf-0a4a14c6d8b7
+:ROAM_ALIASES: f-node
 :END:
 - More links to [[id:15b0204a-0bcc-4ad9-b7c1-addd9119d23c][Node b]]

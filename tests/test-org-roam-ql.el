@@ -86,13 +86,24 @@
                                         "test value 2")
                                (-uniq (org-roam-node-list))))
                         #'string>))))
+      (it "title-or-alias"
+        (expect (sort (-map #'org-roam-node-id (org-roam-ql-nodes '(title-or-alias "c-node"))) #'string>)
+                :to-equal
+                (let ((-compare-fn #'org-roam-ql--compare-nodes))
+                  (sort (-map #'org-roam-node-id
+                              (--filter
+                               (member "c-node" (org-roam-node-aliases it))
+                               (-uniq (org-roam-node-list))))
+                        #'string>))))
       (it "not"
         (expect (sort (-map #'org-roam-node-id (org-roam-ql-nodes '(not (tags "interesting")))) #'string>)
-                :to-equal (sort (-map #'org-roam-node-id
-                                      (--filter
-                                       (not (member "interesting" (org-roam-node-tags it)))
-                                       (org-roam-node-list)))
-                                #'string>))))
+                :to-equal
+                (let ((-compare-fn #'org-roam-ql--compare-nodes))
+                  (sort (-map #'org-roam-node-id
+                              (--filter
+                               (not (member "interesting" (org-roam-node-tags it)))
+                               (-uniq (org-roam-node-list))))
+                        #'string>)))))
     (describe "with function"
       (it "returning list of nodes"
         (expect (org-roam-ql-nodes (lambda () (list (car (org-roam-node-list))))) :to-equal (list (car (org-roam-node-list)))))
