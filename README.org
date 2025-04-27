@@ -15,6 +15,7 @@ This package provides an interface to easily query and display results from your
   - [[#adding-new-predicates][Adding new predicates]]
   - [[#org-dynamic-block][Org dynamic block]]
 - [[#working-with-org-ql][Working with org-ql]]
+- [[#tips-and-tricks][Tips and tricks]]
 
 * Screen-shots
 
@@ -81,30 +82,49 @@ Example configuration:
     #+end_src
     In the above example, the result would contain any nodes whose todo state is =TODO=, have tags "tag1" and "tag2" and are in the org-roam buffer.
     The following are predicates available by default in org-roam-ql:
-  - =or (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)= :: Tests if a node matches/contained-in any of the ~SOURCE-OR-QUERY~'s. 
-  - =and (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)= :: Similar to ~or~, but should satisfy all predicates or contained in all the results of ~SOURCE-OR-QUERY~'s.
-  - =not (SOURCE-OR-QUERY)= :: Tests if a node doesn't match the result or not contained in the result of ~SOURCE-OR-QUERY~.
-  - =file (REGEXP &optional EXACT)= :: Test if nodes file name matches ~REGEXP~. If ~EXACT~ is non-nil, the file slot should be an exact match to ~REGEXP~. Note the slot ~file~ of an org-roam-node would contain the absolute path.
-  - =file-title (REGEXP &optional EXACT)= :: Similar to ~file~, tests the ~file-title~ slot of a node.
-  - =id (ID)= :: Tests if the ~ID~ of a node is a match to the value passed.
-  - =level (LEVEL)= :: Tests if the ~level~ of a node is equal to ~LEVEL~.
-  - =todo (REGEXP &optional EXACT)= :: Similar to ~file~, tests the todo state of a node.
-  - =priority (REGEXP &optional EXACT)= :: Similar to ~file~, tests the priority of a node.
-  - =scheduled (COMPARISON TIME-STRING)= :: Compares the ~scheduled~ of the node with ~TIME-STAMP~ based on ~COMPARISON~. ~TIME-STAMP~ is any valid value for [[https://orgmode.org/manual/The-date_002ftime-prompt.html][org date-time prompt]]. ~COMPARISON~ is either ~<~ or ~>~. Example: ~(scheduled > "-3w")~
-  - =deadline= (COMPARISON TIME-STRING) :: Same as ~scheduled~, tests the ~deadline~ of a node.
-  - =title (REGRXP &optional EXACT)= :: Similar to ~file~, tests the title of a node.
-  - =properties (PROP PROP-VAL)= :: Tests if the value of the property of a node PROP is a match to PROP-VAL. PROP-VAL can be a regular expression.
-  - =tags (TAG1 TAG2 ...)= :: Tests if the tags of a node have TAG1, TAG2, etc.
-  - =refs (REGEXP &optional EXACT)= :: Similar to ~file~, tests the nodes refs slot.
-  - =backlink-to (SOURCE-OR-QUERY)= :: Tests if the node has a backlink to any of the nodes from the results ~SOURCE-OR-QUERY~.
-  - =backlink-from (SOURCE-OR-QUERY)= :: Similar to ~backlink-to~, tests if there are any backlinks from (aka forwardlinks) the resulting nodes from ~SOURCE-OR-QUERY~.
-  - =in-buffer (BUFFER-NAME)= :: This is similar to passing a buffer-name as ~SOURCE-OR-QUERY~. Tests if a node is in the org-roam buffer named ~BUFFER-NAME~.
-  - =nodes-list (NODES-LIST)= :: This is similar to passing a list of nodes as ~SOURCE-OR-QUERY~. Tests if a node is in the ~NODES-LIST~.
-  - =function (FUNC)= :: This is similar to passing a function as ~SOURCE-OR-QUERY~. Tests if the node is in the result of executing the function ~FUNC~.
-  - =funcall (FUNC)= :: Tests a node with the function ~FUNC~, which takes an org-roam node as parameter. Test passes if the function returns non-nil.
+  - ~or (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)~ :: Tests if a node matches/contained-in any of the ~SOURCE-OR-QUERY~'s. 
+  - ~and (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)~ :: Similar to ~or~, but should satisfy all predicates or contained in all the results of ~SOURCE-OR-QUERY~'s.
+  - ~not (SOURCE-OR-QUERY)~ :: Tests if a node doesn't match the result or not contained in the result of ~SOURCE-OR-QUERY~.
+  - ~file (MATCH &optional EXACT USE-REGEXP)~ :: Test if nodes file name matches ~MATCH~. If ~EXACT~ is non-nil, the file slot should be an exact match to ~MATCH~. By default, this uses sql LIKE, but if ~USE-REGEXP~ is non-nil, then ~MATCH~ will be treated as a regex and regex matching will be used. Note the slot ~file~ of an org-roam-node would contain the absolute path.
+  - ~file-title (MATCH &optional EXACT USE-REGEXP)~ :: Similar to ~file~, tests the ~file-title~ slot of a node.
+  - ~id (ID)~ :: Tests if the ~ID~ of a node is a match to the value passed.
+  - ~level= (LEVEL)~ :: Tests if the ~level~ of a node is equal to ~LEVEL~.
+  - ~level< (LEVEL)~ :: Tests if the ~level~ of a node is less than ~LEVEL~.
+  - ~level> (LEVEL)~ :: Tests if the ~level~ of a node is greater than ~LEVEL~.
+  - ~level<> (LEVEL)~ :: Tests if the ~level~ of a node is not equal to ~LEVEL~.
+  - ~point= (POINT)~ :: Tests if the ~point~ of a node is equal to ~POINT~.
+  - ~point< (POINT)~ :: Tests if the ~point~ of a node is less than ~POINT~.
+  - ~point> (POINT)~ :: Tests if the ~point~ of a node is greater than ~POINT~.
+  - ~point<> (POINT)~ :: Tests if the ~point~ of a node is not equal to ~POINT~.
+  - ~todo (MATCH &optional EXACT USE-REGEXP)~ :: Similar to ~file~, tests the todo state of a node.
+  - ~priority (MATCH &optional EXACT USE-REGEXP)~ :: Similar to ~file~, tests the priority of a node.
+  - ~scheduled (COMPARISON TIME-STRING)~ :: Compares the ~scheduled~ of the node with ~TIME-STAMP~ based on ~COMPARISON~. ~TIME-STAMP~ is any valid value for [[https://orgmode.org/manual/The-date_002ftime-prompt.html][org date-time prompt]]. ~COMPARISON~ is either ~<~ or ~>~. Example: ~(scheduled > "-3w")~
+  - ~scheduled-is-after (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes with ~schedule~ after ~TIME-STRING~.
+  - ~scheduled-is-before (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes with ~schedule~ before ~TIME-STRING~.
+  - ~deadline (COMPARISON TIME-STRING)~ :: Same as ~scheduled~, tests the ~deadline~ of a node.
+  - ~deadline-is-after (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes with ~deadline~ after ~TIME-STRING~.
+  - ~deadline-is-before (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes with ~deadline~ before ~TIME-STRING~.
+  - ~title (MATCH &optional EXACT USE-REGEXP)~ :: Similar to ~file~, tests the title of a node. Note this, this only considers the ~title~, and not any of the ~aliases~.
+  - ~aliases (MATCH &optional EXACT USE-REGEXP)~ :: Similar to ~file~, tests the aliases of a node.
+  - ~title-or-alias (MATCH &optional EXACT)~ :: Similar to ~file~, tests both ~title~ and ~aliases~ of a node. If not ~EXACT~ will always use regex matching.
+  - ~properties (PROP PROP-VAL)~ :: Tests if the value of the property of a node PROP is a match to PROP-VAL. PROP-VAL can be a regular expression.
+  - ~tags (TAG1 TAG2 ...)~ :: Tests if the tags of a node have TAG1, TAG2, etc.
+  - ~refs (MATCH &optional EXACT USE-REGEXP)~ :: Similar to ~file~, tests the nodes refs slot.
+  - ~backlink-to (SOURCE-OR-QUERY)~ :: Tests if the node has a backlink to any of the nodes from the results ~SOURCE-OR-QUERY~.
+  - ~backlink-from (SOURCE-OR-QUERY)~ :: Similar to ~backlink-to~, tests if there are any backlinks from (aka forwardlinks) the resulting nodes from ~SOURCE-OR-QUERY~.
+  - ~in-buffer (BUFFER-NAME)~ :: This is similar to passing a buffer-name as ~SOURCE-OR-QUERY~. Tests if a node is in the org-roam buffer named ~BUFFER-NAME~.
+  - ~nodes-list (NODES-LIST)~ :: This is similar to passing a list of nodes as ~SOURCE-OR-QUERY~. Tests if a node is in the ~NODES-LIST~.
+  - ~function (FUNC)~ :: This is similar to passing a function as ~SOURCE-OR-QUERY~. Tests if the node is in the result of executing the function ~FUNC~.
+  - ~funcall (FUNC)~ :: Tests a node with the function ~FUNC~, which takes an org-roam node as parameter. Test passes if the function returns non-nil.
+  - ~file-atime (COMPARISON TIME-STRING)~ :: Same as ~scheduled~, tests the ~deadline~ of a node.
+  - ~file-atime-is-after (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes ~file-atime~ is after ~TIME-STRING~.
+  - ~file-atime-is-before (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes ~file-atime~ is before ~TIME-STRING~.
+  - ~file-mtime (COMPARISON TIME-STRING)~ :: Same as ~scheduled~, tests the ~deadline~ of a node.
+  - ~file-mtime-is-after (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes ~file-mtime~ is after ~TIME-STRING~.
+  - ~file-mtime-is-before (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes ~file-mtime~ is before ~TIME-STRING~.
 ** Adding new predicates
 There are two ways to add a new predicate to org-roam-ql: 
-- =org-roam-ql-defpred (NAME DOCSTRING EXTRACTION-FUNCTION COMPARISON-FUNCTION)= :: Creates a predicate that can be used as ~SOURCE-OR-QUERY~. For example, for a predicate defined as follows:
+- ~org-roam-ql-defpred (NAME DOCSTRING EXTRACTION-FUNCTION COMPARISON-FUNCTION)~ :: Creates a predicate that can be used as ~SOURCE-OR-QUERY~. For example, for a predicate defined as follows:
   #+begin_src emacs-lisp
   (org-roam-ql-defpred sample "A sample predicate" extraction-function comparison-function)
   #+end_src
@@ -121,10 +141,10 @@ There are two ways to add a new predicate to org-roam-ql:
 
   The ~EXTRACTION-FUNCTION~ takes an org-roam-node and returns a value that will be passed as the first parameter to ~COMPARISON-FUNCTION~. The remainder of the parameters when calling the predicate is passed as remaining parameters to ~COMPARISON-FUNCTION~. When the ~COMPARISON-FUNCTION~ returns a non-nil value, it will be included in the result.
 
-- =org-roam-ql-defexpansion (NAME DOCSTRING EXPANSION-FUNCTION)= :: Adds an ~EXPANSION-FUNCTION~ which will be identified by ~NAME~ in a org-roam-ql query. The ~EXPANSION-FUNCTION~ should take the parameters passed in the query and return values that can be passed to ~org-roam-nodes~.
+- ~org-roam-ql-defexpansion (NAME DOCSTRING EXPANSION-FUNCTION)~ :: Adds an ~EXPANSION-FUNCTION~ which will be identified by ~NAME~ in a org-roam-ql query. The ~EXPANSION-FUNCTION~ should take the parameters passed in the query and return values that can be passed to ~org-roam-nodes~.
 
 ** Adding a sorting function
-- =org-roam-ql-register-sort-fn (FUNCTION-NAME SORT-FUNCTION)= :: Registers a sort function which can be used with ~org-roam-ql-nodes~. ~FUNCTION-NAME~ is the string name used to refer to this function with. ~SORT-FUNCTION~ is a function that takes two org-roam-nodes and return a truth value, which is used to sort, i.e., if non-nil, the first node would be before the second node passed to the function.  Uses `seq-sort'.  If a sort-function with the given name already exists, it would be overwritten.
+- ~org-roam-ql-register-sort-fn (FUNCTION-NAME SORT-FUNCTION)~ :: Registers a sort function which can be used with ~org-roam-ql-nodes~. ~FUNCTION-NAME~ is the string name used to refer to this function with. ~SORT-FUNCTION~ is a function that takes two org-roam-nodes and return a truth value, which is used to sort, i.e., if non-nil, the first node would be before the second node passed to the function.  Uses `seq-sort'.  If a sort-function with the given name already exists, it would be overwritten.
   The following example registers a sort function named "custom-prop" which sorts the values based on the "CUSTOM-PROP" property of a node.
   #+begin_src emacs-lisp
     (org-roam-ql-register-sort-fn "custom-prop"
@@ -166,3 +186,6 @@ Optionally, ~org-roam-ql~ results can be visualized with [[https://github.com/al
 Note that org-ql works only with org entries, i.e., `heading nodes`. Hence, if there are any file nodes in the result, they will not be displayed. To be clear about that, when org-roam-ql results are displayed in an org-ql-view buffer, a warning is added to the end mentioning how many file nodes were there in the result. If the extension is loaded, you may view the org-roam-ql results with ~Q~ from the org-roam-ql transient. An org-ql-view can be viewed in an org-roam-like buffer with ~R~ from the org-ql-view transient.
 
 [[images/demo5.gif]]
+
+* Tips and tricks
+The [[https://github.com/ahmed-shariff/org-roam-ql/wiki][wiki]] has additional tips and tricks, like using org-roam-ql to filter completion candidates in minibuffer.
