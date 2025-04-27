@@ -1473,6 +1473,7 @@ Can be used in the minibuffer or when writting querries."
            (todo "Check if `todo' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'todo #'org-roam-node-todo))
            (title "Check if `title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'title #'org-roam-node-title))
            (aliases "Check if `aliases' of a node is LIKE the value" . org-roam-ql--aliases-expansion-function)
+           (priority "Compare to `priority' of a node." ,(org-roam-ql--expand-s-like-function 'priority #'org-roam-node-priority))
            (refs "Check if `refs' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'refs #'org-roam-node-refs))
            (backlink-to "Backlinks to results of QUERY." . org-roam-ql--expand-backlinks)
            (backlink-from "Forewardlinks to results of QUERY" . org-roam-ql--expand-forwardlinks)
