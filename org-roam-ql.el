@@ -57,8 +57,13 @@ rendered.  Each function accepts no arguments, and is run with the
   :type 'hook)
 
 (defcustom org-roam-ql-preview-function #'org-roam-ql-preview-default-function
-  "The preview function used to generate the content of a preview in
-`org-roam-ql-mode' buffer."
+  "The preview function used to generate the content of a nodes
+preview in `org-roam-ql-mode' buffer.
+
+Before calling this, the point will be set to `org-roam-node-point'.
+Will be called with two arguments: (1) The corresponding node, and (2)
+the source-or-query of the corresponding buffer. See
+`org-roam-ql-nodes' for what the value of source-or-query can be."
   :group 'org-roam-ql
   :type 'function)
 
@@ -1042,12 +1047,6 @@ See `org-roam-ql-search' for PREVIEW-FN."
               (push (slot-value magit-section 'node) nodes))))
         nodes))))
 
-(defun org-roam-ql-preview-default-function (_)
-  "The deafult value for `org-roam-ql-preview-fn'.
-
-Simple wrapper `org-roam-preview-default-function'."
-  (org-roam-preview-default-function))
-
 (defun org-roam-ql--bookmark-open (bookmark)
   "Query and open org-roam-ql bookmark BOOKMARK."
   (let ((title (bookmark-prop-get bookmark 'title))
@@ -1482,6 +1481,12 @@ Can be used in the minibuffer or when writting querries."
 (defun org-roam-ql--default-query-for-roam-buffer ()
   "Function used for `org-roam-ql-default-org-roam-buffer-query'."
   `(backlink-to (id ,(org-roam-node-id org-roam-buffer-current-node))))
+
+(defun org-roam-ql-preview-default-function (_ _)
+  "The deafult value for `org-roam-ql-preview-fn'.
+
+Simple wrapper `org-roam-preview-function'."
+  (funcall org-roam-preview-function))
 
 ;;;###autoload
 (defun org-roam-ql-convert-roam-buffer-to-roam-ql-buffer ()
