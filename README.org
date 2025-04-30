@@ -14,6 +14,7 @@ This package provides an interface to easily query and display results from your
   - [[#valid-values-for-source-or-query][Valid values for SOURCE-OR-QUERY]]
   - [[#adding-new-predicates][Adding new predicates]]
   - [[#org-dynamic-block][Org dynamic block]]
+  - [[#custom-preview-function-for-org-roam-ql-buffer][Custom preview function for org-roam-ql buffer]]
 - [[#working-with-org-ql][Working with org-ql]]
 - [[#tips-and-tricks][Tips and tricks]]
 
@@ -53,7 +54,9 @@ Example configuration:
 
 * Usage
 ** Commands/functions
-- =org-roam-ql-search (SOURCE-OR-QUERY &optional TITLE SORT-FN)= :: This is an *interactive* command that creates a ~org-roam-ql~ buffer with the nodes of the corresponding [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] with ~TITLE~. An ~org-roam-ql~ buffer is functionally similar to the ~org-roam-buffer~, but allows displaying any list of nodes ([[#screen-shots][see screen-shots above]]). When called interactively, it will prompt for the ~SOURCE-OR-QUERY~ and ~TITLE~. Note that when entering queries interactively either in ~org-roam-ql-search~ or in the transient, you can get completion-at-point with ~tab~. ~SORT-FN~ is used for sorting the results. It can be a string name of a registered sort function or a predicate function that can be used to sort the nodes (should take two nodes as input and return a non-nil value if the first node should be before the second). By default the following sort function are registered:  ~file-mtime~, ~file-atime~, ~deadline~, ~scheduled~, ~point~, ~level~, ~file-title~, ~file~ and ~title~. Each corresponds to the respective slot of an org-roam-node. It is possible to register new sort functions with ~org-roam-ql-register-sort-fn~. These registered functions will also appear as options for completion in the transient.
+- =org-roam-ql-search (SOURCE-OR-QUERY &optional TITLE SORT-FN PREVIEW-FN)= :: This is an *interactive* command that creates a ~org-roam-ql~ buffer with the nodes of the corresponding [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] with ~TITLE~. An ~org-roam-ql~ buffer is functionally similar to the ~org-roam-buffer~, but allows displaying any list of nodes ([[#screen-shots][see screen-shots above]]). When called interactively, it will prompt for the ~SOURCE-OR-QUERY~ and ~TITLE~. Note that when entering queries interactively either in ~org-roam-ql-search~ or in the transient, you can get completion-at-point with ~tab~. ~SORT-FN~ is used for sorting the results. It can be a string name of a registered sort function or a predicate function that can be used to sort the nodes (should take two nodes as input and return a non-nil value if the first node should be before the second). By default the following sort function are registered:  ~file-mtime~, ~file-atime~, ~deadline~, ~scheduled~, ~point~, ~level~, ~file-title~, ~file~ and ~title~. Each corresponds to the respective slot of an org-roam-node. It is possible to register new sort functions with ~org-roam-ql-register-sort-fn~. These registered functions will also appear as options for completion in the transient.
+
+  ~PREVIEW-FN~ is a function used to generate the preview content on the ~org-roam-ql-mode~ buffer. See [[#custom-preview-function-for-org-roam-ql-buffer][Custom preview function for org-roam-ql buffer]] for more information on what this value can be.  If ~PREVIEW-FN~ is nil, the value of ~org-roam-ql-preview-function~ will be used. If it is non-nil, ~org-roam-ql-preview-function~ will be set as a buffer local value in the ~org-roam-ql-mode~ buffer.
 - =org-roam-ql-nodes (SOURCE-OR-QUERY)= :: Given a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] , return a list of nodes.
 - ~org-roam-ql-agenda-block (QUERY)~ :: Meant to be used in ~org-agenda-custom-commands~ as a user-defined function. Insert items from processing ~QUERY~ (which is a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]]) into current buffer. QUERY is the `match' item in the custom command form. Currently this doesn't respect agenda restrict. Example:
   #+begin_src emacs-lisp
@@ -166,6 +169,16 @@ If no-link is not provided as a parameter, the first column is a link to the nod
 Following is an example of a dynamic block and its result.
 
 [[file:images/dynamic-block.jpg]]
+
+** Custom preview function for org-roam-ql buffer
+
+~org-roam-ql~ buffers visualizes the node itself. Which is unlike ~org-roam~ buffers, which visualizes relationships (like ~backlinks~ or ~refs~). To allow better customization, ~org-roam-ql~ has the following customizable variables. These are mostly similar to the ~org-roam~ counterparts:
+- ~org-roam-ql-preview-function~ :: This differs from the ~org-roam~ counterpart. The preview function used to generate the content of a nodes preview in ~org-roam-ql-mode~ buffer. Before calling this, the point will be set to ~org-roam-node-point~. Will be called with two arguments: (1) The corresponding node, and (2) the source-or-query of the corresponding buffer. See [[#valid-values-for-source-or-query][Valid values for SOURCE-OR-QUERY]] for what the value of source-or-query can be. By default, it calls the ~org-roam-preview-function~. Note that this can be set local to the buffer and will be used to generate the preview when the buffer is refreshed. The value set for this variable also can be overridden by passing it as a parameter to ~org-roam-ql-search~ when called programatically - in this case, the preview function passed as an argument is set as the buffer local value for this variable.
+- ~org-roam-ql-buffer-postrender-functions~ :: Functions to run after a section of a ~org-roam-ql-mode~ buffer is rendered. Each function accepts no arguments, and is run with the ~org-roam-ql-mode~ buffer as the current buffer. By default, it is set to the value of ~org-roam-buffer-postrender-functions~.
+- ~org-roam-ql-preview-postprocess-functions~ :: A list of functions to postprocess the preview content. This is the same as ~org-roam-preview-postprocess-functions~, and the default value is set to this. Each function takes a single argument, the string for the preview content, and returns the post-processed string. The functions are applied in order of appearance in the list.
+
+See ~M-x customize-group RET org-roam-ql~ for more customization options.
+
 * Working with org-ql
 Optionally, ~org-roam-ql~ results can be visualized with [[https://github.com/alphapapa/org-ql][org-ql]], available through the extension ~org-roam-ql-ql~ (naming things is hard!!). This also can be installed from [[https://melpa.org/#/org-roam-ql-ql][MELPA]] or with other package management tools like [[https://framagit.org/steckerhalter/quelpa][quelpa]] and [[https://github.com/radian-software/straight.el][straight]].
 
