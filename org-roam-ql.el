@@ -371,9 +371,10 @@ info on this.
 PREVIEW-FN is a function used to generate the preview content on the
 `org-roam-ql-mode' buffer. See `org-roam-ql-preview-function' for what
 the arguments can be.  If PREVIEW-FN is nil, the value of
-`org-roam-ql-preview-function' will be used. If it is non-nil,
-`org-roam-ql-preview-function' will be set as a buffer local value in
-the `org-roam-ql-mode' buffer."
+`org-roam-ql-preview-function' will be used. If it is non-nil, this
+argument will be set as the buffer local value for
+`org-roam-ql-preview-function' in the corresponding `org-roam-ql-mode'
+buffer"
   (interactive (list (let ((query (org-roam-ql--read-query)))
                        (if (vectorp query)
                            (list query)
