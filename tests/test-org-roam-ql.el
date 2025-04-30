@@ -176,7 +176,28 @@
       (it "agenda to roam buffer"
         (with-current-buffer agenda-buffer-name
           (org-roam-ql-roam-buffer-from-agenda-buffer))
-        (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-roam-buffer (get-buffer second-roam-buffer-name))) :to-have-same-items-as query-result-ids))))
+        (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-roam-buffer (get-buffer second-roam-buffer-name))) :to-have-same-items-as query-result-ids)))
+    (describe "with custom preview function"
+      :var ((result-buffer (window-buffer
+                            (org-roam-ql-search query "test-title"
+                                                nil
+                                                (lambda (node query)
+                                                  (format "test preview %s %s"
+                                                          (org-roam-node-title node)
+                                                          query))))))
+      (it "first render uses custom preview function"
+        (expect
+         (with-current-buffer result-buffer
+           (goto-char (point-min))
+           (count-matches "test preview"))
+         :to-equal (length query-result)))
+      (it "refreshing buffer uses custom preview function"
+        (expect
+         (with-current-buffer result-buffer
+           (org-roam-ql-refresh-buffer)
+           (goto-char (point-min))
+           (count-matches "test preview"))
+         :to-equal (length query-result)))))
 
   (describe "Test org-roam-ql-ql--get-roam-queries"
     (it "without any ql-queries"
@@ -184,6 +205,4 @@
               :to-equal nil))
     (it "with multiple nested queries"
       (expect (org-roam-ql-ql--get-roam-queries '(or (org-roam-query (todo "TODO")) (and (org-roam-query (tags "tag1" "tag2")) (scheduled "something"))))
-              :to-equal '((org-roam-query (todo "TODO")) (org-roam-query (tags "tag1" "tag2"))))))
-
-)
+              :to-equal '((org-roam-query (todo "TODO")) (org-roam-query (tags "tag1" "tag2")))))))
