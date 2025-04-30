@@ -963,9 +963,10 @@ When all sections are inserted, will call hook
             org-roam-ql-buffer-in "org-roam-db")
       (when preview-fn
         (setq-local org-roam-ql-preview-function preview-fn))
-      (insert ?\n)
-      (dolist (section sections)
-        (funcall section))
+      (magit-insert-section section (org-roam)
+         (magit-insert-heading)
+         (dolist (section sections)
+           (funcall section)))
       (run-hooks 'org-roam-ql-buffer-postrender-functions)
       (goto-char 0))
     (display-buffer (current-buffer))))
@@ -981,7 +982,7 @@ This inserts nodes simlar to `org-roam-node-insert-section', but uses
 return value of `org-roam-ql-preview-function' will be passed through
 all values in `org-roam-ql-preview-postprocess-functions'."
   `(lambda ()
-     (magit-insert-section section (org-roam)
+     (magit-insert-section section (org-roam-nodes)
        (magit-insert-heading ,heading)
        (dolist (previewing-node
                 ,nodes)
@@ -990,16 +991,18 @@ all values in `org-roam-ql-preview-postprocess-functions'."
                                              'font-lock-face 'org-roam-title))
            (oset section node previewing-node)
            (magit-insert-section section (org-roam-preview-section)
-             (insert (org-roam-fontify-like-in-org-mode
-                      (save-excursion
-                        (org-roam-with-temp-buffer (org-roam-node-file previewing-node)
-                          (org-with-wide-buffer
-                           (goto-char (org-roam-node-point previewing-node))
-                           (let ((s (funcall org-roam-ql-preview-function previewing-node)))
-                             (dolist (fn org-roam-ql-preview-postprocess-functions)
-                               (setq s (funcall fn s)))
-                             s)))))
-                     "\n")
+             ;; respecting buffer local value
+             (let ((preview-fn org-roam-ql-preview-function))
+               (insert (org-roam-fontify-like-in-org-mode
+                        (save-excursion
+                          (org-roam-with-temp-buffer (org-roam-node-file previewing-node)
+                            (org-with-wide-buffer
+                             (goto-char (org-roam-node-point previewing-node))
+                             (let ((s (funcall preview-fn previewing-node org-roam-ql-buffer-query)))
+                               (dolist (fn org-roam-ql-preview-postprocess-functions)
+                                 (setq s (funcall fn s)))
+                               s)))))
+                       "\n"))
              (oset section file (org-roam-node-file previewing-node))
              (oset section point (org-roam-node-point previewing-node))
              (insert ?\n)))
