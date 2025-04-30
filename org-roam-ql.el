@@ -977,21 +977,34 @@ with the NODES.  Nodes should be a list of org-roam nodes.  HEADING is
 the heading for the function `magit-section'.
 
 This inserts nodes simlar to `org-roam-node-insert-section', but uses
-`org-roam-ql-preview-function' to generate the preview content.
-"
+`org-roam-ql-preview-function' to generate the preview content. The
+return value of `org-roam-ql-preview-function' will be passed through
+all values in `org-roam-ql-preview-postprocess-functions'."
   `(lambda ()
-     (magit-insert-section (org-roam)
+     (magit-insert-section section (org-roam)
        (magit-insert-heading ,heading)
-       (dolist (entry
+       (dolist (previewing-node
                 ,nodes)
-         (let ((pos (org-roam-node-point entry))
-               (properties (org-roam-node-properties entry)))
-           (org-roam-node-insert-section
-            :source-node entry
-            :point pos
-            :properties properties))
+         (magit-insert-section section (org-roam-node-section)
+           (magit-insert-heading (propertize (org-roam-node-title previewing-node)
+                                             'font-lock-face 'org-roam-title))
+           (oset section node previewing-node)
+           (magit-insert-section section (org-roam-preview-section)
+             (insert (org-roam-fontify-like-in-org-mode
+                      (save-excursion
+                        (org-roam-with-temp-buffer (org-roam-node-file previewing-node)
+                          (org-with-wide-buffer
+                           (goto-char (org-roam-node-point previewing-node))
+                           (let ((s (funcall org-roam-ql-preview-function previewing-node)))
+                             (dolist (fn org-roam-ql-preview-postprocess-functions)
+                               (setq s (funcall fn s)))
+                             s)))))
+                     "\n")
+             (oset section file (org-roam-node-file previewing-node))
+             (oset section point (org-roam-node-point previewing-node))
+             (insert ?\n)))
          (insert ?\n))
-       (run-hooks 'org-roam-buffer-postrender-functions))))
+       (magit-insert-child-count section))))
 
 (defun org-roam-ql--roam-buffer-for-nodes (nodes title buffer-name &optional source-or-query sort-fn preview-fn)
   "View nodes in org-roam-ql buffer.
@@ -1025,6 +1038,12 @@ See `org-roam-ql-search' for PREVIEW-FN."
             (when (org-roam-node-section-p magit-section)
               (push (slot-value magit-section 'node) nodes))))
         nodes))))
+
+(defun org-roam-ql-preview-default-function (_)
+  "The deafult value for `org-roam-ql-preview-fn'.
+
+Simple wrapper `org-roam-preview-default-function'."
+  (org-roam-preview-default-function))
 
 (defun org-roam-ql--bookmark-open (bookmark)
   "Query and open org-roam-ql bookmark BOOKMARK."
