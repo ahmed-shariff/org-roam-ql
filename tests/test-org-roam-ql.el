@@ -31,10 +31,9 @@
 (require 'dash)
 
 (describe "org-roam-ql"
-  :var ((org-roam-directory (expand-file-name "tests/roam-nodes"
-                                              (locate-dominating-file default-directory ".git"))))
-  (before-all
-    (org-roam-db-sync))
+  :var* ((org-roam-directory (expand-file-name "tests/roam-nodes"
+                                               (locate-dominating-file default-directory ".git")))
+         (_ (org-roam-db-sync)))
   (describe "Test the s-exp query"
     (it "with the todo (LIKE)"
       (expect (org-roam-ql--check-if-valid-query '(todo "TODO"))
