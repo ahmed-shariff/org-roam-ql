@@ -33,7 +33,8 @@
 (describe "org-roam-ql"
   :var ((org-roam-directory (expand-file-name "tests/roam-nodes"
                                               (locate-dominating-file default-directory ".git"))))
-  (org-roam-db-sync)
+  (before-all
+    (org-roam-db-sync))
   (describe "Test the s-exp query"
     (it "with the todo (LIKE)"
       (expect (org-roam-ql--check-if-valid-query '(todo "TODO"))
@@ -121,32 +122,30 @@
         (expect (org-roam-ql-nodes (lambda () 'somthing-else)) :to-throw 'user-error))
       (it "returning nil"
         (expect (org-roam-ql-nodes (lambda () nil)) :to-equal nil)))
-    ;; FIXME: Not sure why passing just the buffer name is not working here!
     (describe "with roam buffers"
-      (let* ((nodes (--filter (s-match "test2.org" (org-roam-node-file it)) (org-roam-node-list)))
-             (buffer-name "test-buffer"))
-        (org-roam-ql--roam-buffer-for-nodes nodes "test buffer" buffer-name nodes)
-        (it "as a string"
-          (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
-                                             (org-roam-ql-nodes buffer-name)))
-                  :to-have-same-items-as (-map #'org-roam-node-id nodes)))
-        (it "as a predicate"
-          (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
-                                             (org-roam-ql-nodes `(in-buffer ,buffer-name))))
-                  :to-have-same-items-as (-map #'org-roam-node-id nodes)))))
-    ;; FIXME: Not sure why passing just the buffer name is not working here!
+      :var* ((nodes (--filter (s-match "test2.org" (org-roam-node-file it)) (org-roam-node-list)))
+             (buffer-name "test-buffer")
+             (_ (org-roam-ql--roam-buffer-for-nodes nodes "test buffer" buffer-name nodes)))
+      (it "as a string"
+        (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
+                                           (org-roam-ql-nodes buffer-name)))
+                :to-have-same-items-as (-map #'org-roam-node-id nodes)))
+      (it "as a predicate"
+        (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
+                                           (org-roam-ql-nodes `(in-buffer ,buffer-name))))
+                :to-have-same-items-as (-map #'org-roam-node-id nodes))))
     (describe "with agenda buffers"
-      (let* ((nodes (--filter (s-match "test2.org" (org-roam-node-file it)) (org-roam-node-list)))
-             (buffer-name "test-buffer"))
-        (org-roam-ql--agenda-buffer-for-nodes nodes "test buffer" buffer-name nodes)
-        (it "as a string"
-          (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
-                                             (org-roam-ql-nodes buffer-name)))
-                  :to-have-same-items-as (-map #'org-roam-node-id nodes)))
-        (it "as a predicate"
-          (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
-                                             (org-roam-ql-nodes `(in-buffer ,buffer-name))))
-                  :to-have-same-items-as (-map #'org-roam-node-id nodes)))))
+      :var* ((nodes (--filter (s-match "test2.org" (org-roam-node-file it)) (org-roam-node-list)))
+             (buffer-name "test-buffer")
+             (_ (org-roam-ql--agenda-buffer-for-nodes nodes "test buffer" buffer-name nodes)))
+      (it "as a string"
+        (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
+                                           (org-roam-ql-nodes buffer-name)))
+                :to-have-same-items-as (-map #'org-roam-node-id nodes)))
+      (it "as a predicate"
+        (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
+                                           (org-roam-ql-nodes `(in-buffer ,buffer-name))))
+                :to-have-same-items-as (-map #'org-roam-node-id nodes))))
     (describe "with invalid inputs"
       (it "string"
         (expect (org-roam-ql-nodes "a random string") :to-throw 'user-error))))
@@ -161,20 +160,20 @@
     (it "in roam buffer"
       (org-roam-ql--roam-buffer-for-nodes query-result "roam-test" "roam-test-buffer" query)
       (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-roam-buffer (get-buffer "roam-test-buffer"))) :to-have-same-items-as query-result-ids))
-    (let ((roam-buffer-name (org-roam-ql--get-formatted-buffer-name (org-roam-ql--get-formatted-title "test-title" nil)))
-          (agenda-buffer-name (org-roam-ql--get-formatted-buffer-name
-                               (org-roam-ql--get-formatted-title "test-title" nil "from roam buffer")))
-          (second-roam-buffer-name (org-roam-ql--get-formatted-buffer-name
-                                    (org-roam-ql--get-formatted-title
-                                     (org-roam-ql--get-formatted-title "test-title" nil "from roam buffer")
+    (describe "switching from"
+      :var* ((roam-buffer-name (org-roam-ql--get-formatted-buffer-name (org-roam-ql--get-formatted-title "test-title" nil)))
+             (agenda-buffer-name (org-roam-ql--get-formatted-buffer-name
+                                  (org-roam-ql--get-formatted-title "test-title" nil "from roam buffer")))
+             (second-roam-buffer-name (org-roam-ql--get-formatted-buffer-name
+                                       (org-roam-ql--get-formatted-title
+                                        (org-roam-ql--get-formatted-title "test-title" nil "from roam buffer")
                                      nil "from agenda buffer")))
-          roam-buffer agenda-buffer second-roam-buffer)
-      (org-roam-ql-search query "test-title")
-      (it "switching from roam to agenda buffer"
+             (_ (org-roam-ql-search query "test-title")))
+      (it "roam to agenda buffer"
         (with-current-buffer roam-buffer-name
           (org-roam-ql-agenda-buffer-from-roam-buffer))
         (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-agenda-buffer (get-buffer agenda-buffer-name))) :to-have-same-items-as query-result-ids))
-      (it "switching from agenda to roam buffer"
+      (it "agenda to roam buffer"
         (with-current-buffer agenda-buffer-name
           (org-roam-ql-roam-buffer-from-agenda-buffer))
         (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-roam-buffer (get-buffer second-roam-buffer-name))) :to-have-same-items-as query-result-ids))))
@@ -187,27 +186,4 @@
       (expect (org-roam-ql-ql--get-roam-queries '(or (org-roam-query (todo "TODO")) (and (org-roam-query (tags "tag1" "tag2")) (scheduled "something"))))
               :to-equal '((org-roam-query (todo "TODO")) (org-roam-query (tags "tag1" "tag2"))))))
 
-
-  ;; (describe "Tets query expansion"
-  ;;   (it "with only todo"
-  ;;     (expect (macroexpand-1 '(org-roam-ql--expand-query-function (todo "TODO")))
-  ;;             :to-equal `(let ((val (org-roam-node-todo it))) (and val (s-match "TODO" val)))))
-  ;;   (it "with only tags"
-  ;;     (expect (macroexpand-1 '(org-roam-ql--expand-query-function (tags "ATTACH")))
-  ;;             :to-equal `(let ((val (org-roam-node-tags it)))
-  ;;                          (and val (funcall (lambda (tags &rest values)
-  ;;                                              (--all-p (member it tags) values))
-  ;;                                            val "ATTACH")))))
-  ;;   (it "with 'or"
-  ;;     (expect (macroexpand-1 '(org-roam-ql--expand-query (or (todo "TODO") (and (schedule '(1)) (todo "DONE")))))
-  ;;             :to-equal
-  ;;             `(or
-  ;;               (org-roam-ql--expand-query (todo "TODO"))
-  ;;               (org-roam-ql--expand-query (and (schedule '(1)) (todo "DONE"))))))
-  ;;   (it "with 'and"
-  ;;     (expect (macroexpand-1 '(org-roam-ql--expand-query (and (todo "TODO") (or (schedule '(1)) (todo "DONE")))))
-  ;;             :to-equal
-  ;;             `(and
-  ;;               (org-roam-ql--expand-query (todo "TODO"))
-  ;;               (org-roam-ql--expand-query (or (schedule '(1)) (todo "DONE"))))))))
 )
