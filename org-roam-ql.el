@@ -700,6 +700,23 @@ or fallback to using predicate function if `use-regexp' is used."
              match-string
            (format "%%%s%%" match-string))))))
 
+(defun org-roam-ql--file-title-expansion-function (match-string &optional exact use-regexp)
+  "Expand to nodes with file-title that MATCH-STRING. If EXACT is
+non-nil, then will only do exact matches. If USE-REGEXP, then use
+predicate function else use sql LIKE."
+  (if use-regexp
+      (org-roam-ql--process-comparison-function #'org-roam-node-file-title
+                                                #'org-roam-ql--predicate-s-match
+                                                (list match-string exact))
+    `([:select nodes:id
+               :from nodes
+               :left :join files
+               :on (= files:file nodes:file)
+               :where (like files:title $s1)]
+      ,(if exact
+           match-string
+         (format "%%%s%%" match-string)))))
+
 (defun org-roam-ql--aliases-expansion-function (match-string &optional exact use-regexp)
   "Expand to nodes with alias that MATCH-STRING. If EXACT is non-nil,
 then will only do exact matches. If USE-REGEXP, then use predicate
@@ -1543,7 +1560,7 @@ Simple wrapper `org-roam-preview-function'."
            (point> "Check if `point' of a node is greater than value" . ,(org-roam-ql--expand-comparison-function '> 'point))
            (point<> "Check if `point' of a node is not equal to value" . ,(org-roam-ql--expand-comparison-function '<> 'point))
            (file "Check if `file' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'file #'org-roam-node-file))
-           (file-title "Check if `file-title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'file-title #'org-roam-node-file-title))
+           (file-title "Check if `file-title' of a node is LIKE the value" . org-roam-ql--file-title-expansion-function)
            (todo "Check if `todo' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'todo #'org-roam-node-todo))
            (title "Check if `title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'title #'org-roam-node-title))
            (aliases "Check if `aliases' of a node is LIKE the value" . org-roam-ql--aliases-expansion-function)
