@@ -681,10 +681,11 @@ overwritten."
 
 (defun org-roam-ql--predicate-s-match (value regexp &optional exact)
   "Return non-nil if there is a REGEXP match in VALUE.
-If EXACT, test if VALUE and REGEXP are equal strings."
+If EXACT, test if VALUE and REGEXP are equal strings.
+Ignores the case when matching."
   (when (and value regexp)
     (if exact
-        (s-equals-p value regexp)
+        (string-equal-ignore-case value regexp)
       (s-match regexp value))))
 
 (defun org-roam-ql--expand-s-like-function (slot-name-symbol extraction-function)
