@@ -688,18 +688,22 @@ Ignores the case when matching."
         (string-equal-ignore-case value regexp)
       (s-match regexp value))))
 
-(defun org-roam-ql--expand-s-like-function (slot-name-symbol extraction-function)
+(defmacro org-roam-ql--expand-s-like-function (slot-name-symbol extraction-function)
   "Return a function that can expand for string match using sql LIKE
 or fallback to using predicate function if `use-regexp' is used."
-  (lambda (match-string &optional exact use-regexp)
-    (if use-regexp
-        (org-roam-ql--process-comparison-function extraction-function
-                                                  #'org-roam-ql--predicate-s-match
-                                                  (list match-string exact))
-      `([:select id :from nodes :where (like ,slot-name-symbol $s1)]
-        ,(if exact
-             match-string
-           (format "%%%s%%" match-string))))))
+  `(defun ,(intern (format "org-roam-ql--%s-s-like-function" slot-name-symbol))
+       (match-string &optional exact use-regexp)
+     ,(format "Expand to nodes with %s that MATCH-STRING. If EXACT is
+non-nil, then will only do exact matches. If USE-REGEXP, then use
+predicate function else use sql LIKE." slot-name-symbol)
+     (if use-regexp
+         (org-roam-ql--process-comparison-function ,extraction-function
+                                                   #'org-roam-ql--predicate-s-match
+                                                   (list match-string exact))
+       (list [:select id :from nodes :where (like ,slot-name-symbol $s1)]
+             (if exact
+                 match-string
+               (format "%%%s%%" match-string))))))
 
 (defun org-roam-ql--file-title-expansion-function (match-string &optional exact use-regexp)
   "Expand to nodes with file-title that MATCH-STRING. If EXACT is
@@ -1560,13 +1564,13 @@ Simple wrapper `org-roam-preview-function'."
            (point< "Check if `point' of a node is less than value" . ,(org-roam-ql--expand-comparison-function '< 'point))
            (point> "Check if `point' of a node is greater than value" . ,(org-roam-ql--expand-comparison-function '> 'point))
            (point<> "Check if `point' of a node is not equal to value" . ,(org-roam-ql--expand-comparison-function '<> 'point))
-           (file "Check if `file' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'file #'org-roam-node-file))
+           (file "Check if `file' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function file #'org-roam-node-file))
            (file-title "Check if `file-title' of a node is LIKE the value" . org-roam-ql--file-title-expansion-function)
-           (todo "Check if `todo' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'todo #'org-roam-node-todo))
-           (title "Check if `title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'title #'org-roam-node-title))
+           (todo "Check if `todo' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function todo #'org-roam-node-todo))
+           (title "Check if `title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function title #'org-roam-node-title))
            (aliases "Check if `aliases' of a node is LIKE the value" . org-roam-ql--aliases-expansion-function)
-           (priority "Compare to `priority' of a node." ,(org-roam-ql--expand-s-like-function 'priority #'org-roam-node-priority))
-           (refs "Check if `refs' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function 'refs #'org-roam-node-refs))
+           (priority "Compare to `priority' of a node." ,(org-roam-ql--expand-s-like-function priority #'org-roam-node-priority))
+           (refs "Check if `refs' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function refs #'org-roam-node-refs))
            (backlink-to "Backlinks to results of QUERY." . org-roam-ql--expand-backlinks)
            (backlink-from "Forewardlinks to results of QUERY" . org-roam-ql--expand-forwardlinks)
            (in-buffer "In BUFFER" . org-roam-ql--expansion-identity)
