@@ -722,6 +722,26 @@ predicate function else use sql LIKE."
            match-string
          (format "%%%s%%" match-string)))))
 
+(defun org-roam-ql--refs-expansion-function (match-string &optional exact use-regexp)
+  "Expand to nodes with refs that MATCH-STRING. If EXACT is
+non-nil, then will only do exact matches. If USE-REGEXP, then use
+predicate function else use sql LIKE."
+  (if use-regexp
+      (org-roam-ql--process-comparison-function
+       #'org-roam-node-refs
+       (lambda (value)
+         (--any (org-roam-ql--predicate-s-match
+                 ;; Removing the ref keyword
+                 (string-join (cdr (string-split it ":"))
+                              ":")
+                 match-string exact)
+                value))
+       nil)
+    `([:select node-id :from refs :where (like ref $s1)]
+      ,(if exact
+           match-string
+         (format "%%%s%%" match-string)))))
+
 (defun org-roam-ql--aliases-expansion-function (match-string &optional exact use-regexp)
   "Expand to nodes with alias that MATCH-STRING. If EXACT is non-nil,
 then will only do exact matches. If USE-REGEXP, then use predicate
@@ -1570,7 +1590,7 @@ Simple wrapper `org-roam-preview-function'."
            (title "Check if `title' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function title #'org-roam-node-title))
            (aliases "Check if `aliases' of a node is LIKE the value" . org-roam-ql--aliases-expansion-function)
            (priority "Compare to `priority' of a node." ,(org-roam-ql--expand-s-like-function priority #'org-roam-node-priority))
-           (refs "Check if `refs' of a node is LIKE the value" . ,(org-roam-ql--expand-s-like-function refs #'org-roam-node-refs))
+           (refs "Check if `refs' of a node is LIKE the value" . org-roam-ql--refs-expansion-function)
            (backlink-to "Backlinks to results of QUERY." . org-roam-ql--expand-backlinks)
            (backlink-from "Forewardlinks to results of QUERY" . org-roam-ql--expand-forwardlinks)
            (in-buffer "In BUFFER" . org-roam-ql--expansion-identity)
