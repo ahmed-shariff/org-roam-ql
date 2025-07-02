@@ -178,19 +178,31 @@ Following is an example of a dynamic block and its result.
 
 [[file:images/dynamic-block.jpg]]
 
-A few other example of dblocks:
+A few other example of dynamic blocks:
 - With custom column titles and sorting based on "deadline":
   #+begin_src org
-    #+BEGIN org-roam-ql :query (todo "DONE") :columns ((title "T") (deadline "D")) :sort "deadline"
+    #+BEGIN: org-roam-ql :query (todo "DONE") :columns ((title "T") (deadline "D")) :sort "deadline"
   #+end_src
 - Org-roam-ql comes with a custom column `property` which is registered with ~org-roam-ql-register-dblock-column~. It expects one parameter, the property name. The following uses this column with the custom column title "cat" showing the value of property "CATEGORY":
   #+begin_src org
-    #+BEGIN org-roam-ql :query (todo "DONE") :columns (title ((property "cat") "CATEGORY"))
+    #+BEGIN: org-roam-ql :query (todo "DONE") :columns (title ((property "cat") "CATEGORY"))
   #+end_src
 - Same as above, without a custom column title for the property column. The title for that column would be "Property":
   #+begin_src org
-    #+BEGIN org-roam-ql :query (todo "DONE") :columns (title ((property) "CATEGORY"))
+    #+BEGIN: org-roam-ql :query (todo "DONE") :columns (title ((property) "CATEGORY"))
   #+end_src
+
+- A custom column can be added using ~org-roam-ql-register-dblock-column~:
+  #+begin_src emacs-lisp
+    (defun my/org-roam-ql-dblock-category-column (node)
+      (alist-get "CATEGORY" (org-roam-node-properties node) nil nil #'string-equal))
+
+    (org-roam-ql-register-dblock-column 'cat #'my/org-roam-ql-dblock-category-column)
+  #+end_src
+   The above can be used as follows:
+   #+begin_src org
+    #+BEGIN: org-roam-ql :query (todo "DONE") :columns (title cat)
+   #+end_src
 
 ** Custom preview function for org-roam-ql buffer
 
