@@ -71,6 +71,7 @@ Example configuration:
           ("cr" "todo nodes" todo "TODO" ((org-agenda-files (org-roam-ql-nodes-files '(title "Node"))))))
   #+end_src
 - ~org-roam-ql-add-saved-query (NAME DOCSTRING QUERY)~ :: Stores valid [[#valid-values-for-source-or-query][QUERY]] with ~NAME~ and ~DOCSTRING~. The ~NAME~ can be used as a query in place of any other ~SOURCE-OR-QUERY~. ~NAME~ can be a string or a symbol.
+- ~org-roam-ql-register-dblock-column~ :: Register a new column to use with dblock.  When ~IDENTIFIER~ is seen in ~:columns~ of the org-roam-ql dblock (see [[#org-dynamic-block][Org dynamic block]]), FN will be called with one parameter, a /org-roam-node/.
 ** Valid values for ~SOURCE-OR-QUERY~
 - A list of ~org-roam-nodes~ :: This should self explanatory.
 - A list of parameters that can be passed to ~org-roam-db-query~ :: It should be a list of the form ~(QUERY ARG1 ARG2...)~. The result of calling ~org-roam-db-query~ with these parameters should return a list of records where the first element is the ID of a corresponding node. For example:
@@ -161,7 +162,12 @@ There are two ways to add a new predicate to org-roam-ql:
 ** Org dynamic block
 Similar to ~org-ql~, ~org-roam-ql~ also provides a dynamic block. The header parameters are as follows:
 - ~:query~ - A valid [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]]
-- ~:columns~ - A list of columns to display. Each column name is a slot name of ~org-roam-nodes~. For any function/accessor with a name of the form ~org-roam-node-<name>~, which takes an org-roam-node as a parameter, ~<name>~ can also be used column name. For example, if there is a function named ~org-roam-node-short-title~, ~short-title~ can be used as a column name, this will result in a column with the title ~short-title~ where the content of each row is the result of calling the respective function.
+- ~:columns~ - A list of columns to display. Each column name is a:
+  - ~SYM~ - A symbol. This will be used as the column title. It can be:
+    - A slot name of ~org-roam-node~. For any function/accessor with a name of the form ~org-roam-node-<name>~, which takes an ~org-roam-node~ as a parameter, ~<name>~ can also be used as ~SYM~. For example, if there is a function named ~org-roam-node-short-title~, ~short-title~ can be used as a column name (~SYM~), this will result in a column with the title ~short-title~ where the content of each row is the result of calling the respective function.
+    - The identifier used to register a function using ~org-roam-ql-register-dblock-column~.
+  - ~(SYM NAME)~ - A list where the first element is a ~SYM~ (see above) and the second element should be a string NAME. In this case, the NAME will be used as the column title as opposed to ~SYM~.
+  - ~((SYM [NAME]) ARG1 ARG2...)~ - A list where the first element is similar to the above ~(SYM NAME)~ pattern. However, here ~NAME~ is optional. If ~NAME~ is not provided, ~SYM~ will be used as the column title. The corresponding function for ~SYM~ will be called with the remainder of the elements in the list (i.e., ~ARG1~, ~ARG2~, ect.) as arguments after the node. That is, if the corresponding function is ~FN~, it will be called invoked with ~(apply FN NODE '(ARG1 ARG2 ...))~.
 - ~:sort~ - Name of a registered sort functions. See [[#commandsfunctions][ ~org-roam-ql-search~ ]] for more info on the values for sort functions.
 - ~:take~ (optional) - If a positive integer N, take the first N elements, if a negative -N, take the last N nodes.
 - ~:no-link~ (optional) - If a non-nil value is set, the first column containing the links will be dropped.
@@ -171,6 +177,20 @@ If no-link is not provided as a parameter, the first column is a link to the nod
 Following is an example of a dynamic block and its result.
 
 [[file:images/dynamic-block.jpg]]
+
+A few other example of dblocks:
+- With custom column titles and sorting based on "deadline":
+  #+begin_src org
+    #+BEGIN org-roam-ql :query (todo "DONE") :columns ((title "T") (deadline "D")) :sort "deadline"
+  #+end_src
+- Org-roam-ql comes with a custom column `property` which is registered with ~org-roam-ql-register-dblock-column~. It expects one parameter, the property name. The following uses this column with the custom column title "cat" showing the value of property "CATEGORY":
+  #+begin_src org
+    #+BEGIN org-roam-ql :query (todo "DONE") :columns (title ((property "cat") "CATEGORY"))
+  #+end_src
+- Same as above, without a custom column title for the property column. The title for that column would be "Property":
+  #+begin_src org
+    #+BEGIN org-roam-ql :query (todo "DONE") :columns (title ((property) "CATEGORY"))
+  #+end_src
 
 ** Custom preview function for org-roam-ql buffer
 

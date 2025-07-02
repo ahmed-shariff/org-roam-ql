@@ -81,6 +81,7 @@ applied in order of appearance in the list."
 (defvar org-roam-ql--query-expansion-functions (make-hash-table) "Holds the function to expand a query.")
 (defvar org-roam-ql--sort-functions (make-hash-table :test 'equal) "Holds the function to sort nodes.")
 (defvar org-roam-ql--saved-queries (make-hash-table :test 'equal) "Holds the saved queries.")
+(defvar org-roam-ql--dblock-column-functions (make-hash-table) "Holds the function to expand dblock columns.")
 (defvar org-roam-ql--cache (make-hash-table))
 (defvar org-roam-ql--db-mtime nil)
 (defvar org-roam-ql--search-query-history '() "History of queries with `org-roam-ql-search'.")
@@ -1433,10 +1434,88 @@ If there are entries that do not have an ID, it will signal an error"
 ;; org dynamic block
 ;; *****************************************************************************
 
+(defun org-roam-ql-register-dblock-column (identifier fn)
+  "Register a new column to use with dblock.  When IDENTIFIER is seen
+in `:columns' of the org-roam-ql dblock (see
+`org-dblock-write:org-roam-ql'), FN will be called with one parameter,
+a `org-roam-node'."
+  (puthash identifier fn org-roam-ql--dblock-column-functions))
+
+(defun org-roam-ql--node-property (node property)
+  "Return the value of PROPERTY of NODE.
+PROPERTY is extracted using `org-roam-node-properties'."
+  (alist-get (upcase property) (org-roam-node-properties node) nil nil #'string-equal))
+
 (defun org-dblock-write:org-roam-ql (params)
-  "Write org block for org-roam-ql with PARAMS."
+  "Write org block for org-roam-ql with PARAMS.
+
+Valid parameters include:
+  :query    A valid source-or-query (see `org-roam-ql-nodes')
+  :columns  A list of columns. See below for the specifications of columns.
+  :sort     (optional) Name of a registered sort functions.
+            See `org-roam-ql-search' for more info on the values for
+            sort functions.
+  :take     (optional) If a positive integer N, take the first
+            N elements, if a negative -N, take the last N nodes.
+  :no-link  (optional) - If a non-nil value is set, the first column
+            containing the links will be dropped.
+
+Columns:
+Each column with :columns should one of:
+- SYM - A symbol. This will be used as the column title. It can be:
+  - A slot name of `org-roam-node'.For any function/accessor with a
+    name of the form `org-roam-node-<name>', which takes an
+    `org-roam-node' as a parameter, <name> can also be used as
+    SYM. For example, if there is a function named
+    `org-roam-node-short-title', `short-title' can be used as a column
+    name (SYM), this will result in a column with the title
+    short-title where the content of each row is the result of calling
+    the respective function.
+  - The identifier used to register a function using
+    `org-roam-ql-register-dblock-column'.
+
+- (SYM NAME) - A list where the first element is a SYM (see above) and
+  the second element should be a string NAME. In this case, the NAME
+  will be used as the column title as opposed to SYM.
+- ((SYM [NAME]) ARG1 ARG2...) - A list where the first element is
+  similar to the above (SYM NAME) pattern. However, here NAME is
+  optional. If NAME is not provided, SYM will be used as the column
+  title. The corresponding function for SYM will be called with the
+  remainder of the elements in the list (i.e., ARG1, ARG2, ect.) as
+  arguments after the node. That is, if the corresponding function is
+  FN, it will be called invoked with (apply FN NODE '(ARG1 ARG2 ...)).
+
+
+For example, an org-roam-ql dynamic block header could look like
+this (must be a single line in the Org buffer):
+
+  #+BEGIN org-roam-ql :query (todo \"TODO\") :columns
+(title (tags \"T\")) :sort \"scheduled\" :take 10 :no-link nil
+"
   (let ((query (plist-get params :query))
-        (columns (plist-get params :columns))
+        (columns (->>
+                  (plist-get params :columns)
+                  (--map
+                   (pcase it
+                     ((pred symbolp) (list (format "%s" it) it))
+                     ((and (pred consp)
+                           `(,(and (pred symbolp) sym)
+                             ,(and (pred stringp) name)))
+                      (list name sym))
+                     (`(,(and (pred consp)
+                              `(,(and (pred symbolp) sym) .
+                                ,(or (and (pred consp) `(,name))
+                                     (and null name))))
+                        . ,args)
+                      (list (or name (format "%s" sym)) sym args))
+                     (_ (user-error "Unknown pattern %s in column" it))))
+                  (--map
+                   (list (car it)
+                         (or
+                          (gethash (cadr it) org-roam-ql--dblock-column-functions)
+                          (intern-soft (format "org-roam-node-%s" (cadr it)))
+                          (user-error "Unknown column function %s" (cadr it)))
+                         (caddr it)))))
         (sort (plist-get params :sort))
         (take (plist-get params :take))
         (no-link (plist-get params :no-link)))
@@ -1449,20 +1528,20 @@ If there are entries that do not have an ID, it will signal an error"
                               (integer (-take take nodes)))))
               (insert "|"
                       (if no-link "" "|")
-                      (string-join (--map (pcase it
-                                            ((pred symbolp) (capitalize (symbol-name it)))
-                                            (`(,_ ,name) name))
-                                          columns)
-                                   " | ")
+                      (string-join (--map (car it) columns) " | ")
                       "|\n|-\n")
               (dolist (node nodes)
                 (insert "|"
                         (if no-link
                             ""
                           (format "[[id:%s][link]]|" (org-roam-node-id node)))
-                        (string-join (--map (let ((value (funcall (intern-soft
-                                                                   (format "org-roam-node-%s" it))
-                                                                  node)))
+                        (string-join (--map (let ((value
+                                                   (condition-case err
+                                                       (apply (cadr it) node (caddr it))
+                                                     (wrong-number-of-arguments
+                                                      (user-error "Column %s(%s) could not be processed. Incorrect number of arguments passed. Expected %s"
+                                                                  (car it) (cadr it)
+                                                                  (cdr err))))))
                                               (pcase value
                                                 ((pred listp) (string-join (--map (format "%s" it) value) ","))
                                                 (_ (format "%s" value))))
@@ -1609,6 +1688,8 @@ Simple wrapper `org-roam-preview-function'."
            ("file-atime" . org-roam-ql--sort-time-less)
            ("file-mtime" . org-roam-ql--sort-time-less)))
   (org-roam-ql--sort-function-for-slot (car sort-function) (cdr sort-function)))
+
+(org-roam-ql-register-dblock-column 'property #'org-roam-ql--node-property)
 
 (provide 'org-roam-ql)
 
