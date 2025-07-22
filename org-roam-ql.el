@@ -1564,26 +1564,16 @@ QUERY is the `match' item in the custom command form.  Currently this
 doesn't respect agenda restrict."
   ;; Copying alot from org-ql-search-block
   (let (narrow-p old-beg old-end strings)
-    (when-let* ((from (pcase org-agenda-restrict
-                        ('nil (org-agenda-files nil 'ifmode))
-                        (_ (prog1 org-agenda-restrict
-                             (with-current-buffer org-agenda-restrict
-			       ;; Narrow the buffer; remember to widen it later.
-			       (setf old-beg (point-min) old-end (point-max)
-                                     narrow-p t)
-			       (narrow-to-region org-agenda-restrict-begin org-agenda-restrict-end))))))
-                (nodes (org-roam-ql-nodes query)))
-      (when narrow-p
-        ;; Restore buffer's previous restrictions.
-        (with-current-buffer from
-          (narrow-to-region old-beg old-end)))
-      (org-agenda-prepare)
-      (org-agenda--insert-overriding-header (org-roam-ql--get-formatted-title nil query))
-      ;; But we do call `org-agenda-finalize-entries', which allows `org-super-agenda' to work.
-      (dolist-with-progress-reporter (node nodes)
-          (format "Processing %s nodes" (length nodes))
-        (push (org-roam-ql-view--format-node node) strings))
-      (insert (org-agenda-finalize-entries strings) "\n"))))
+    (if-let* ((nodes (org-roam-ql-nodes query)))
+        (progn
+          (org-agenda-prepare)
+          (org-agenda--insert-overriding-header (org-roam-ql--get-formatted-title nil query))
+          ;; But we do call `org-agenda-finalize-entries', which allows `org-super-agenda' to work.
+          (dolist-with-progress-reporter (node nodes)
+              (format "Processing %s nodes" (length nodes))
+            (push (org-roam-ql-view--format-node node) strings))
+          (insert (org-agenda-finalize-entries strings) "\n"))
+      (message "No nodes for agenada with query %s" query))))
 
 (defun org-roam-ql-nodes-files (source-or-query)
   "Retuns a list of files of the corresponding SOURCE-OR-QUERY.
