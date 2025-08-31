@@ -116,8 +116,8 @@ Example configuration:
   - ~properties (PROP PROP-VAL)~ :: Tests if the value of the property of a node PROP is a match to PROP-VAL. PROP-VAL can be a regular expression.
   - ~tags (TAG1 TAG2 ...)~ :: Tests if the tags of a node have TAG1, TAG2, etc.
   - ~refs (MATCH &optional EXACT USE-REGEXP)~ :: Similar to ~file~, tests the nodes refs slot.
-  - ~backlink-to (SOURCE-OR-QUERY)~ :: Tests if the node has a backlink to any of the nodes from the results ~SOURCE-OR-QUERY~.
-  - ~backlink-from (SOURCE-OR-QUERY)~ :: Similar to ~backlink-to~, tests if there are any backlinks from (aka forwardlinks) the resulting nodes from ~SOURCE-OR-QUERY~.
+  - ~backlink-to (SOURCE-OR-QUERY &key (TYPE "id") (COMBINE :or))~ :: Tests if the node has a backlink to any of the nodes from resolving ~SOURCE-OR-QUERY~. ~TYPE~ specifies the link type. If ~TYPE~ is nil, it will match to all types of links. ~COMBINE~ can be :and or :or. If ~COMBINE~ is ~:and~, return only nodes that have backward links to all results of ~SOURCE-OR-QUERY~; if ~:or~, return nodes that have backward links to any of them. For example, the query ~(backlink-to (title "Node") :type nil :combine :and)~ will match to all types of backlinks and return nodes that have backlinks to all the nodes ~(title "Node")~ resolve to.
+  - ~backlink-from (SOURCE-OR-QUERY &key (TYPE "id") (COMBINE :or))~ :: Similar to ~backlink-to~, tests if there are any backlinks from (aka forwardlinks) the resulting nodes from ~SOURCE-OR-QUERY~.
   - ~in-buffer (BUFFER-NAME)~ :: This is similar to passing a buffer-name as ~SOURCE-OR-QUERY~. Tests if a node is in the org-roam buffer named ~BUFFER-NAME~.
   - ~nodes-list (NODES-LIST)~ :: This is similar to passing a list of nodes as ~SOURCE-OR-QUERY~. Tests if a node is in the ~NODES-LIST~.
   - ~function (FUNC)~ :: This is similar to passing a function as ~SOURCE-OR-QUERY~. Tests if the node is in the result of executing the function ~FUNC~.

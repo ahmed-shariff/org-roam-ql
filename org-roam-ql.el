@@ -785,22 +785,24 @@ And its value is a string equal to VALUE."
   `(,(org-roam-node-title node)
     ,@(org-roam-node-aliases node)))
 
-(cl-defun org-roam-ql--expand-forwardlinks (source-or-query &key (type "id") (combine :and))
-  "Expansion function for forwardlinks.
-Return a list of nodes that have forward links to any nodes that
-SOURCE-OR-QUERY resolves to, as a list.  TYPE is the type of the
-link.  COMBINE can be :and or :or.  If :and, only nodes that have
-forwardlinks to all results of source-or-query, else if have
-forwardlinks to any of them."
+(cl-defun org-roam-ql--expand-forwardlinks (source-or-query &key (type "id") (combine :or))
+  "Expansion function for forward links.
+
+Return a list of nodes that have forward links to the node(s)
+that SOURCE-OR-QUERY resolves to. TYPE specifies the link type.
+COMBINE can be :and or :or. If COMBINE is :and, return only nodes
+that have forward links to all results of SOURCE-OR-QUERY; if :or,
+return nodes that have forward links to any of them.".
   (org-roam-ql--expand-link source-or-query type combine nil))
 
-(cl-defun org-roam-ql--expand-backlinks (source-or-query &key (type "id") (combine :and))
-  "Expansion function for backlinks.
-Returns a list of nodes that have back links to any nodes that
-SOURCE-OR-QUERY resolves to, as a list.  TYPE is the type of the link.
-COMBINE can be :and or :or.  If :and, only nodes that have backlinks
-to all results of source-or-query, else if have backlinks to any of
-them."
+(cl-defun org-roam-ql--expand-backlinks (source-or-query &key (type "id") (combine :or))
+  "Expansion function for backward links.
+
+Return a list of nodes that have backward links to the node(s)
+that SOURCE-OR-QUERY resolves to. TYPE specifies the link type.
+COMBINE can be :and or :or. If COMBINE is :and, return only nodes
+that have backward links to all results of SOURCE-OR-QUERY; if :or,
+return nodes that have backward links to any of them."
   (org-roam-ql--expand-link source-or-query type combine t))
 
 (defun org-roam-ql--expand-link (source-or-query type combine is-backlink)
