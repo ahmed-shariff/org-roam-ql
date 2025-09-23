@@ -792,7 +792,7 @@ Return a list of nodes that have forward links to the node(s)
 that SOURCE-OR-QUERY resolves to. TYPE specifies the link type.
 COMBINE can be :and or :or. If COMBINE is :and, return only nodes
 that have forward links to all results of SOURCE-OR-QUERY; if :or,
-return nodes that have forward links to any of them.".
+return nodes that have forward links to any of them."
   (org-roam-ql--expand-link source-or-query type combine nil))
 
 (cl-defun org-roam-ql--expand-backlinks (source-or-query &key (type "id") (combine :or))
