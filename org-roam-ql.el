@@ -1092,6 +1092,7 @@ See `org-roam-ql-search' for PREVIEW-FN."
               (push (slot-value magit-section 'node) nodes))))
         nodes))))
 
+;;;###autoload
 (defun org-roam-ql--bookmark-open (bookmark)
   "Query and open org-roam-ql bookmark BOOKMARK."
   (let ((title (bookmark-prop-get bookmark 'title))
