@@ -119,6 +119,7 @@ SOURCE-OR-QUERY can be one of the following:
   :where (= todo \"TODO\")], you can omit the part till after
   :where i.e., pass only [(= todo \"TODO\")] and the rest will get
   appended in the front.
+- A sql statement - i.e, a string starting with \"select\"
 - A list of org-roam-nodes or an org-roam-node.
 - A function that returns a list of org-roam-nodes.
 
@@ -151,6 +152,10 @@ functions with `org-roam-ql-register-sort-fn'."
                               query
                             (vconcat [:select id :from nodes :where] query))
                           args))))
+         ((and str
+               (pred stringp)
+               (guard (string-prefix-p "select" str t)))
+          (--map (org-roam-node-from-id (car it)) (org-roam-db-query str)))
          ((and (pred listp) (pred org-roam-ql--check-if-valid-query))
           (org-roam-ql--expand-query source-or-query))
          ((pred functionp)

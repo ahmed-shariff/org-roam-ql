@@ -78,6 +78,7 @@ Example configuration:
   #+begin_src emacs-lisp
   (org-roam-ql-nodes '([:select [id] :from nodes :where (= todo \"TODO\")]))
   #+end_src
+- A SQL statement :: A SQL statement (a string starting with "select")
 - Saved query name :: Name of a saved query (see ~org-roam-ql-add-saved-query~). This can be string or a symbol. Note that the name of the saved query is always stored as a symbol. If a string is passed, it gets interned into a symbol before looking up the query. The returned nodes will be a result of executing the query represented by the name.
 - Bookmark name :: Name of a bookmark of a org-roam-ql-buffer. This matched against the name given when ~bookmark-set~ is called from a org-roam-ql-buffer.
 - Buffer name :: A buffer or buffer-name of a ~org-roam~ buffer, a ~org-roam-ql~ buffer or an agenda-like buffer displaying a list of org-roam nodes.
