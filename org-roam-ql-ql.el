@@ -168,7 +168,7 @@ parameters were ever passed"
   (advice-add 'org-ql-view-refresh :around #'org-roam-ql-ql--refresh)
 
   (transient-insert-suffix
-    'org-roam-ql-buffer-dispatch '(1 -1)
+    'org-roam-ql-buffer-dispatch '(2 -1)
     [("Q" "View in org-ql buffer" org-roam-ql-ql-buffer-from-roam-buffer)])
 
   (transient-insert-suffix

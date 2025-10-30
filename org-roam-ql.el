@@ -91,6 +91,13 @@ applied in order of appearance in the list."
 (defvar-local org-roam-ql--buffer-displayed-query nil "The query which produced the results of the buffer.")
 (defvar-local org-roam-ql-buffer-in nil
   "Define which option to use - `in-buffer' or `org-roam-db'.")
+(defvar-local org-roam-ql--filter-for-roam nil "Filter that will be applied to org-roam section.
+
+This is expected to be a valid `org-roam-ql' query or nil.
+See `org-roam-backlinks-section-with-ql-filter' and `org-roam-reflinks-section-with-ql-filter'")
+
+;; See `kill-all-local-variables'
+(put 'org-roam-ql--filter-for-roam 'permanent-local t)
 
 ;; `bookmark.el' setup
 (defvar bookmark-make-record-function)
@@ -1293,6 +1300,86 @@ If there are entries that do not have an ID, it will signal an error"
                                       org-roam-ql-preview-function))
 
 ;; *****************************************************************************
+;; `org-roam' sections (`org-roam-mode-sections') that can also be
+;; filtered with org-roam-ql
+;; *****************************************************************************
+(cl-defun org-roam-backlinks-section-with-ql-filter (node &key (unique nil) (show-backlink-p nil)
+                                                          (section-heading "Backlinks:"))
+  "Same as `org-roam-backlinks-section', but considers the filter (`org-roam-ql--filter-for-roam') of the current buffer.
+
+When UNIQUE is nil, show all positions where references are found.
+When UNIQUE is t, limit to unique sources.
+
+When SHOW-BACKLINK-P is not null, only show backlinks for which
+this predicate is not nil.
+
+SECTION-HEADING is the string used as a heading for the backlink section."
+  (let* ((backlinks (seq-sort #'org-roam-backlinks-sort (org-roam-backlinks-get node :unique unique)))
+         (filter org-roam-ql--filter-for-roam)
+         (filter-node-ids (and filter
+                               (condition-case _err
+                                   (-map #'org-roam-node-id (org-roam-ql-nodes filter))
+                                 (user-error
+                                  (message "Cannot apply filter: %s" _err))))))
+    (when backlinks
+      (if filter-node-ids
+          (setq backlinks
+                (--filter (member (org-roam-node-id (org-roam-backlink-source-node it)) filter-node-ids)
+                          backlinks))
+        (setq filter nil))
+      (magit-insert-section (org-roam-backlinks)
+        (magit-insert-heading (if filter
+                                  (let ((has-colon (string-suffix-p ":" section-heading))
+                                        (filter-string (format "%S" filter)))
+                                    (concat (string-trim section-heading nil ":")
+                                            " (filter: "
+                                            (substring filter-string 0 (min 40 (length filter-string)))
+                                            ")"
+                                            (when has-colon ":")))
+                                section-heading))
+        (dolist (backlink backlinks)
+          (when (or (null show-backlink-p)
+                    (and (not (null show-backlink-p))
+                         (funcall show-backlink-p backlink)))
+            (org-roam-node-insert-section
+             :source-node (org-roam-backlink-source-node backlink)
+             :point (org-roam-backlink-point backlink)
+             :properties (org-roam-backlink-properties backlink))))
+        (insert ?\n)))))
+
+(defun org-roam-reflinks-section-with-ql-filter (node)
+  "The reflinks section for NODE with org-roam-ql filter (`org-roam-ql--filter-for-roam').
+
+Same as `org-roam-reflinks-section'."
+  (when-let ((refs (org-roam-node-refs node))
+             (reflinks (seq-sort #'org-roam-reflinks-sort (org-roam-reflinks-get node))))
+    (let* ((filter org-roam-ql--filter-for-roam)
+           (filter-node-ids (and filter
+                                 (condition-case _err
+                                     (-map #'org-roam-node-id (org-roam-ql-nodes filter))
+                                   (user-error
+                                    (message "Cannot apply filter: %s" _err))))))
+      (if filter-node-ids
+          (setq reflinks
+                (--filter (member (org-roam-node-id (org-roam-reflink-source-node it)) filter-node-ids)
+                          reflinks))
+        (setq filter nil))
+      (magit-insert-section (org-roam-reflinks)
+        (magit-insert-heading (if filter
+                                  (concat "Reflinks (filter:"
+                                          (-->
+                                           (format "%S" filter)
+                                           (substring it 0 (min 40 (length it))))
+                                          "):")
+                                "Reflinks:")
+          (dolist (reflink reflinks)
+            (org-roam-node-insert-section
+             :source-node (org-roam-reflink-source-node reflink)
+             :point (org-roam-reflink-point reflink)
+             :properties (org-roam-reflink-properties reflink)))
+          (insert ?\n))))))
+
+;; *****************************************************************************
 ;; org-roam-ql transient
 ;; *****************************************************************************
 ;; Copying alot it from org-ql-view and magit-transient
@@ -1360,11 +1447,17 @@ If there are entries that do not have an ID, it will signal an error"
 
 (transient-define-prefix org-roam-ql-buffer-dispatch ()
   "Show `org-roam-ql' dispatcher."
-  ["Edit"
-   [("t" org-roam-ql-view--transient-title)
+  [[(:info
+    (lambda () (if (derived-mode-p 'org-roam-ql-mode)
+                   "Edit"
+                 "Query on org-roam-buffer"))
+    :format "%d" :face transient-heading)
+    ("t" org-roam-ql-view--transient-title)
     ("q" org-roam-ql-view--transient-query)
     ("s" org-roam-ql-view--transient-sort)
     ("i" org-roam-ql-view--transient-in)]]
+  [["Filter org-roam-buffer"
+    ("F" org-roam-ql-view--filter-roam)]]
   ["View"
    [("r" "Refresh" org-roam-ql-refresh-buffer)]
    [:if-derived org-roam-mode
@@ -1437,6 +1530,17 @@ If there are entries that do not have an ID, it will signal an error"
   :prompt "In: "
   :always-read t
   :choices '("in-buffer" "org-roam-db"))
+
+(transient-define-infix org-roam-ql-view--filter-roam ()
+  :class 'org-roam-ql--variable--sexp
+  :argument ""
+  :variable 'org-roam-ql--filter-for-roam
+  :prompt "Filter: "
+  :always-read t
+  :if (lambda () (org-roam-ql--check-if-roam-buffer))
+  :reader (lambda (&rest _)
+            (org-roam-ql--read-query (when org-roam-ql--filter-for-roam
+                                       (format "%S" org-roam-ql--filter-for-roam)))))
 
 ;; *****************************************************************************
 ;; org dynamic block
