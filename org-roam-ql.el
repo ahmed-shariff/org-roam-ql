@@ -607,7 +607,7 @@ Sets the history as well."
                                       (when (derived-mode-p 'org-roam-mode)
                                         (propertize (buffer-name)
                                                     'type 'buffer
-                                                    'data (if (equal (buffer-name) org-roam-buffer)
+                                                    'data (if (org-roam-ql--check-if-roam-buffer)
                                                               (cons org-roam-buffer "org-roam-buffer")
                                                             (with-current-buffer it
                                                               (cons org-roam-ql-buffer-query org-roam-ql-buffer-title))))))
@@ -980,7 +980,7 @@ Similar to `org-roam-mode', but doesn't default to the
 
 (defun org-roam-ql--refresh-roam-buffer ()
   "Refresh a org-roam buffer."
-  (if (equal (buffer-name) org-roam-buffer)
+  (if (org-roam-ql--check-if-roam-buffer)
       (if (not org-roam-ql-buffer-query)
           (org-roam-buffer-refresh)
         (let ((query org-roam-ql-buffer-query)
@@ -1112,7 +1112,7 @@ See `org-roam-ql-search' for PREVIEW-FN."
 
 See docs of `bookmark-make-record-function'."
   (let ((bookmark (cons nil (bookmark-make-record-default 'no-file 'no-context))))
-    (if (equal (buffer-name) org-roam-buffer)
+    (if (org-roam-ql--check-if-roam-buffer)
         (progn
           (bookmark-prop-set bookmark 'handler #'org-roam-ql--bookmark-open)
           (bookmark-prop-set bookmark 'title
@@ -1606,6 +1606,10 @@ Can be used in the minibuffer or when writting querries."
 
 Simple wrapper `org-roam-preview-function'."
   (funcall org-roam-preview-function))
+
+(defun org-roam-ql--check-if-roam-buffer ()
+  "Check if the buffer is a org-roam buffer but not a org-roam-ql buffer."
+  (and (derived-mode-p 'org-roam-mode) (not (derived-mode-p 'org-roam-ql-mode))))
 
 ;;;###autoload
 (defun org-roam-ql-convert-roam-buffer-to-roam-ql-buffer ()
