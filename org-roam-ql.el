@@ -91,6 +91,7 @@ applied in order of appearance in the list."
 (defvar-local org-roam-ql--buffer-displayed-query nil "The query which produced the results of the buffer.")
 (defvar-local org-roam-ql-buffer-in nil
   "Define which option to use - `in-buffer' or `org-roam-db'.")
+;;;###autoload
 (defvar-local org-roam-ql--filter-for-roam nil "Filter that will be applied to org-roam section.
 
 This is expected to be a valid `org-roam-ql' query or nil.
@@ -1054,13 +1055,14 @@ all values in `org-roam-ql-preview-postprocess-functions'."
           (oset section node previewing-node)
           (magit-insert-section section (org-roam-preview-section)
             ;; respecting buffer local value
-            (let ((preview-fn org-roam-ql-preview-function))
+            (let ((preview-fn org-roam-ql-preview-function)
+                  (query org-roam-ql-buffer-query))
               (insert (org-roam-fontify-like-in-org-mode
                        (save-excursion
                          (org-roam-with-temp-buffer (org-roam-node-file previewing-node)
                            (org-with-wide-buffer
                             (goto-char (org-roam-node-point previewing-node))
-                            (let ((s (funcall preview-fn previewing-node org-roam-ql-buffer-query)))
+                            (let ((s (funcall preview-fn previewing-node query)))
                               (dolist (fn org-roam-ql-preview-postprocess-functions)
                                 (setq s (funcall fn s)))
                               s)))))
