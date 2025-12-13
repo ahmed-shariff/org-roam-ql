@@ -1005,12 +1005,11 @@ Similar to `org-roam-mode', but doesn't default to the
                               title)))
     (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--roam-buffer-for-nodes)))
 
-(defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query sort-fn preview-fn)
+(defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query sort-fn)
   "Render SECTIONS (list of functions) in an org-roam-ql buffer.
 TITLE is the title, BUFFER-NAME is the name for the buffer.
 See `org-roam-nodes' for information on SOURCE-OR-QUERY.
 See `org-roam-ql-nodes' for SORT-FN.
-See `org-roam-ql-search' for PREVIEW-FN.
 When all sections are inserted, will call hook
 `org-roam-ql-buffer-postrender-functions'."
   ;; copied  from `org-roam-buffer-render-contents'
@@ -1025,8 +1024,6 @@ When all sections are inserted, will call hook
             org-roam-ql-buffer-title title
             org-roam-ql-buffer-sort sort-fn
             org-roam-ql-buffer-in "org-roam-db")
-      (when preview-fn
-        (setq-local org-roam-ql-preview-function preview-fn))
       (magit-insert-section section (org-roam)
          (magit-insert-heading)
          (dolist (section sections)
@@ -1079,10 +1076,13 @@ See `org-roam-ql--render-roam-buffer' for TITLE BUFFER-NAME and SOURCE-OR-QUERY.
 See `org-roam-ql--nodes-section' for NODES.
 See `org-roam-ql-nodes' for SORT-FN.
 See `org-roam-ql-search' for PREVIEW-FN."
-  (org-roam-ql--render-roam-buffer
-   (list
-    (org-roam-ql--nodes-section nodes "Nodes:"))
-   title buffer-name (or source-or-query nodes) sort-fn preview-fn))
+  (prog1 (org-roam-ql--render-roam-buffer
+          (list
+           (org-roam-ql--nodes-section nodes "Nodes:"))
+          title buffer-name (or source-or-query nodes) sort-fn preview-fn)
+    (when preview-fn
+      (with-current-buffer (get-buffer buffer-name)
+        (setq-local org-roam-ql-preview-function preview-fn)))))
 
 (defun org-roam-ql--nodes-from-roam-buffer (buffer)
   "Collect the org-roam-nodes from a valid BUFFER."
