@@ -1305,9 +1305,41 @@ If there are entries that do not have an ID, it will signal an error"
 ;; `org-roam' sections (`org-roam-mode-sections') that can also be
 ;; filtered with org-roam-ql
 ;; *****************************************************************************
-(cl-defun org-roam-backlinks-section-with-ql-filter (node &key (unique nil) (show-backlink-p nil)
-                                                          (section-heading "Backlinks:"))
-  "Same as `org-roam-backlinks-section', but considers the filter (`org-roam-ql--filter-for-roam') of the current buffer.
+(cl-defun org-roam-ql-backlinks-get (query &key unique)
+  "Return the backlinks for any node in query.
+
+ When UNIQUE is nil, show all positions where references are found.
+ When UNIQUE is t, limit to unique sources."
+  ;; Copied from `org-roam-backlinks-get'
+  (let* ((sql (if unique
+                  [:select :distinct [source dest pos properties]
+                   :from links
+                   :where (in dest $v1)
+                   :and (= type "id")
+                   :group :by source
+                   :having (funcall min pos)]
+                [:select [source dest pos properties]
+                 :from links
+                 :where (in dest $v1)
+                 :and (= type "id")]))
+         (backlinks (org-roam-db-query sql (apply #'vector
+                                                  (-map #'org-roam-node-id (org-roam-ql-nodes query))))))
+    (cl-loop for backlink in backlinks
+             collect (pcase-let ((`(,source-id ,dest-id ,pos ,properties) backlink))
+                       (org-roam-populate
+                        (org-roam-backlink-create
+                         :source-node (org-roam-node-create :id source-id)
+                         :target-node (org-roam-node-create :id dest-id)
+                         :point pos
+                         :properties properties))))))
+
+(cl-defun org-roam-backlinks-section-with-ql-filter (node-or-query &key (unique nil) (show-backlink-p nil)
+                                                                   (section-heading "Backlinks:"))
+  "Render section for backlinks to NODE-OR-QUERY.
+
+This is Same as `org-roam-backlinks-section', but can accept a query
+instead of a node and considers the filter
+(`org-roam-ql--filter-for-roam') of the current buffer.
 
 When UNIQUE is nil, show all positions where references are found.
 When UNIQUE is t, limit to unique sources.
@@ -1316,7 +1348,10 @@ When SHOW-BACKLINK-P is not null, only show backlinks for which
 this predicate is not nil.
 
 SECTION-HEADING is the string used as a heading for the backlink section."
-  (let* ((backlinks (seq-sort #'org-roam-backlinks-sort (org-roam-backlinks-get node :unique unique)))
+  (let* ((backlinks (seq-sort #'org-roam-backlinks-sort
+                              (if (org-roam-node-p node-or-query)
+                                  (org-roam-backlinks-get node-or-query :unique unique)
+                                (org-roam-ql-backlinks-get node-or-query :unique unique))))
          (filter org-roam-ql--filter-for-roam)
          (filter-node-ids (and filter
                                (condition-case _err
@@ -1349,12 +1384,43 @@ SECTION-HEADING is the string used as a heading for the backlink section."
              :properties (org-roam-backlink-properties backlink))))
         (insert ?\n)))))
 
-(defun org-roam-reflinks-section-with-ql-filter (node)
-  "The reflinks section for NODE with org-roam-ql filter (`org-roam-ql--filter-for-roam').
+(defun org-roam-ql-reflinks-get (query)
+  "Return the reflinks for any node in query."
+  (let ((refs (org-roam-db-query [:select :distinct [refs:ref links:source links:pos links:properties]
+                                  :from refs
+                                  :left-join links
+                                  :where (in refs:node-id $v1)
+                                  :and (= links:dest refs:ref)
+                                  :union
+                                  :select :distinct [refs:ref citations:node-id
+                                                     citations:pos citations:properties]
+                                  :from refs
+                                  :left-join citations
+                                  :where (in refs:node-id $v1)
+                                  :and (= citations:cite-key refs:ref)]
+                                 (apply #'vector
+                                        (-map #'org-roam-node-id (org-roam-ql-nodes query)))))
+        links)
+    (pcase-dolist (`(,ref ,source-id ,pos ,properties) refs)
+      (push (org-roam-populate
+             (org-roam-reflink-create
+              :source-node (org-roam-node-create :id source-id)
+              :ref ref
+              :point pos
+              :properties properties)) links))
+    links))
 
-Same as `org-roam-reflinks-section'."
-  (when-let ((refs (org-roam-node-refs node))
-             (reflinks (seq-sort #'org-roam-reflinks-sort (org-roam-reflinks-get node))))
+(defun org-roam-reflinks-section-with-ql-filter (node-or-query)
+  "The reflinks section for NODE-OR-QUERY with org-roam-ql filter (`org-roam-ql--filter-for-roam').
+
+Same as `org-roam-reflinks-section', but will take both node or a query."
+  (when-let ((refs (if (org-roam-node-p node-or-query)
+                       (org-roam-node-refs node-or-query)
+                     (-any-p #'org-roam-node-refs (org-roam-ql-nodes node-or-query))))
+             (reflinks (seq-sort #'org-roam-reflinks-sort
+                                 (if (org-roam-node-p node-or-query)
+                                     (org-roam-reflinks-get node-or-query)
+                                   (org-roam-ql-reflinks-get node-or-query)))))
     (let* ((filter org-roam-ql--filter-for-roam)
            (filter-node-ids (and filter
                                  (condition-case _err
