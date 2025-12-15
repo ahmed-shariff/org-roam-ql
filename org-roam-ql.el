@@ -1079,7 +1079,7 @@ See `org-roam-ql-search' for PREVIEW-FN."
   (prog1 (org-roam-ql--render-roam-buffer
           (list
            (org-roam-ql--nodes-section nodes "Nodes:"))
-          title buffer-name (or source-or-query nodes) sort-fn preview-fn)
+          title buffer-name (or source-or-query nodes) sort-fn)
     (when preview-fn
       (with-current-buffer (get-buffer buffer-name)
         (setq-local org-roam-ql-preview-function preview-fn)))))
