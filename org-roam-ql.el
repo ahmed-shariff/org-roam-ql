@@ -1005,13 +1005,13 @@ Similar to `org-roam-mode', but doesn't default to the
                               title)))
     (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--roam-buffer-for-nodes)))
 
-(defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query sort-fn)
+(defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query sort-fn pre-render-fn post-render-fn)
   "Render SECTIONS (list of functions) in an org-roam-ql buffer.
-TITLE is the title, BUFFER-NAME is the name for the buffer.
-See `org-roam-nodes' for information on SOURCE-OR-QUERY.
-See `org-roam-ql-nodes' for SORT-FN.
-When all sections are inserted, will call hook
-`org-roam-ql-buffer-postrender-functions'."
+TITLE is the title, BUFFER-NAME is the name for the buffer.  See
+`org-roam-nodes' for information on SOURCE-OR-QUERY.  See
+`org-roam-ql-nodes' for SORT-FN.  PRE-RENDER-FN, if non-nil, will be
+called before rendering all SECTIONS.  POST-RENDER-FN, if non-nil,
+will be called after rendering all SECTIONS. "
   ;; copied  from `org-roam-buffer-render-contents'
   (with-current-buffer (get-buffer-create buffer-name)
     (let ((inhibit-read-only t))
@@ -1024,11 +1024,14 @@ When all sections are inserted, will call hook
             org-roam-ql-buffer-title title
             org-roam-ql-buffer-sort sort-fn
             org-roam-ql-buffer-in "org-roam-db")
+      (when pre-render-fn
+        (funcall pre-render-fn))
       (magit-insert-section section (org-roam)
          (magit-insert-heading)
          (dolist (section sections)
            (funcall section)))
-      (run-hooks 'org-roam-ql-buffer-postrender-functions)
+      (when post-render-fn
+        (funcall post-render-fn))
       (goto-char 0))
     (display-buffer (current-buffer))))
 
@@ -1076,13 +1079,15 @@ See `org-roam-ql--render-roam-buffer' for TITLE BUFFER-NAME and SOURCE-OR-QUERY.
 See `org-roam-ql--nodes-section' for NODES.
 See `org-roam-ql-nodes' for SORT-FN.
 See `org-roam-ql-search' for PREVIEW-FN."
-  (prog1 (org-roam-ql--render-roam-buffer
-          (list
-           (org-roam-ql--nodes-section nodes "Nodes:"))
-          title buffer-name (or source-or-query nodes) sort-fn)
-    (when preview-fn
-      (with-current-buffer (get-buffer buffer-name)
-        (setq-local org-roam-ql-preview-function preview-fn)))))
+  (org-roam-ql--render-roam-buffer
+   (list
+    (org-roam-ql--nodes-section nodes "Nodes:"))
+   title buffer-name (or source-or-query nodes) sort-fn
+   (lambda ()
+     (when preview-fn
+       (setq-local org-roam-ql-preview-function preview-fn)))
+   (lambda ()
+     (run-hooks 'org-roam-ql-buffer-postrender-functions))))
 
 (defun org-roam-ql--nodes-from-roam-buffer (buffer)
   "Collect the org-roam-nodes from a valid BUFFER."
