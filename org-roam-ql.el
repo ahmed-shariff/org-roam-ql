@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 Shariff AM Faleel
 
 ;; Author: Shariff AM Faleel
-;; Package-Requires: ((emacs "28") (org-roam "2.2.0") (s "1.12.0") (magit-section "3.3.0") (transient "0.4") (org-super-agenda "1.2") (dash "2.0"))
+;; Package-Requires: ((emacs "28") (org-roam "2.2.0") (s "1.12.0") (magit-section "3.3.0") (transient "0.4") (dash "2.0"))
 ;; Version: 0.3-pre
 ;; Homepage: https://github.com/ahmed-shariff/org-roam-ql
 ;; SPDX-License-Identifier: GPL-3.0-or-later
@@ -29,9 +29,9 @@
 
 (require 'magit-section)
 (require 'transient)
-(require 'org-super-agenda)
 (require 'org-roam-utils)
 (require 'org-roam-node)
+(require 'org-agenda)
 (require 'dash)
 (require 's)
 (require 'bookmark)
@@ -1161,12 +1161,13 @@ See docs of `bookmark-make-record-function'."
 Based on `org-agenda-mode-map'.")
 
 ;; KLUDGE: preview-fn is left _
-(defun org-roam-ql--agenda-buffer-for-nodes (nodes title buffer-name &optional source-or-query sort-fn _ super-groups)
+(defun org-roam-ql--agenda-buffer-for-nodes (nodes title buffer-name &optional source-or-query sort-fn _ process-entries-fn)
   "Display the nodes in a agenda like buffer.
 See `org-roam-ql--render-roam-buffer' for TITLE BUFFER-NAME and SOURCE-OR-QUERY.
 See `org-roam-ql--nodes-section' for NODES.
 See `org-roam-ql-nodes' for SORT-FN.
-See `org-super-agenda' for SUPER-GROUPS."
+`process-entries-fn' would recieve a list of strings, each an entry in
+the agenda buffer and return the list of strings to be displayed."
   (with-current-buffer (get-buffer-create buffer-name)
     (unless (eq major-mode 'org-agenda-mode)
       (org-agenda-mode)
@@ -1190,11 +1191,8 @@ See `org-super-agenda' for SUPER-GROUPS."
         (dolist-with-progress-reporter (node nodes)
             (format "Processing %s nodes" (length nodes))
           (push (org-roam-ql-view--format-node node) strings))
-        (when super-groups
-          (let ((org-super-agenda-groups (cl-etypecase super-groups
-                                           (symbol (symbol-value super-groups))
-                                           (list super-groups))))
-            (setf strings (org-super-agenda--group-items strings))))
+        (when process-entries-fn
+          (setf strings (funcall process-entries-fn strings)))
         (insert (string-join strings "\n") "\n")
         (pop-to-buffer (current-buffer))
         (org-agenda-finalize)
