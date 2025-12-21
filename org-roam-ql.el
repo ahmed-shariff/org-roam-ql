@@ -96,6 +96,8 @@ applied in order of appearance in the list."
 
 This is expected to be a valid `org-roam-ql' query or nil.
 See `org-roam-backlinks-section-with-ql-filter' and `org-roam-reflinks-section-with-ql-filter'")
+(defvar-local org-roam-ql--kind nil
+  "The type of query. It can be 'nodes or 'backlinks.")
 
 ;; See `kill-all-local-variables'
 (put 'org-roam-ql--filter-for-roam 'permanent-local t)
@@ -172,12 +174,7 @@ functions with `org-roam-ql-register-sort-fn'."
                 it
               (user-error "Function did not expand to list of nodes"))))
          (_ (user-error "Invalid source-or-query. Got  %S" source-or-query)))
-       (if-let ((-sort-fn (when sort-fn
-                            (or (and (functionp sort-fn) sort-fn)
-                                (gethash sort-fn org-roam-ql--sort-functions)
-                                (user-error (concat "SORT-FN is not a function registered"
-                                                    "as a sort-function"
-                                                    "(see `org-roam-ql-register-sort-fn')"))))))
+       (if-let ((-sort-fn (and sort-fn (org-roam-ql--get-sort-fn sort-fn))))
            (seq-sort -sort-fn it)
          it)))
 
@@ -373,14 +370,15 @@ the COMPARISON-FUNCTION."
             (org-roam-ql--nodes-cached (org-roam-ql--node-list))))
 
 ;;;###autoload
-(defun org-roam-ql-search (source-or-query &optional title sort-fn preview-fn)
+(defun org-roam-ql-search (source-or-query &optional title filter sort-fn preview-fn)
   "Get nodes that match SOURCE-OR-QUERY and display in org-roam-ql
 buffer.  See `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be.
-TITLE is a title to associate with the view.  Reesults will be
-displayed in a org-roam-ql buffer.  SORT-FN is used for sorting the
-results.  It can be a string name of a slot or a predicate function
-which can be used to sort the nodes.  See `org-roam-nodes' for more
-info on this.
+FILTER is an additional query similar to SOURCE-OR-QUERY which can be
+applied to the results of SOURCE-OR-QUERY.  TITLE is a title to
+associate with the view.  Reesults will be displayed in a org-roam-ql
+buffer.  SORT-FN is used for sorting the results.  It can be a string
+name of a slot or a predicate function which can be used to sort the
+nodes.  See `org-roam-nodes' for more info on this.
 
 PREVIEW-FN is a function used to generate the preview content on the
 `org-roam-ql-mode' buffer. See `org-roam-ql-preview-function' for what
@@ -394,15 +392,14 @@ buffer"
                            (list query)
                          query))
                      (read-string "Title: ")))
-  (let* ((nodes (org-roam-ql-nodes source-or-query sort-fn)))
-    (org-roam-ql--roam-buffer-for-nodes
-     nodes
-     title
-     (org-roam-ql--get-formatted-buffer-name
-      (org-roam-ql--get-formatted-title title source-or-query))
-     source-or-query
-     sort-fn
-     preview-fn)))
+  (org-roam-ql--render-roam-buffer 'nodes
+                                   source-or-query
+                                   filter
+                                   title
+                                   (org-roam-ql--get-formatted-buffer-name
+                                    (org-roam-ql--get-formatted-title title source-or-query))
+                                   sort-fn
+                                   preview-fn))
 
 (defun org-roam-ql--get-formatted-title (title source-or-query &optional extended-kwd)
   "Return the formatted TITLE.
@@ -918,6 +915,15 @@ overwritten."
   (declare (indent defun))
   (puthash function-name sort-function org-roam-ql--sort-functions))
 
+(defun org-roam-ql--get-sort-fn (sort-fn)
+  "Helper to process sort-fn. If it is a function, return as is, if
+not lookup function registered using `org-roam-ql-register-sort-fn'."
+  (or (and (functionp sort-fn) sort-fn)
+      (gethash sort-fn org-roam-ql--sort-functions)
+      (user-error (concat "SORT-FN is not a function registered"
+                          "as a sort-function"
+                          "(see `org-roam-ql-register-sort-fn')"))))
+
 (defun org-roam-ql--sort-function-for-slot (slot-name comparison-function)
   "Add a sort function of SLOT-NAME of org-roam-node.
 COMPARISON-FUNCTION is the symbol of function.
@@ -959,33 +965,6 @@ Similar to `org-roam-mode', but doesn't default to the
   :group 'org-roam-ql
   (setq-local bookmark-make-record-function #'org-roam-ql--bookmark-make-record))
 
-(defun org-roam-ql--refresh-buffer-with-display-function (display-function)
-  "Refresh a buffer with a DISPLAY-FUNCTION."
-  (let* ((buffer-name (buffer-name))
-         subquery
-         (query (pcase org-roam-ql-buffer-in
-                  ("in-buffer" (let ((query org-roam-ql-buffer-query))
-                                 (setq org-roam-ql-buffer-query
-                                       org-roam-ql--buffer-displayed-query
-                                       org-roam-ql-buffer-in "org-roam-db"
-                                       subquery t)
-                                 `(and ,org-roam-ql--buffer-displayed-query
-                                       ,query)))
-                  ("org-roam-db" org-roam-ql-buffer-query)
-                  (_ (user-error "Invalid value for `org-roam-ql-buffer-in'")))))
-    (funcall display-function
-             (org-roam-ql-nodes query org-roam-ql-buffer-sort)
-             (if subquery
-                 (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended")
-               org-roam-ql-buffer-title)
-             (if subquery
-                 (org-roam-ql--get-formatted-buffer-name
-                  (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended"))
-               buffer-name)
-             query
-             org-roam-ql-buffer-sort
-             org-roam-ql-preview-function)))
-
 (defun org-roam-ql--refresh-roam-buffer ()
   "Refresh a org-roam buffer."
   (if (org-roam-ql--check-if-roam-buffer)
@@ -998,20 +977,62 @@ Similar to `org-roam-mode', but doesn't default to the
                 org-roam-ql-buffer-title nil
                 org-roam-ql-buffer-in nil)
           (org-roam-buffer-refresh)
+          ;; TODO convert to a org-roam-ql-backlinks-search
           (org-roam-ql-search `(and ,(pcase org-roam-ql-default-org-roam-buffer-query
                                        ((pred functionp) (funcall org-roam-ql-default-org-roam-buffer-query))
                                        (_ org-roam-ql-default-org-roam-buffer-query))
                                     ,query)
                               title)))
-    (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--roam-buffer-for-nodes)))
+    (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
+        (let ((title (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended"))
+              (source-buffer (current-buffer)))
+          (org-roam-ql--render-roam-buffer org-roam-ql--kind
+                                           (if org-roam-ql--filter-for-roam
+                                               `(and ,org-roam-ql--buffer-displayed-query
+                                                     ,org-roam-ql--filter-for-roam)
+                                             org-roam-ql--buffer-displayed-query)
+                                           org-roam-ql-buffer-query
+                                           title
+                                           (org-roam-ql--get-formatted-buffer-name title)
+                                           org-roam-ql-buffer-sort
+                                           org-roam-ql-preview-function)
+          (with-current-buffer source-buffer
+            (setq org-roam-ql-buffer-in "org-roam-db"
+                  org-roam-ql-buffer-query org-roam-ql--buffer-displayed-query)))
+      (org-roam-ql--render-roam-buffer org-roam-ql--kind
+                                       org-roam-ql-buffer-query
+                                       org-roam-ql--filter-for-roam
+                                       org-roam-ql-buffer-title
+                                       (buffer-name)
+                                       org-roam-ql-buffer-sort
+                                       org-roam-ql-preview-function))))
 
-(defun org-roam-ql--render-roam-buffer (sections title buffer-name source-or-query sort-fn pre-render-fn post-render-fn)
-  "Render SECTIONS (list of functions) in an org-roam-ql buffer.
-TITLE is the title, BUFFER-NAME is the name for the buffer.  See
-`org-roam-nodes' for information on SOURCE-OR-QUERY.  See
-`org-roam-ql-nodes' for SORT-FN.  PRE-RENDER-FN, if non-nil, will be
-called before rendering all SECTIONS.  POST-RENDER-FN, if non-nil,
-will be called after rendering all SECTIONS. "
+(defun org-roam-ql--render-roam-buffer (kind source-or-query filter-source-or-query title buffer-name
+                                        &optional sort-fn preview-fn pre-render-fn post-render-fn)
+  "Render an org-roam-ql buffer.
+KIND dictates how SOURCE-OR-QUERY is processed, where the point is
+set when the preview-function is called. KIND can be one of the
+following values:
+- 'nodes - SOURCE-OR-QUERY will be used as is with
+  `org-roam-ql-nodes'. When rendering a given node, it will set the
+  point to the value of `org-roam-node-point'.
+- 'backlinks - Will display nodes to any given node in the result from
+  processing SOURCE-OR-QUERY. It would be simliar to having
+  '(backlink-to SOURCE-OR-QUERY), but when the preview function is
+  exectued, the point is set to the value of
+  `org-roam-backlink-point'.
+
+FILTER-SOURCE-OR-QUERY will be used to further filter the results,
+i.e., a node/backlink being displayed should also be in the result of
+processing FILTER-SOURCE-OR-QUERY with `org-roam-node-ql'
+TITLE is the title, BUFFER-NAME is the name for the buffer.
+See `org-roam-ql-nodes' for SORT-FN. Note that this is applied to the
+nodes being displayed in the buffer.
+If PREVIEW-FN is non-nil, it will be set as the buffer local value for
+`org-roam-ql-preview-function'.
+PRE-RENDER-FN, if non-nil, will be called before rendering all
+SECTIONS.  POST-RENDER-FN, if non-nil, will be called after rendering
+all SECTIONS. "
   ;; copied  from `org-roam-buffer-render-contents'
   (with-current-buffer (get-buffer-create buffer-name)
     (let ((inhibit-read-only t))
@@ -1021,73 +1042,72 @@ will be called after rendering all SECTIONS. "
        (org-roam-ql--get-formatted-title title source-or-query))
       (setq org-roam-ql-buffer-query source-or-query
             org-roam-ql--buffer-displayed-query source-or-query
+            org-roam-ql--kind kind
+            org-roam-ql--filter-for-roam filter-source-or-query
             org-roam-ql-buffer-title title
             org-roam-ql-buffer-sort sort-fn
             org-roam-ql-buffer-in "org-roam-db")
       (when pre-render-fn
         (funcall pre-render-fn))
-      (magit-insert-section section (org-roam)
-         (magit-insert-heading)
-         (dolist (section sections)
-           (funcall section)))
+      (let* ((-compare-fn #'org-roam-ql--compare-nodes)
+             (filter-node-ids (and filter-source-or-query
+                                   (-map #'org-roam-node-id (org-roam-ql-nodes filter-source-or-query))))
+             (nodes (-->
+                     (pcase kind
+                       ;; The default of nil is to have backward compatibility with current bookmarks.
+                       ((or 'nodes 'nil) (org-roam-ql-nodes source-or-query sort-fn))
+                       ('backlinks
+                        (->>
+                         (org-roam-db-query [:select [source pos properties]
+                                                     :from links
+                                                     :where (in dest $v1)
+                                                     ;; KLUDGE: include? parametrize?
+                                                     ;; :and (= type "id")
+                                                     ]
+                                            (apply #'vector
+                                                   (-map #'org-roam-node-id (org-roam-ql-nodes source-or-query))))
+                         (--map (let ((node (org-roam-node-from-id (car it))))
+                                  (setf (org-roam-node-point node) (cadr it))
+                                  node)))))
+                     (if filter-node-ids
+                         (--filter (member (org-roam-node-id it) filter-node-ids) it)
+                       it))))
+        (magit-insert-section section (org-roam)
+          (magit-insert-heading)
+          (magit-insert-section section (org-roam-nodes)
+            ;; TODO: Add summary of filter to heading
+            (magit-insert-heading "Results:")
+            (dolist (previewing-node nodes)
+              (magit-insert-section section (org-roam-node-section)
+                (magit-insert-heading (propertize (org-roam-node-title previewing-node)
+                                                  'font-lock-face 'org-roam-title))
+                (oset section node previewing-node)
+                (magit-insert-section section (org-roam-preview-section)
+                  ;; respecting buffer local value
+                  (let ((preview-fn (if preview-fn
+                                        (setq-local org-roam-ql-preview-function preview-fn)
+                                      org-roam-ql-preview-function))
+                        (query org-roam-ql-buffer-query))
+                    (insert (org-roam-fontify-like-in-org-mode
+                             (save-excursion
+                               (org-roam-with-temp-buffer (org-roam-node-file previewing-node)
+                                 (org-with-wide-buffer
+                                  (goto-char (org-roam-node-point previewing-node))
+                                  (let ((s (funcall preview-fn previewing-node query)))
+                                    (dolist (fn org-roam-ql-preview-postprocess-functions)
+                                      (setq s (funcall fn s)))
+                                    s)))))
+                            "\n"))
+                  (oset section file (org-roam-node-file previewing-node))
+                  (oset section point (org-roam-node-point previewing-node))
+                  (insert ?\n)))
+              (insert ?\n))
+            (magit-insert-child-count section))))
       (when post-render-fn
         (funcall post-render-fn))
+      (run-hooks 'org-roam-ql-buffer-postrender-functions)
       (goto-char 0))
     (display-buffer (current-buffer))))
-
-(defun org-roam-ql--nodes-section (nodes &optional heading)
-  "Return a function that generate magit-sections for NODES.
-This can be passed as a section for `org-roam-ql--render-roam-buffer'
-with the NODES.  Nodes should be a list of org-roam nodes.  HEADING is
-the heading for the function `magit-section'.
-
-This inserts nodes simlar to `org-roam-node-insert-section', but uses
-`org-roam-ql-preview-function' to generate the preview content. The
-return value of `org-roam-ql-preview-function' will be passed through
-all values in `org-roam-ql-preview-postprocess-functions'."
-  (lambda ()
-    (magit-insert-section section (org-roam-nodes)
-      (magit-insert-heading heading)
-      (dolist (previewing-node nodes)
-        (magit-insert-section section (org-roam-node-section)
-          (magit-insert-heading (propertize (org-roam-node-title previewing-node)
-                                            'font-lock-face 'org-roam-title))
-          (oset section node previewing-node)
-          (magit-insert-section section (org-roam-preview-section)
-            ;; respecting buffer local value
-            (let ((preview-fn org-roam-ql-preview-function)
-                  (query org-roam-ql-buffer-query))
-              (insert (org-roam-fontify-like-in-org-mode
-                       (save-excursion
-                         (org-roam-with-temp-buffer (org-roam-node-file previewing-node)
-                           (org-with-wide-buffer
-                            (goto-char (org-roam-node-point previewing-node))
-                            (let ((s (funcall preview-fn previewing-node query)))
-                              (dolist (fn org-roam-ql-preview-postprocess-functions)
-                                (setq s (funcall fn s)))
-                              s)))))
-                      "\n"))
-            (oset section file (org-roam-node-file previewing-node))
-            (oset section point (org-roam-node-point previewing-node))
-            (insert ?\n)))
-        (insert ?\n))
-      (magit-insert-child-count section))))
-
-(defun org-roam-ql--roam-buffer-for-nodes (nodes title buffer-name &optional source-or-query sort-fn preview-fn)
-  "View nodes in org-roam-ql buffer.
-See `org-roam-ql--render-roam-buffer' for TITLE BUFFER-NAME and SOURCE-OR-QUERY.
-See `org-roam-ql--nodes-section' for NODES.
-See `org-roam-ql-nodes' for SORT-FN.
-See `org-roam-ql-search' for PREVIEW-FN."
-  (org-roam-ql--render-roam-buffer
-   (list
-    (org-roam-ql--nodes-section nodes "Nodes:"))
-   title buffer-name (or source-or-query nodes) sort-fn
-   (lambda ()
-     (when preview-fn
-       (setq-local org-roam-ql-preview-function preview-fn)))
-   (lambda ()
-     (run-hooks 'org-roam-ql-buffer-postrender-functions))))
 
 (defun org-roam-ql--nodes-from-roam-buffer (buffer)
   "Collect the org-roam-nodes from a valid BUFFER."
@@ -1116,8 +1136,10 @@ See `org-roam-ql-search' for PREVIEW-FN."
   "Query and open org-roam-ql bookmark BOOKMARK."
   (let ((title (bookmark-prop-get bookmark 'title))
         (query (bookmark-prop-get bookmark 'query))
-        (sort (bookmark-prop-get bookmark 'sort)))
-    (org-roam-ql-search query title sort)))
+        (sort (bookmark-prop-get bookmark 'sort))
+        (kind (bookmark-prop-get bookmark 'kind)))
+    (pcase kind
+      ((or 'nodes 'nil) (org-roam-ql-search query title sort)))))
 
 (put 'org-roam-ql--bookmark-open 'bookmark-handler-type "org-roam-ql query")
 
@@ -1143,6 +1165,7 @@ See docs of `bookmark-make-record-function'."
       (bookmark-prop-set bookmark 'title     org-roam-ql-buffer-title)
       (bookmark-prop-set bookmark 'query     org-roam-ql-buffer-query)
       (bookmark-prop-set bookmark 'sort      org-roam-ql-buffer-sort)
+      (bookmark-prop-set bookmark 'kind      org-roam-ql--kind)
       bookmark)))
 
 ;; *****************************************************************************
@@ -1160,8 +1183,9 @@ See docs of `bookmark-make-record-function'."
   "Keymap for agenda-view of org-roam-ql.
 Based on `org-agenda-mode-map'.")
 
-;; KLUDGE: preview-fn is left _
-(defun org-roam-ql--agenda-buffer-for-nodes (nodes title buffer-name &optional source-or-query sort-fn _ process-entries-fn)
+;; TODO: should pass the kind through this?
+;; TODO: should have filter?
+(defun org-roam-ql--render-agenda-buffer (source-or-query title buffer-name &optional sort-fn process-entries-fn)
   "Display the nodes in a agenda like buffer.
 See `org-roam-ql--render-roam-buffer' for TITLE BUFFER-NAME and SOURCE-OR-QUERY.
 See `org-roam-ql--nodes-section' for NODES.
@@ -1186,17 +1210,18 @@ the agenda buffer and return the list of strings to be displayed."
             org-roam-ql-buffer-title title
             org-roam-ql-buffer-sort sort-fn
             org-roam-ql-buffer-in "org-roam-db")
-      (if (not nodes)
-          (user-error "Empty result for query")
-        (dolist-with-progress-reporter (node nodes)
-            (format "Processing %s nodes" (length nodes))
-          (push (org-roam-ql-view--format-node node) strings))
-        (when process-entries-fn
-          (setf strings (funcall process-entries-fn strings)))
-        (insert (string-join strings "\n") "\n")
-        (pop-to-buffer (current-buffer))
-        (org-agenda-finalize)
-        (goto-char (point-min))))))
+      (if-let (nodes (org-roam-ql-nodes source-or-query))
+          (progn
+            (dolist-with-progress-reporter (node nodes)
+                (format "Processing %s nodes" (length nodes))
+              (push (org-roam-ql-view--format-node node) strings))
+            (when process-entries-fn
+              (setf strings (funcall process-entries-fn strings)))
+            (insert (string-join strings "\n") "\n")
+            (pop-to-buffer (current-buffer))
+            (org-agenda-finalize)
+            (goto-char (point-min)))
+        (user-error "Empty result for query")))))
 
 (defun org-roam-ql--get-file-marker (node)
   "Return a marker for NODE."
@@ -1255,7 +1280,23 @@ list.  If NODE is nil, return an empty string."
 
 (defun org-roam-ql--refresh-agenda-buffer ()
   "Refresh the agenda-based org-roam-ql buffer."
-  (org-roam-ql--refresh-buffer-with-display-function #'org-roam-ql--agenda-buffer-for-nodes))
+  (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
+      (let ((title (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended"))
+            (source-buffer (current-buffer)))
+        (org-roam-ql--render-agenda-buffer `(and
+                                             ,org-roam-ql--buffer-displayed-query
+                                             ,org-roam-ql-buffer-query)
+                                           title
+                                           (org-roam-ql--get-formatted-buffer-name title)
+                                           org-roam-ql-buffer-sort)
+
+        (with-current-buffer source-buffer
+          (setq org-roam-ql-buffer-in "org-roam-db"
+                org-roam-ql-buffer-query org-roam-ql--buffer-displayed-query)))
+    (org-roam-ql--render-agenda-buffer org-roam-ql--buffer-displayed-query
+                                       title
+                                       (buffer-name)
+                                       org-roam-ql-buffer-sort)))
 
 (defun org-roam-ql--nodes-from-agenda-buffer (buffer)
   "Return the list of nodes from the `org-agenda' BUFFER.
@@ -1285,24 +1326,28 @@ If there are entries that do not have an ID, it will signal an error"
   "Convert a roam buffer to agenda buffer."
   (interactive)
   (if (derived-mode-p 'org-roam-mode)
-      (org-roam-ql--agenda-buffer-for-nodes (org-roam-ql--nodes-from-roam-buffer (current-buffer))
-                                            (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer")
-                                            (org-roam-ql--get-formatted-buffer-name
-                                             (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer"))
-                                            org-roam-ql-buffer-query)
+      (let ((title (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer")))
+        (org-roam-ql--render-agenda-buffer (if org-roam-ql--buffer-displayed-query
+                                               (if org-roam-ql--filter-for-roam
+                                                   `(and ,org-roam-ql--buffer-displayed-query
+                                                         ,org-roam-ql--filter-for-roam)
+                                                   org-roam-ql--buffer-displayed-query)
+                                             `(in-buffer ,(buffer-name)))
+                                           title
+                                           (org-roam-ql--get-formatted-buffer-name title)
+                                           org-roam-ql-buffer-sort))
     (user-error "Not in a org-roam-ql agenda buffer")))
 
 (defun org-roam-ql-roam-buffer-from-agenda-buffer ()
   "Convert a agenda-buffer reusult to a roam-buffer."
   (interactive)
-  (org-roam-ql--roam-buffer-for-nodes (org-roam-ql--nodes-from-agenda-buffer (current-buffer))
-                                      (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from agenda buffer")
-                                      (org-roam-ql--get-formatted-buffer-name
-                                       (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from agenda buffer"))
-                                      (if org-roam-ql-buffer-query
-                                          org-roam-ql-buffer-query
-                                        `(in-buffer ,(buffer-name)))
-                                      org-roam-ql-preview-function))
+  (org-roam-ql-search (if org-roam-ql--buffer-displayed-query
+                          org-roam-ql--buffer-displayed-query
+                        `(in-buffer ,(buffer-name)))
+                      (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from agenda buffer")
+                      nil 
+                      org-roam-ql-buffer-sort
+                      org-roam-ql-preview-function))
 
 ;; *****************************************************************************
 ;; `org-roam' sections (`org-roam-mode-sections') that can also be
