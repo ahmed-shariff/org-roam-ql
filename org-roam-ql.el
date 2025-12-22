@@ -983,7 +983,7 @@ Similar to `org-roam-mode', but doesn't default to the
                                        (_ org-roam-ql-default-org-roam-buffer-query))
                                     ,query)
                               title)))
-    (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
+    (if (eq org-roam-ql-buffer-in 'in-buffer)
         (let ((title (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended"))
               (source-buffer (current-buffer)))
           (org-roam-ql--render-roam-buffer org-roam-ql--kind
@@ -997,7 +997,7 @@ Similar to `org-roam-mode', but doesn't default to the
                                            org-roam-ql-buffer-sort
                                            org-roam-ql-preview-function)
           (with-current-buffer source-buffer
-            (setq org-roam-ql-buffer-in "org-roam-db"
+            (setq org-roam-ql-buffer-in 'org-roam-db
                   org-roam-ql-buffer-query org-roam-ql--buffer-displayed-query)))
       (org-roam-ql--render-roam-buffer org-roam-ql--kind
                                        org-roam-ql-buffer-query
@@ -1046,7 +1046,7 @@ all SECTIONS. "
             org-roam-ql--filter-for-roam filter-source-or-query
             org-roam-ql-buffer-title title
             org-roam-ql-buffer-sort sort-fn
-            org-roam-ql-buffer-in "org-roam-db")
+            org-roam-ql-buffer-in 'org-roam-db)
       (when pre-render-fn
         (funcall pre-render-fn))
       (let* ((-compare-fn #'org-roam-ql--compare-nodes)
@@ -1209,7 +1209,7 @@ the agenda buffer and return the list of strings to be displayed."
             org-roam-ql--buffer-displayed-query source-or-query
             org-roam-ql-buffer-title title
             org-roam-ql-buffer-sort sort-fn
-            org-roam-ql-buffer-in "org-roam-db")
+            org-roam-ql-buffer-in 'org-roam-db)
       (if-let (nodes (org-roam-ql-nodes source-or-query))
           (progn
             (dolist-with-progress-reporter (node nodes)
@@ -1280,7 +1280,7 @@ list.  If NODE is nil, return an empty string."
 
 (defun org-roam-ql--refresh-agenda-buffer ()
   "Refresh the agenda-based org-roam-ql buffer."
-  (if (s-equals-p org-roam-ql-buffer-in "in-buffer")
+  (if (eq org-roam-ql-buffer-in 'in-buffer)
       (let ((title (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended"))
             (source-buffer (current-buffer)))
         (org-roam-ql--render-agenda-buffer `(and
@@ -1291,7 +1291,7 @@ list.  If NODE is nil, return an empty string."
                                            org-roam-ql-buffer-sort)
 
         (with-current-buffer source-buffer
-          (setq org-roam-ql-buffer-in "org-roam-db"
+          (setq org-roam-ql-buffer-in 'org-roam-db
                 org-roam-ql-buffer-query org-roam-ql--buffer-displayed-query)))
     (org-roam-ql--render-agenda-buffer org-roam-ql--buffer-displayed-query
                                        title
@@ -1535,7 +1535,7 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
 
 (cl-defmethod transient-format-description ((obj org-roam-ql--variable))
   "Format of the OBJ's DESCRIPTION."
-  (format "%s" (propertize (oref obj prompt) 'face 'transient-argument)))
+  (format "%s" (propertize (transient-prompt obj) 'face 'transient-argument)))
 
 (cl-defmethod transient-format-value ((obj org-roam-ql--variable))
   "Format of the OBJ's VALUE."
@@ -1545,9 +1545,9 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
   "Format of the OBJ's VALUE for choices."
   (let ((value (oref obj value)))
     (format "{ %s }"
-            (s-join " | " (--map (if (s-equals-p it value)
-                                     it
-                                   (propertize it 'face 'transient-inactive-value))
+            (s-join " | " (--map (if (eq it value)
+                                     (format "%s" it)
+                                   (propertize (format "%s" it) 'face 'transient-inactive-value))
                                  (oref obj choices))))))
 
 (cl-defmethod transient-format-value ((obj org-roam-ql--variable--sexp))
@@ -1563,17 +1563,18 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
 
 (transient-define-prefix org-roam-ql-buffer-dispatch ()
   "Show `org-roam-ql' dispatcher."
+  :refresh-suffixes t
   [[(:info
     (lambda () (if (derived-mode-p 'org-roam-ql-mode)
                    "Edit"
                  "Query on org-roam-buffer"))
     :format "%d" :face transient-heading)
     ("t" org-roam-ql-view--transient-title)
+    ("k" org-roam-ql-view--transient-kind)
     ("q" org-roam-ql-view--transient-query)
+    ("F" org-roam-ql-view--filter-roam)
     ("s" org-roam-ql-view--transient-sort)
     ("i" org-roam-ql-view--transient-in)]]
-  [["Filter org-roam-buffer"
-    ("F" org-roam-ql-view--filter-roam)]]
   ["View"
    [("r" "Refresh" org-roam-ql-refresh-buffer)]
    [:if-derived org-roam-mode
@@ -1620,7 +1621,10 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
   :class 'org-roam-ql--variable--sexp
   :argument ""
   :variable 'org-roam-ql-buffer-query
-  :prompt "Query: "
+  :prompt (lambda (&rest _)
+            (if (or (eq org-roam-ql-buffer-in 'in-buffer) (org-roam-ql--check-if-roam-buffer))
+                "Query extending current on refresh: "
+              "Query: "))
   :always-read t
   :reader (lambda (&rest _)
             (org-roam-ql--read-query (when org-roam-ql-buffer-query
@@ -1642,10 +1646,29 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
   :class 'org-roam-ql--variable--choices
   :argument ""
   :variable 'org-roam-ql-buffer-in
-  :default-value "org-roam-db"
+  :init-value (lambda (obj)
+                (unless org-roam-ql-buffer-in
+                  (setq org-roam-ql-buffer-in (oref obj default-value)))
+                (oset obj value org-roam-ql-buffer-in))
+  :default-value 'in-buffer
   :prompt "In: "
   :always-read t
-  :choices '("in-buffer" "org-roam-db"))
+  :if (lambda () (not (org-roam-ql--check-if-roam-buffer)))
+  :choices '(in-buffer org-roam-db))
+
+(transient-define-infix org-roam-ql-view--transient-kind ()
+  :class 'org-roam-ql--variable--choices
+  :argument ""
+  :variable 'org-roam-ql--kind
+  :init-value (lambda (obj)
+                (unless org-roam-ql--kind
+                  (setq org-roam-ql--kind (oref obj default-value)))
+                (oset obj value org-roam-ql--kind))
+  :default-value 'backlinks
+  :prompt "View kind: "
+  :always-read t
+  :if (lambda () (not (org-roam-ql--check-if-roam-buffer)))
+  :choices '(nodes backlinks))
 
 (transient-define-infix org-roam-ql-view--filter-roam ()
   :class 'org-roam-ql--variable--sexp
@@ -1653,7 +1676,8 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
   :variable 'org-roam-ql--filter-for-roam
   :prompt "Filter: "
   :always-read t
-  :if (lambda () (org-roam-ql--check-if-roam-buffer))
+  :inapt-if (lambda () (and (not (org-roam-ql--check-if-roam-buffer))
+                            (eq org-roam-ql-buffer-in 'in-buffer)))
   :reader (lambda (&rest _)
             (org-roam-ql--read-query (when org-roam-ql--filter-for-roam
                                        (format "%S" org-roam-ql--filter-for-roam)))))
