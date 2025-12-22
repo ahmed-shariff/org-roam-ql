@@ -92,15 +92,16 @@ applied in order of appearance in the list."
 (defvar-local org-roam-ql-buffer-in nil
   "Define which option to use - `in-buffer' or `org-roam-db'.")
 ;;;###autoload
-(defvar-local org-roam-ql--filter-for-roam nil "Filter that will be applied to org-roam section.
+(defvar-local org-roam-ql-buffer-filter nil "Filter that will be applied to org-roam section.
 
-This is expected to be a valid `org-roam-ql' query or nil.
-See `org-roam-backlinks-section-with-ql-filter' and `org-roam-reflinks-section-with-ql-filter'")
-(defvar-local org-roam-ql--kind nil
+This is expected to be a valid `org-roam-ql' query or nil.")
+(defvar-local org-roam-ql--buffer-displayed-filter nil "Filter that produced the resutls in the buffer.")
+(defvar-local org-roam-ql-buffer-kind nil
   "The type of query. It can be 'nodes or 'backlinks.")
+(defvar-local org-roam-ql--buffer-displayed-kind nil "The kind which produced the results in the buffer.")
 
 ;; See `kill-all-local-variables'
-(put 'org-roam-ql--filter-for-roam 'permanent-local t)
+(put 'org-roam-ql-buffer-filter 'permanent-local t)
 
 ;; `bookmark.el' setup
 (defvar bookmark-make-record-function)
@@ -986,10 +987,10 @@ Similar to `org-roam-mode', but doesn't default to the
     (if (eq org-roam-ql-buffer-in 'in-buffer)
         (let ((title (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended"))
               (source-buffer (current-buffer)))
-          (org-roam-ql--render-roam-buffer org-roam-ql--kind
-                                           (if org-roam-ql--filter-for-roam
+          (org-roam-ql--render-roam-buffer org-roam-ql-buffer-kind
+                                           (if org-roam-ql--buffer-displayed-filter
                                                `(and ,org-roam-ql--buffer-displayed-query
-                                                     ,org-roam-ql--filter-for-roam)
+                                                     ,org-roam-ql--buffer-displayed-filter)
                                              org-roam-ql--buffer-displayed-query)
                                            org-roam-ql-buffer-query
                                            title
@@ -998,10 +999,12 @@ Similar to `org-roam-mode', but doesn't default to the
                                            org-roam-ql-preview-function)
           (with-current-buffer source-buffer
             (setq org-roam-ql-buffer-in 'org-roam-db
-                  org-roam-ql-buffer-query org-roam-ql--buffer-displayed-query)))
-      (org-roam-ql--render-roam-buffer org-roam-ql--kind
+                  org-roam-ql-buffer-kind org-roam-ql--buffer-displayed-kind
+                  org-roam-ql-buffer-query org-roam-ql--buffer-displayed-query
+                  org-roam-ql-buffer-filter org-roam-ql--buffer-displayed-filter)))
+      (org-roam-ql--render-roam-buffer org-roam-ql-buffer-kind
                                        org-roam-ql-buffer-query
-                                       org-roam-ql--filter-for-roam
+                                       org-roam-ql-buffer-filter
                                        org-roam-ql-buffer-title
                                        (buffer-name)
                                        org-roam-ql-buffer-sort
@@ -1042,8 +1045,10 @@ all SECTIONS. "
        (org-roam-ql--get-formatted-title title source-or-query))
       (setq org-roam-ql-buffer-query source-or-query
             org-roam-ql--buffer-displayed-query source-or-query
-            org-roam-ql--kind kind
-            org-roam-ql--filter-for-roam filter-source-or-query
+            org-roam-ql-buffer-kind kind
+            org-roam-ql--buffer-displayed-kind kind
+            org-roam-ql-buffer-filter filter-source-or-query
+            org-roam-ql--buffer-displayed-filter filter-source-or-query
             org-roam-ql-buffer-title title
             org-roam-ql-buffer-sort sort-fn
             org-roam-ql-buffer-in 'org-roam-db)
@@ -1165,7 +1170,7 @@ See docs of `bookmark-make-record-function'."
       (bookmark-prop-set bookmark 'title     org-roam-ql-buffer-title)
       (bookmark-prop-set bookmark 'query     org-roam-ql-buffer-query)
       (bookmark-prop-set bookmark 'sort      org-roam-ql-buffer-sort)
-      (bookmark-prop-set bookmark 'kind      org-roam-ql--kind)
+      (bookmark-prop-set bookmark 'kind      org-roam-ql-buffer-kind)
       bookmark)))
 
 ;; *****************************************************************************
@@ -1292,7 +1297,9 @@ list.  If NODE is nil, return an empty string."
 
         (with-current-buffer source-buffer
           (setq org-roam-ql-buffer-in 'org-roam-db
-                org-roam-ql-buffer-query org-roam-ql--buffer-displayed-query)))
+                  org-roam-ql-buffer-kind org-roam-ql--buffer-displayed-kind
+                  org-roam-ql-buffer-query org-roam-ql--buffer-displayed-query
+                  org-roam-ql-buffer-filter org-roam-ql--buffer-displayed-filter)))
     (org-roam-ql--render-agenda-buffer org-roam-ql--buffer-displayed-query
                                        title
                                        (buffer-name)
@@ -1328,9 +1335,9 @@ If there are entries that do not have an ID, it will signal an error"
   (if (derived-mode-p 'org-roam-mode)
       (let ((title (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer")))
         (org-roam-ql--render-agenda-buffer (if org-roam-ql--buffer-displayed-query
-                                               (if org-roam-ql--filter-for-roam
+                                               (if org-roam-ql--buffer-displayed-filter
                                                    `(and ,org-roam-ql--buffer-displayed-query
-                                                         ,org-roam-ql--filter-for-roam)
+                                                         ,org-roam-ql--buffer-displayed-filter)
                                                    org-roam-ql--buffer-displayed-query)
                                              `(in-buffer ,(buffer-name)))
                                            title
@@ -1387,7 +1394,7 @@ If there are entries that do not have an ID, it will signal an error"
 
 This is Same as `org-roam-backlinks-section', but can accept a query
 instead of a node and considers the filter
-(`org-roam-ql--filter-for-roam') of the current buffer.
+(`org-roam-ql-buffer-filter') of the current buffer.
 
 When UNIQUE is nil, show all positions where references are found.
 When UNIQUE is t, limit to unique sources.
@@ -1400,7 +1407,7 @@ SECTION-HEADING is the string used as a heading for the backlink section."
                               (if (org-roam-node-p node-or-query)
                                   (org-roam-backlinks-get node-or-query :unique unique)
                                 (org-roam-ql-backlinks-get node-or-query :unique unique))))
-         (filter org-roam-ql--filter-for-roam)
+         (filter org-roam-ql-buffer-filter)
          (filter-node-ids (and filter
                                (condition-case _err
                                    (-map #'org-roam-node-id (org-roam-ql-nodes filter))
@@ -1459,7 +1466,7 @@ SECTION-HEADING is the string used as a heading for the backlink section."
     links))
 
 (defun org-roam-reflinks-section-with-ql-filter (node-or-query)
-  "The reflinks section for NODE-OR-QUERY with org-roam-ql filter (`org-roam-ql--filter-for-roam').
+  "The reflinks section for NODE-OR-QUERY with org-roam-ql filter (`org-roam-ql-buffer-filter').
 
 Same as `org-roam-reflinks-section', but will take both node or a query."
   (when-let ((refs (if (org-roam-node-p node-or-query)
@@ -1469,7 +1476,7 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
                                  (if (org-roam-node-p node-or-query)
                                      (org-roam-reflinks-get node-or-query)
                                    (org-roam-ql-reflinks-get node-or-query)))))
-    (let* ((filter org-roam-ql--filter-for-roam)
+    (let* ((filter org-roam-ql-buffer-filter)
            (filter-node-ids (and filter
                                  (condition-case _err
                                      (-map #'org-roam-node-id (org-roam-ql-nodes filter))
@@ -1564,7 +1571,8 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
 (transient-define-prefix org-roam-ql-buffer-dispatch ()
   "Show `org-roam-ql' dispatcher."
   :refresh-suffixes t
-  [[(:info
+  [:description org-roam-ql--buffer-dispatch-summary
+   [(:info
     (lambda () (if (derived-mode-p 'org-roam-ql-mode)
                    "Edit"
                  "Query on org-roam-buffer"))
@@ -1605,6 +1613,30 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
   (let ((max-width (- (window-width) 15)))
     (format "%s: %s" (propertize key 'face 'transient-argument)
             (s-truncate max-width (format "%s" value)))))
+
+(defun org-roam-ql--buffer-dispatch-summary ()
+  "Description string for `org-roam-ql-buffer-dispatch'."
+  (concat
+   (propertize "Showing: " 'face 'transient-heading)
+   (propertize (if (eq org-roam-ql--buffer-displayed-kind 'nodes)
+                   "nodes" "backlinks")
+               'face 'warning)
+   " to "
+   (propertize (format "%S" org-roam-ql--buffer-displayed-query) 'face 'warning)
+   (when org-roam-ql--buffer-displayed-filter
+     (concat " filtered by "
+             (propertize (format "%S" org-roam-ql--buffer-displayed-filter) 'face 'warning)))
+   "\n"
+   (propertize "On refresh: " 'face 'transient-heading)
+   (propertize (if (eq org-roam-ql-buffer-kind 'nodes)
+                   "nodes" "backlinks")
+               'face 'warning)
+   " to "
+   (propertize (format "%S" org-roam-ql-buffer-query) 'face 'warning)
+   (when org-roam-ql-buffer-filter
+     (concat " filtered by "
+             (propertize (format "%S" org-roam-ql-buffer-filter) 'face 'warning)))
+   "\n"))
 
 (transient-define-infix org-roam-ql-view--transient-title ()
   :class 'org-roam-ql--variable
@@ -1659,11 +1691,11 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
 (transient-define-infix org-roam-ql-view--transient-kind ()
   :class 'org-roam-ql--variable--choices
   :argument ""
-  :variable 'org-roam-ql--kind
+  :variable 'org-roam-ql-buffer-kind
   :init-value (lambda (obj)
-                (unless org-roam-ql--kind
-                  (setq org-roam-ql--kind (oref obj default-value)))
-                (oset obj value org-roam-ql--kind))
+                (unless org-roam-ql-buffer-kind
+                  (setq org-roam-ql-buffer-kind (oref obj default-value)))
+                (oset obj value org-roam-ql-buffer-kind))
   :default-value 'backlinks
   :prompt "View kind: "
   :always-read t
@@ -1673,14 +1705,14 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
 (transient-define-infix org-roam-ql-view--filter-roam ()
   :class 'org-roam-ql--variable--sexp
   :argument ""
-  :variable 'org-roam-ql--filter-for-roam
+  :variable 'org-roam-ql-buffer-filter
   :prompt "Filter: "
   :always-read t
   :inapt-if (lambda () (and (not (org-roam-ql--check-if-roam-buffer))
                             (eq org-roam-ql-buffer-in 'in-buffer)))
   :reader (lambda (&rest _)
-            (org-roam-ql--read-query (when org-roam-ql--filter-for-roam
-                                       (format "%S" org-roam-ql--filter-for-roam)))))
+            (org-roam-ql--read-query (when org-roam-ql-buffer-filter
+                                       (format "%S" org-roam-ql-buffer-filter)))))
 
 ;; *****************************************************************************
 ;; org dynamic block
