@@ -979,11 +979,15 @@ Similar to `org-roam-mode', but doesn't default to the
                 org-roam-ql-buffer-in nil)
           (org-roam-buffer-refresh)
           ;; TODO convert to a org-roam-ql-backlinks-search
-          (org-roam-ql-search `(and ,(pcase org-roam-ql-default-org-roam-buffer-query
+          (org-roam-ql-search (let ((buffer-query
+                                     (pcase org-roam-ql-default-org-roam-buffer-query
                                        ((pred functionp) (funcall org-roam-ql-default-org-roam-buffer-query))
-                                       (_ org-roam-ql-default-org-roam-buffer-query))
-                                    ,query)
-                              title)))
+                                       (_ org-roam-ql-default-org-roam-buffer-query))))
+                                (if org-roam-ql--buffer-displayed-filter
+                                    `(and ,buffer-query ,org-roam-ql--buffer-displayed-filter)
+                                  buffer-query))
+                              title
+                              query)))
     (if (eq org-roam-ql-buffer-in 'in-buffer)
         (let ((title (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended"))
               (source-buffer (current-buffer)))
@@ -1415,9 +1419,11 @@ SECTION-HEADING is the string used as a heading for the backlink section."
                                   (message "Cannot apply filter: %s" _err))))))
     (when backlinks
       (if filter-node-ids
-          (setq backlinks
+          (progn
+            (setq-local org-roam-ql--buffer-displayed-filter org-roam-ql-buffer-filter)
+            (setq backlinks
                 (--filter (member (org-roam-node-id (org-roam-backlink-source-node it)) filter-node-ids)
-                          backlinks))
+                          backlinks)))
         (setq filter nil))
       (magit-insert-section (org-roam-backlinks)
         (magit-insert-heading (if filter
@@ -1483,9 +1489,11 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
                                    (user-error
                                     (message "Cannot apply filter: %s" _err))))))
       (if filter-node-ids
-          (setq reflinks
-                (--filter (member (org-roam-node-id (org-roam-reflink-source-node it)) filter-node-ids)
-                          reflinks))
+          (progn
+            (setq-local org-roam-ql--buffer-displayed-filter org-roam-ql-buffer-filter)
+            (setq reflinks
+                  (--filter (member (org-roam-node-id (org-roam-reflink-source-node it)) filter-node-ids)
+                            reflinks)))
         (setq filter nil))
       (magit-insert-section (org-roam-reflinks)
         (magit-insert-heading (if filter
@@ -1616,27 +1624,55 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
 
 (defun org-roam-ql--buffer-dispatch-summary ()
   "Description string for `org-roam-ql-buffer-dispatch'."
-  (concat
-   (propertize "Showing: " 'face 'transient-heading)
-   (propertize (if (eq org-roam-ql--buffer-displayed-kind 'nodes)
-                   "nodes" "backlinks")
-               'face 'warning)
-   " to "
-   (propertize (format "%S" org-roam-ql--buffer-displayed-query) 'face 'warning)
-   (when org-roam-ql--buffer-displayed-filter
-     (concat " filtered by "
-             (propertize (format "%S" org-roam-ql--buffer-displayed-filter) 'face 'warning)))
-   "\n"
-   (propertize "On refresh: " 'face 'transient-heading)
-   (propertize (if (eq org-roam-ql-buffer-kind 'nodes)
-                   "nodes" "backlinks")
-               'face 'warning)
-   " to "
-   (propertize (format "%S" org-roam-ql-buffer-query) 'face 'warning)
-   (when org-roam-ql-buffer-filter
-     (concat " filtered by "
-             (propertize (format "%S" org-roam-ql-buffer-filter) 'face 'warning)))
-   "\n"))
+  (let ((is-in-buffer (eq org-roam-ql-buffer-in 'in-buffer))
+        (in-roam-buffer (org-roam-ql--check-if-roam-buffer)))
+    (concat
+     (propertize "Showing: " 'face 'transient-heading)
+     (propertize (if (eq org-roam-ql--buffer-displayed-kind 'nodes)
+                     "nodes" "backlinks")
+                 'face 'warning)
+     " to "
+     (propertize (if in-roam-buffer 
+                     (format "node %S" (org-roam-node-title org-roam-buffer-current-node))
+                   (format "%S" org-roam-ql--buffer-displayed-query))
+                 'face 'warning)
+     (when org-roam-ql--buffer-displayed-filter
+       (concat " filtered by "
+               (propertize (format "%S" org-roam-ql--buffer-displayed-filter) 'face 'warning)))
+     "\n"
+     (propertize "On refresh: " 'face 'transient-heading)
+     (propertize (if (eq org-roam-ql-buffer-kind 'nodes)
+                     "nodes" "backlinks")
+                 'face 'warning)
+     " to "
+     (propertize (if (and (not org-roam-ql-buffer-query) in-roam-buffer)
+                     ;; In roam buffer we state which node is being displayed
+                     (format "node %S" (org-roam-node-title org-roam-buffer-current-node))
+                   (format "%S"
+                           (if in-roam-buffer
+                               ;; org-roam-ql-buffer-query is non-nil, handle filter
+                               (let ((buffer-query
+                                      (pcase org-roam-ql-default-org-roam-buffer-query
+                                        ((pred functionp) (funcall org-roam-ql-default-org-roam-buffer-query))
+                                        (_ org-roam-ql-default-org-roam-buffer-query))))
+                                 (if org-roam-ql--buffer-displayed-filter
+                                     `(and ,buffer-query ,org-roam-ql--buffer-displayed-filter)
+                                   buffer-query))
+                             ;; handle filter in org-roam-ql buffer
+                             (if (and is-in-buffer org-roam-ql--buffer-displayed-filter)
+                                 `(and ,org-roam-ql--buffer-displayed-query
+                                       ,org-roam-ql--buffer-displayed-filter)
+                               org-roam-ql-buffer-query))))
+                 'face 'warning)
+     (when (or org-roam-ql-buffer-filter (and in-roam-buffer org-roam-ql-buffer-query))
+       (concat " filtered by "
+               (propertize (format "%S" (if (or is-in-buffer (and in-roam-buffer org-roam-ql-buffer-query))
+                                            org-roam-ql-buffer-query
+                                          org-roam-ql-buffer-filter))
+                           'face 'warning)))
+     (when (or is-in-buffer (and in-roam-buffer org-roam-ql-buffer-query))
+       " extending current in new buffer")
+     "\n")))
 
 (transient-define-infix org-roam-ql-view--transient-title ()
   :class 'org-roam-ql--variable
@@ -1708,8 +1744,10 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
   :variable 'org-roam-ql-buffer-filter
   :prompt "Filter: "
   :always-read t
-  :inapt-if (lambda () (and (not (org-roam-ql--check-if-roam-buffer))
-                            (eq org-roam-ql-buffer-in 'in-buffer)))
+  :inapt-if (lambda ()
+              (if (org-roam-ql--check-if-roam-buffer)
+                  org-roam-ql-buffer-query
+                (eq org-roam-ql-buffer-in 'in-buffer)))
   :reader (lambda (&rest _)
             (org-roam-ql--read-query (when org-roam-ql-buffer-filter
                                        (format "%S" org-roam-ql-buffer-filter)))))
