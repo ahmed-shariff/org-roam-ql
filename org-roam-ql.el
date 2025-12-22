@@ -992,6 +992,20 @@ DOCSTRING is the documentation string to use for the function."
     map)
   "Keymap for roam-buffer.  Extends `org-roam-mode-map'.")
 
+(defvar org-roam-ql--node-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map org-roam-node-map)
+    (define-key map [remap revert-buffer] #'org-roam-ql-refresh-buffer)
+    map)
+  "Keymap for previews.  Extends `org-roam-node-map'.")
+
+(defvar org-roam-ql--preview-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map org-roam-preview-map)
+    (define-key map [remap revert-buffer] #'org-roam-ql-refresh-buffer)
+    map)
+  "Keymap for previews.  Extends `org-roam-preview-map'.")
+
 (define-derived-mode org-roam-ql-mode org-roam-mode "Org-roam-ql"
   "A major mode to display a list of nodes.
 Similar to `org-roam-mode', but doesn't default to the
@@ -1125,7 +1139,9 @@ all SECTIONS. "
                 (magit-insert-heading (propertize (org-roam-node-title previewing-node)
                                                   'font-lock-face 'org-roam-title))
                 (oset section node previewing-node)
+                (oset section keymap 'org-roam-ql--node-map)
                 (magit-insert-section section (org-roam-preview-section)
+                  (oset section keymap 'org-roam-ql--preview-map)
                   ;; respecting buffer local value
                   (let ((preview-fn (if preview-fn
                                         (setq-local org-roam-ql-preview-function preview-fn)
