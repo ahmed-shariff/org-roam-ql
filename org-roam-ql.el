@@ -376,7 +376,7 @@ the COMPARISON-FUNCTION."
 buffer.  See `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be.
 FILTER is an additional query similar to SOURCE-OR-QUERY which can be
 applied to the results of SOURCE-OR-QUERY.  TITLE is a title to
-associate with the view.  Reesults will be displayed in a org-roam-ql
+associate with the view.  Results will be displayed in a org-roam-ql
 buffer.  SORT-FN is used for sorting the results.  It can be a string
 name of a slot or a predicate function which can be used to sort the
 nodes.  See `org-roam-nodes' for more info on this.
@@ -394,6 +394,39 @@ buffer"
                          query))
                      (read-string "Title: ")))
   (org-roam-ql--render-roam-buffer 'nodes
+                                   source-or-query
+                                   filter
+                                   title
+                                   (org-roam-ql--get-formatted-buffer-name
+                                    (org-roam-ql--get-formatted-title title source-or-query))
+                                   sort-fn
+                                   preview-fn))
+
+;;;###autoload
+(defun org-roam-ql-search-backlinks (source-or-query &optional title filter sort-fn preview-fn)
+  "Get nodes that match have backlinks to SOURCE-OR-QUERY and display
+in org-roam-ql buffer.  See `org-roam-ql-nodes' for what
+SOURCE-OR-QUERY can be.  FILTER is an additional query similar to
+SOURCE-OR-QUERY which can be applied to the results, i.e., backlinks
+to SOURCE-OR-QUERY.  TITLE is a title to associate with the view.
+Results will be displayed in a org-roam-ql buffer.  SORT-FN is used
+for sorting the results.  It can be a string name of a slot or a
+predicate function which can be used to sort the nodes.  See
+`org-roam-nodes' for more info on this.
+
+PREVIEW-FN is a function used to generate the preview content on the
+`org-roam-ql-mode' buffer. See `org-roam-ql-preview-function' for what
+the arguments can be.  If PREVIEW-FN is nil, the value of
+`org-roam-ql-preview-function' will be used. If it is non-nil, this
+argument will be set as the buffer local value for
+`org-roam-ql-preview-function' in the corresponding `org-roam-ql-mode'
+buffer"
+  (interactive (list (let ((query (org-roam-ql--read-query)))
+                       (if (vectorp query)
+                           (list query)
+                         query))
+                     (read-string "Title: ")))
+  (org-roam-ql--render-roam-buffer 'backlinks
                                    source-or-query
                                    filter
                                    title
@@ -979,15 +1012,16 @@ Similar to `org-roam-mode', but doesn't default to the
                 org-roam-ql-buffer-in nil)
           (org-roam-buffer-refresh)
           ;; TODO convert to a org-roam-ql-backlinks-search
-          (org-roam-ql-search (let ((buffer-query
-                                     (pcase org-roam-ql-default-org-roam-buffer-query
-                                       ((pred functionp) (funcall org-roam-ql-default-org-roam-buffer-query))
-                                       (_ org-roam-ql-default-org-roam-buffer-query))))
-                                (if org-roam-ql--buffer-displayed-filter
-                                    `(and ,buffer-query ,org-roam-ql--buffer-displayed-filter)
-                                  buffer-query))
-                              title
-                              query)))
+          (org-roam-ql-search-backlinks
+           (let ((buffer-query
+                  (pcase org-roam-ql-default-org-roam-buffer-query
+                    ((pred functionp) (funcall org-roam-ql-default-org-roam-buffer-query))
+                    (_ org-roam-ql-default-org-roam-buffer-query))))
+             (if org-roam-ql--buffer-displayed-filter
+                 `(and ,buffer-query ,org-roam-ql--buffer-displayed-filter)
+               buffer-query))
+           title
+           query)))
     (if (eq org-roam-ql-buffer-in 'in-buffer)
         (let ((title (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended"))
               (source-buffer (current-buffer)))
