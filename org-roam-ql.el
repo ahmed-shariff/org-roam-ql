@@ -1192,12 +1192,14 @@ all SECTIONS. "
 ;;;###autoload
 (defun org-roam-ql--bookmark-open (bookmark)
   "Query and open org-roam-ql bookmark BOOKMARK."
-  (let ((title (bookmark-prop-get bookmark 'title))
-        (query (bookmark-prop-get bookmark 'query))
-        (sort (bookmark-prop-get bookmark 'sort))
-        (kind (bookmark-prop-get bookmark 'kind)))
+  (let ((title  (bookmark-prop-get bookmark 'title))
+        (query  (bookmark-prop-get bookmark 'query))
+        (sort   (bookmark-prop-get bookmark 'sort))
+        (kind   (bookmark-prop-get bookmark 'kind))
+        (filter (bookmark-prop-get bookmark 'filter)))
     (pcase kind
-      ((or 'nodes 'nil) (org-roam-ql-search query title sort)))))
+      ((or 'nodes 'nil) (org-roam-ql-search           query title filter sort))
+      ('backlinks       (org-roam-ql-search-backlinks query title filter sort)))))
 
 (put 'org-roam-ql--bookmark-open 'bookmark-handler-type "org-roam-ql query")
 
@@ -1213,14 +1215,16 @@ See docs of `bookmark-make-record-function'."
                              (or org-roam-ql-buffer-title
                                  (org-roam-ql--get-formatted-title
                                   (org-roam-node-title org-roam-buffer-current-node) nil)))
-          (bookmark-prop-set bookmark 'query
-                             (org-roam-ql--get-query-for-roam-buffer))
-          (bookmark-prop-set bookmark 'sort (or org-roam-ql-buffer-sort "title")))
+          (bookmark-prop-set bookmark 'query (org-roam-ql--get-query-for-roam-buffer))
+          (bookmark-prop-set bookmark 'sort (or org-roam-ql-buffer-sort "title"))
+          (bookmark-prop-set bookmark 'kind 'backlinks)
+          (bookmark-prop-set bookmark 'filter org-roam-ql-buffer-filter))
       (bookmark-prop-set bookmark 'handler   #'org-roam-ql--bookmark-open)
       (bookmark-prop-set bookmark 'title     org-roam-ql-buffer-title)
       (bookmark-prop-set bookmark 'query     org-roam-ql-buffer-query)
       (bookmark-prop-set bookmark 'sort      org-roam-ql-buffer-sort)
       (bookmark-prop-set bookmark 'kind      org-roam-ql-buffer-kind)
+      (bookmark-prop-set bookmark 'filter    org-roam-ql-buffer-filter)
       bookmark)))
 
 ;; *****************************************************************************
@@ -1640,7 +1644,9 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
   ["View"
    [("r" "Refresh" org-roam-ql-refresh-buffer)]
    [:if-derived org-roam-mode
-                ("S" "Show in agenda buffer" org-roam-ql-agenda-buffer-from-roam-buffer)
+                ("S" "Show in agenda buffer" org-roam-ql-agenda-buffer-from-roam-buffer)]
+   ;; TODO: set `bookmark-make-record-function' in org-roam buffers
+   [:if-derived org-roam-ql-mode
                 ("b" "Bookmark (org-roam-ql)" bookmark-set)]
    [:if-not-derived org-roam-ql-mode
                     ("o" "Convert to org-roam-ql buffer"
@@ -1956,7 +1962,7 @@ Can be used in the minibuffer or when writting querries."
 
 (defun org-roam-ql--default-query-for-roam-buffer ()
   "Function used for `org-roam-ql-default-org-roam-buffer-query'."
-  `(backlink-to (id ,(org-roam-node-id org-roam-buffer-current-node))))
+  `(id ,(org-roam-node-id org-roam-buffer-current-node)))
 
 (defun org-roam-ql--get-query-for-roam-buffer ()
   "Process `org-roam-ql-default-org-roam-buffer-query'."
