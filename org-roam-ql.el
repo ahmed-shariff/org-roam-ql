@@ -1642,17 +1642,16 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
     ("s" org-roam-ql-view--transient-sort)
     ("i" org-roam-ql-view--transient-in)]]
   ["View"
-   [("r" "Refresh" org-roam-ql-refresh-buffer)]
-   [:if-derived org-roam-mode
-                ("S" "Show in agenda buffer" org-roam-ql-agenda-buffer-from-roam-buffer)]
-   ;; TODO: set `bookmark-make-record-function' in org-roam buffers
-   [:if-derived org-roam-ql-mode
-                ("b" "Bookmark (org-roam-ql)" bookmark-set)]
-   [:if-not-derived org-roam-ql-mode
-                    ("o" "Convert to org-roam-ql buffer"
-                     org-roam-ql-convert-roam-buffer-to-roam-ql-buffer)]
-   [:if-derived org-agenda-mode
-                ("S" "Show in org-roam buffer" org-roam-ql-roam-buffer-from-agenda-buffer)]])
+   [("r" "Refresh" org-roam-ql-refresh-buffer)
+    ("S" "Show in agenda buffer" org-roam-ql-agenda-buffer-from-roam-buffer
+     :if-derived org-roam-mode)
+    ;; TODO: set `bookmark-make-record-function' in org-roam buffers
+    ("b" "Bookmark (org-roam-ql)" bookmark-set
+     :if-derived org-roam-ql-mode)
+    ("o" "Convert to org-roam-ql buffer" org-roam-ql-convert-roam-buffer-to-roam-ql-buffer
+     :if-not-derived org-roam-ql-mode)
+    ("S" "Show in org-roam buffer" org-roam-ql-roam-buffer-from-agenda-buffer
+     :if-derived org-agenda-mode)]])
 
 ;;;###autoload
 (defun org-roam-ql-refresh-buffer ()
@@ -1686,7 +1685,10 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
      " to "
      (propertize (if in-roam-buffer 
                      (format "node %S" (org-roam-node-title org-roam-buffer-current-node))
-                   (format "%S" org-roam-ql--buffer-displayed-query))
+                   (format "%S" (if (org-roam-ql--check-if-list-of-org-roam-nodes-list
+                                     org-roam-ql--buffer-displayed-query)
+                                    (concat "[" (length org-roam-ql--buffer-displayed-query) " nodes]")
+                                  org-roam-ql--buffer-displayed-query)))
                  'face 'warning)
      (when org-roam-ql--buffer-displayed-filter
        (concat " filtered by "
@@ -1711,7 +1713,10 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
                              (if (and is-in-buffer org-roam-ql--buffer-displayed-filter)
                                  `(and ,org-roam-ql--buffer-displayed-query
                                        ,org-roam-ql--buffer-displayed-filter)
-                               org-roam-ql-buffer-query))))
+                               (if (org-roam-ql--check-if-list-of-org-roam-nodes-list
+                                    org-roam-ql-buffer-query)
+                                   (concat "[" (length org-roam-ql-buffer-query) " nodes]")
+                                 org-roam-ql-buffer-query)))))
                  'face 'warning)
      (when (or org-roam-ql-buffer-filter (and in-roam-buffer org-roam-ql-buffer-query))
        (concat " filtered by "
