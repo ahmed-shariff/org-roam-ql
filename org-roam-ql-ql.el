@@ -38,7 +38,7 @@
 
 (defvar org-roam-ql-ql--current-nodes nil)
 
-(defun org-roam-ql-ql--ql-view-buffer-for-nodes (nodes title buffer-name &optional source-or-query super-groups)
+(defun org-roam-ql-ql--render-ql-view (source-or-query title buffer-name &optional super-groups)
   "Display NODES in `org-ql-view' buffer with TITLE in buffer BUFFER-NAME.
 See `org-roam-ql-nodes' for SOURCE-OR-QUERY.
 See `org-super-agenda' for SUPER-GROUPS."
@@ -46,6 +46,7 @@ See `org-super-agenda' for SUPER-GROUPS."
     (let* ((strings '())
            (header (org-ql-view--header-line-format
                     :title title))
+           (nodes (org-roam-ql-nodes source-or-query))
            (org-ql-view-buffers-files (org-roam-ql--nodes-files nodes))
            (org-ql-view-query `(org-roam-query ,source-or-query))
            (org-ql-view-sort nil)
@@ -60,10 +61,12 @@ See `org-super-agenda' for SUPER-GROUPS."
             (format "Processing %s nodes" (length nodes))
           (push (org-roam-ql-view--format-node node) strings))
         (when super-groups
-          (let ((org-super-agenda-groups (cl-etypecase super-groups
+          (if (require 'org-super-agenda nil t)
+              (let ((org-super-agenda-groups (cl-etypecase super-groups
                                            (symbol (symbol-value super-groups))
                                            (list super-groups))))
-            (setf strings (org-super-agenda--group-items strings))))
+                (setf strings (org-super-agenda--group-items strings)))
+            (warn "org-super-agenda not available. Install org-super-agenda to use `super-groups' parameter.")))
         (org-ql-view--display :buffer buffer-name :header header
           :strings strings)
         (with-current-buffer buffer-name
@@ -138,15 +141,10 @@ parameters were ever passed"
   (when (or (derived-mode-p 'org-agenda-mode) (derived-mode-p 'org-roam-mode))
     (let* ((b (buffer-name (current-buffer)))
            (title (org-roam-ql--get-formatted-title b nil "from org-ql-view")))
-      (org-roam-ql-ql--ql-view-buffer-for-nodes (cond
-                                                 ((derived-mode-p 'org-roam-mode)
-                                                  (org-roam-ql--nodes-from-roam-buffer (current-buffer)))
-                                                 ((derived-mode-p 'org-agenda-mode)
-                                                  (org-roam-ql--nodes-from-agenda-buffer (current-buffer))))
-                                                title
-                                                (org-roam-ql--get-formatted-buffer-name
-                                                 title)
-                                                `(in-buffer ,b)))))
+      (org-roam-ql-ql--render-ql-view `(in-buffer ,b)
+                                      title
+                                      (org-roam-ql--get-formatted-buffer-name
+                                       title)))))
 
 ;;;###autoload
 (defun org-roam-ql-ql-roam-buffer-from-agenda-buffer ()
@@ -156,19 +154,18 @@ parameters were ever passed"
     (user-error "Not an Org QL View buffer"))
   (when (derived-mode-p 'org-agenda-mode)
     (let* ((b (buffer-name (current-buffer))))
-      (org-roam-ql--agenda-buffer-for-nodes (org-roam-ql--nodes-from-agenda-buffer (current-buffer))
-                                            (org-roam-ql--get-formatted-title b nil "from org-ql-view")
-                                            (org-roam-ql--get-formatted-buffer-name
-                                             (org-roam-ql--get-formatted-title b nil "from org-ql-view"))
-                                            `(in-buffer ,b)))))
+      (org-roam-ql--render-agenda-buffer `(in-buffer ,b)
+                                         (org-roam-ql--get-formatted-title b nil "from org-ql-view")
+                                         (org-roam-ql--get-formatted-buffer-name
+                                          (org-roam-ql--get-formatted-title b nil "from org-ql-view"))))))
 
 ;;;###autoload
 (defun org-roam-ql-ql-init ()
   "Integrate `org-roam-ql' into `org-ql'."
   (advice-add 'org-ql-view-refresh :around #'org-roam-ql-ql--refresh)
 
-  (transient-insert-suffix
-    'org-roam-ql-buffer-dispatch '(2 -1)
+  (transient-append-suffix
+    'org-roam-ql-buffer-dispatch '(1 -1)
     [("Q" "View in org-ql buffer" org-roam-ql-ql-buffer-from-roam-buffer)])
 
   (transient-insert-suffix
