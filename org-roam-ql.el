@@ -1028,14 +1028,13 @@ Similar to `org-roam-mode', but doesn't default to the
           ;; TODO convert to a org-roam-ql-backlinks-search
           (org-roam-ql-search-backlinks
            (let ((buffer-query
-                  (pcase org-roam-ql-default-org-roam-buffer-query
-                    ((pred functionp) (funcall org-roam-ql-default-org-roam-buffer-query))
-                    (_ org-roam-ql-default-org-roam-buffer-query))))
+                  (org-roam-ql--get-query-for-roam-buffer)))
              (if org-roam-ql--buffer-displayed-filter
                  `(and ,buffer-query ,org-roam-ql--buffer-displayed-filter)
                buffer-query))
            title
-           query)))
+           query
+           org-roam-ql-buffer-sort)))
     (if (eq org-roam-ql-buffer-in 'in-buffer)
         (let ((title (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "extended"))
               (source-buffer (current-buffer)))
@@ -1215,10 +1214,7 @@ See docs of `bookmark-make-record-function'."
                                  (org-roam-ql--get-formatted-title
                                   (org-roam-node-title org-roam-buffer-current-node) nil)))
           (bookmark-prop-set bookmark 'query
-                             (pcase org-roam-ql-default-org-roam-buffer-query
-                               ((pred functionp)
-                                (funcall org-roam-ql-default-org-roam-buffer-query))
-                               (_ org-roam-ql-default-org-roam-buffer-query)))
+                             (org-roam-ql--get-query-for-roam-buffer))
           (bookmark-prop-set bookmark 'sort (or org-roam-ql-buffer-sort "title")))
       (bookmark-prop-set bookmark 'handler   #'org-roam-ql--bookmark-open)
       (bookmark-prop-set bookmark 'title     org-roam-ql-buffer-title)
@@ -1701,10 +1697,7 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
                    (format "%S"
                            (if in-roam-buffer
                                ;; org-roam-ql-buffer-query is non-nil, handle filter
-                               (let ((buffer-query
-                                      (pcase org-roam-ql-default-org-roam-buffer-query
-                                        ((pred functionp) (funcall org-roam-ql-default-org-roam-buffer-query))
-                                        (_ org-roam-ql-default-org-roam-buffer-query))))
+                               (let ((buffer-query (org-roam-ql--get-query-for-roam-buffer)))
                                  (if org-roam-ql--buffer-displayed-filter
                                      `(and ,buffer-query ,org-roam-ql--buffer-displayed-filter)
                                    buffer-query))
@@ -1965,6 +1958,13 @@ Can be used in the minibuffer or when writting querries."
   "Function used for `org-roam-ql-default-org-roam-buffer-query'."
   `(backlink-to (id ,(org-roam-node-id org-roam-buffer-current-node))))
 
+(defun org-roam-ql--get-query-for-roam-buffer ()
+  "Process `org-roam-ql-default-org-roam-buffer-query'."
+  (pcase org-roam-ql-default-org-roam-buffer-query
+    ((pred functionp)
+     (funcall org-roam-ql-default-org-roam-buffer-query))
+    (_ org-roam-ql-default-org-roam-buffer-query)))
+
 (defun org-roam-ql-preview-default-function (_ _)
   "The deafult value for `org-roam-ql-preview-fn'.
 
@@ -1980,15 +1980,13 @@ Simple wrapper `org-roam-preview-function'."
   "Convert a `org-roam-mode' buffer to a `org-roam-ql-mode' buffer."
   (interactive)
   (when (and (derived-mode-p 'org-roam-mode) (not (derived-mode-p 'org-roam-ql-mode)))
-    (org-roam-ql-search
-     (pcase org-roam-ql-default-org-roam-buffer-query
-       ((pred functionp)
-        (funcall org-roam-ql-default-org-roam-buffer-query))
-       (_ org-roam-ql-default-org-roam-buffer-query))
+    (org-roam-ql-search-backlinks
+     (org-roam-ql--get-query-for-roam-buffer)
      (or org-roam-ql-buffer-title
          (org-roam-ql--get-formatted-title
           (org-roam-node-title org-roam-buffer-current-node) nil))
-     (or org-roam-ql-buffer-sort nil))))
+     org-roam-ql--buffer-displayed-filter
+     org-roam-ql-buffer-sort)))
 
 ;; *****************************************************************************
 ;; Setup of org-roam-ql
