@@ -124,7 +124,7 @@
     (describe "with roam buffers"
       :var* ((nodes (--filter (s-match "test2.org" (org-roam-node-file it)) (org-roam-node-list)))
              (buffer-name "test-buffer")
-             (_ (org-roam-ql--roam-buffer-for-nodes nodes "test buffer" buffer-name nodes)))
+             (_ (org-roam-ql--render-roam-buffer 'nodes nodes nil "test buffer" buffer-name)))
       (it "as a string"
         (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
                                            (org-roam-ql-nodes buffer-name)))
@@ -136,7 +136,7 @@
     (describe "with agenda buffers"
       :var* ((nodes (--filter (s-match "test2.org" (org-roam-node-file it)) (org-roam-node-list)))
              (buffer-name "test-buffer")
-             (_ (org-roam-ql--agenda-buffer-for-nodes nodes "test buffer" buffer-name nodes)))
+             (_ (org-roam-ql--render-agenda-buffer nodes "test buffer" buffer-name)))
       (it "as a string"
         (expect (-map #'org-roam-node-id (with-current-buffer buffer-name
                                            (org-roam-ql-nodes buffer-name)))
@@ -154,10 +154,10 @@
            (query-result (org-roam-ql-nodes query))
            (query-result-ids (-map #'org-roam-node-id query-result)))
     (it "in agenda buffer"
-      (org-roam-ql--agenda-buffer-for-nodes query-result "agenda-test" "agenda-test-buffer" query)
+      (org-roam-ql--render-agenda-buffer query "agenda-test" "agenda-test-buffer")
       (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-agenda-buffer (get-buffer "agenda-test-buffer"))) :to-have-same-items-as query-result-ids))
     (it "in roam buffer"
-      (org-roam-ql--roam-buffer-for-nodes query-result "roam-test" "roam-test-buffer" query)
+      (org-roam-ql--render-roam-buffer 'nodes query nil "roam-test" "roam-test-buffer")
       (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-roam-buffer (get-buffer "roam-test-buffer"))) :to-have-same-items-as query-result-ids))
     (describe "switching from"
       :var* ((roam-buffer-name (org-roam-ql--get-formatted-buffer-name (org-roam-ql--get-formatted-title "test-title" nil)))
@@ -179,7 +179,7 @@
     (describe "with custom preview function"
       :var ((result-buffer (window-buffer
                             (org-roam-ql-search query "test-title"
-                                                nil
+                                                nil nil
                                                 (lambda (node query)
                                                   (format "test preview %s %s"
                                                           (org-roam-node-title node)
