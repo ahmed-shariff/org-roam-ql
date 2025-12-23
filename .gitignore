@@ -12,3 +12,6 @@
 
 # Tests
 sandbox/
+/.eask/
+/dist/
+/temp/

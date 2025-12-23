@@ -4,7 +4,7 @@
 
 ;; Author: Shariff AM Faleel
 ;; Package-Requires: ((emacs "28") (org-roam "2.2.0") (s "1.12.0") (magit-section "3.3.0") (transient "0.4") (dash "2.0"))
-;; Version: 0.3-pre
+;; Version: 0.3pre
 ;; Homepage: https://github.com/ahmed-shariff/org-roam-ql
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 

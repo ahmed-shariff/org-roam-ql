@@ -1,59 +1,89 @@
-# * makem.sh/Makefile --- Script to aid building and testing Emacs Lisp packages
+##
+# Eask generated template Makefile
+#
+# File located in https://github.com/emacs-eask/template-elisp/blob/master/Makefile
+##
 
-# URL: https://github.com/alphapapa/makem.sh
-# Version: 0.5
+EMACS ?= emacs
+EASK ?= eask
 
-# * Arguments
+.PHONY: clean package install compile test checkdoc lint
 
-# For consistency, we use only var=val options, not hyphen-prefixed options.
+# CI entry point
+#
+# You can add or remove any commands here
+#
+# (Option 1): Basic for beginner, only tests for package's installation
+# ci: clean package install compile
+# (Option 2): Advanced for a high-quality package
+#ci: clean package install compile checkdoc lint test
+ci: clean package install compile test
 
-# NOTE: I don't like duplicating the arguments here and in makem.sh,
-# but I haven't been able to find a way to pass arguments which
-# conflict with Make's own arguments through Make to the script.
-# Using -- doesn't seem to do it.
+# Build an package artefact, default to `dist` folder
+#
+# This is used to test if your package can be built correctly before the
+# package installation.
+package:
+	@echo "Packaging..."
+	$(EASK) package
 
-ifdef install-deps
-	INSTALL_DEPS = "--install-deps"
-endif
-ifdef install-linters
-	INSTALL_LINTERS = "--install-linters"
-endif
+# Install package
+#
+# If your package is a single file package, you generally wouldn't need to 
+install:
+	@echo "Installing..."
+	$(EASK) install
 
-ifdef sandbox
-	ifeq ($(sandbox), t)
-		SANDBOX = --sandbox
-	else
-		SANDBOX = --sandbox=$(sandbox)
-	endif
-endif
+# Byte-compile package
+#
+# Compile all your package .el files to .elc
+compile:
+	@echo "Compiling..."
+	$(EASK) compile
 
-ifdef debug
-	DEBUG = "--debug"
-endif
+# Run regression tests
+#
+# The default test is `ert`; but Eask also support other regression test!
+# See https://emacs-eask.github.io/Getting-Started/Commands-and-options/#-linting
+test:
+	@echo "Testing..."
+	$(EASK) install-deps --dev
+	$(EASK) test buttercup
 
-# ** Verbosity
+# Run checkdoc
+#
+# See https://www.emacswiki.org/emacs/CheckDoc
+checkdoc:
+	@echo "Checking documentation..."
+	$(EASK) lint checkdoc --strict
 
-# Since the "-v" in "make -v" gets intercepted by Make itself, we have
-# to use a variable.
+# Lint package metadata
+#
+# See https://github.com/purcell/package-lint
+lint:
+	@echo "Linting..."
+	$(EASK) lint package
 
-verbose = $(v)
+# Generate autoloads file
+#
+# NOTE: This is generally unnecessary
+autoloads:
+	@echo "Generating autoloads..."
+	$(EASK) autoloads
 
-ifneq (,$(findstring vvv,$(verbose)))
-	VERBOSE = "-vvv"
-else ifneq (,$(findstring vv,$(verbose)))
-	VERBOSE = "-vv"
-else ifneq (,$(findstring v,$(verbose)))
-	VERBOSE = "-v"
-endif
+# Generate -pkg file
+#
+# NOTE: This is generally unnecessary
+pkg-file:
+	@echo "Generating -pkg file..."
+	$(EASK) pkg-file
 
-# * Rules
-
-# TODO: Handle cases in which "test" or "tests" are called and a
-# directory by that name exists, which can confuse Make.
-
-%:
-	@./makem.sh $(DEBUG) $(VERBOSE) $(SANDBOX) $(INSTALL_DEPS) $(INSTALL_LINTERS) $(@)
-
-.DEFAULT: init
-init:
-	@./makem.sh $(DEBUG) $(VERBOSE) $(SANDBOX) $(INSTALL_DEPS) $(INSTALL_LINTERS)
+# Clean up
+#
+# This will clean all the entire workspace including the following folders
+# and files
+#
+#   - .eask folder (sandbox)
+#   - all .elc files
+clean:
+	$(EASK) clean all
