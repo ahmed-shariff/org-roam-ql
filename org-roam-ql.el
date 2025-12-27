@@ -1570,7 +1570,10 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
 
 (defclass org-roam-ql--variable--choices (org-roam-ql--variable) nil)
 
-(defclass org-roam-ql--variable--sexp (org-roam-ql--variable) nil)
+(defclass org-roam-ql--variable--sexp (org-roam-ql--variable)
+  ((value-formatter :initarg :value-formatter
+                    :initform (lambda (value)
+                                (format "%S" value)))))
 
 (cl-defmethod transient-init-value ((obj org-roam-ql--variable))
   "Initialize the transient value of OBJ."
@@ -1618,7 +1621,7 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
 (cl-defmethod transient-format-value ((obj org-roam-ql--variable--sexp))
   "Format of the OBJ's VALUE for sexpressions."
   ;; copied from `org-ql'.
-  (let ((value (format "%S" (oref obj value))))
+  (let ((value (funcall (oref obj value-formatter) (oref obj value))))
     (with-temp-buffer
       (delay-mode-hooks
         (insert value)
@@ -1687,7 +1690,7 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
                      (format "node %S" (org-roam-node-title org-roam-buffer-current-node))
                    (format "%S" (if (org-roam-ql--check-if-list-of-org-roam-nodes-list
                                      org-roam-ql--buffer-displayed-query)
-                                    (concat "[" (length org-roam-ql--buffer-displayed-query) " nodes]")
+                                    (format "[%s nodes]" (length org-roam-ql--buffer-displayed-query))
                                   org-roam-ql--buffer-displayed-query)))
                  'face 'warning)
      (when org-roam-ql--buffer-displayed-filter
@@ -1715,7 +1718,7 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
                                        ,org-roam-ql--buffer-displayed-filter)
                                (if (org-roam-ql--check-if-list-of-org-roam-nodes-list
                                     org-roam-ql-buffer-query)
-                                   (concat "[" (length org-roam-ql-buffer-query) " nodes]")
+                                   (format "[%s nodes]" (length org-roam-ql-buffer-query))
                                  org-roam-ql-buffer-query)))))
                  'face 'warning)
      (when (or org-roam-ql-buffer-filter (and in-roam-buffer org-roam-ql-buffer-query))
@@ -1748,6 +1751,10 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
                 "Query extending current on refresh: "
               "Query: "))
   :always-read t
+  :value-formatter (lambda (value)
+                     (if (ignore-errors (org-roam-ql--check-if-list-of-org-roam-nodes-list value))
+                         (format "[%s nodes]" (length value))
+                       (format "%S" value)))
   :reader (lambda (&rest _)
             (org-roam-ql--read-query (when org-roam-ql-buffer-query
                                        (format "%S" org-roam-ql-buffer-query)))))
