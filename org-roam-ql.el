@@ -621,7 +621,9 @@ Sets the history as well."
                                                               (cons org-roam-ql-buffer-query org-roam-ql-buffer-title))))))
                                     (buffer-list))))
                          (candidates (--map (if wrap-in-quotes (format "\"%s\""it) it) (append saved-queries bookmarks buffers)))
-                         (width (-max (-map #'length candidates))))
+                         (width (if candidates
+                                    (-max (-map #'length candidates))
+                                  100))) ;; doesn't matter as there are no candidates.
                     (cond
                      ((eq action 'metadata)
                       (cons
