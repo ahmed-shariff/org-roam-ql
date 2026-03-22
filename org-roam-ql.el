@@ -4,7 +4,7 @@
 
 ;; Author: Shariff AM Faleel
 ;; Package-Requires: ((emacs "28") (org-roam "2.2.0") (s "1.12.0") (magit-section "3.3.0") (transient "0.4") (dash "2.0"))
-;; Version: 0.3pre
+;; Version: 0.3
 ;; Homepage: https://github.com/ahmed-shariff/org-roam-ql
 ;; SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -1027,7 +1027,6 @@ Similar to `org-roam-mode', but doesn't default to the
                 org-roam-ql-buffer-title nil
                 org-roam-ql-buffer-in nil)
           (org-roam-buffer-refresh)
-          ;; TODO convert to a org-roam-ql-backlinks-search
           (org-roam-ql-search-backlinks
            (let ((buffer-query
                   (org-roam-ql--get-query-for-roam-buffer)))
