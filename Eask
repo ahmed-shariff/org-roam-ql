@@ -1,7 +1,7 @@
 ;; -*- mode: eask; lexical-binding: t -*-
 
 (package "org-roam-ql"
-         "0.3pre"
+         "0.3"
          "Interface to query and view results from org-roam")
 
 (website-url "https://github.com/ahmed-shariff/org-roam-ql")
