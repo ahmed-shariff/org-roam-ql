@@ -4,7 +4,7 @@
 
 #+TITLE: org-roam-ql - query language for org-roam
 
-This package provides an interface to easily query and display results from your ~org-roam~ database. 
+This package provides an interface to easily query and display results from your ~org-roam~ database.
 
 * Contents
 - [[#screen-shots][Screen-shots]]
@@ -21,13 +21,13 @@ This package provides an interface to easily query and display results from your
 
 * Screen-shots
 
-You can query org-roam with ~org-roam-ql-search~. The results are displayed in an org-roam-like buffer. org-roam-ql also comes with a transient that can be used to modify the results viewed. The transient can be activated with ~v~. You can modify the title (~t~), query (~q~), sort (~s~) and specify if the query is a subquery (apply query on the results of the buffer) or query against the whole org-roam database (~i~). Refreshing the buffer (~r~) will display the updated results.
+You can query org-roam with ~org-roam-ql-search~. The results are displayed in an org-roam-like buffer. org-roam-ql also comes with a transient that can be used to modify the results viewed. The transient can be activated with ~v~. You can modify the title (~t~), view kind (~k~), query (~q~), filter (~F~), sort (~s~) and specify whether the query should be evaluated against the current in-buffer results or against the whole org-roam database (~i~). Refreshing the buffer (~r~) will display the updated results.
 
-[[images/demo4.gif]]
+[[images/demo7.gif]]
 
-The transient is available in the org-roam buffer as well, this allows you to start a query from the results in the org-roam buffer. You also can view the results in an agenda-like buffer (~S~). When entering a query in any interactive function of org-roam-ql, it also has completion-at-point. ~org-roam-ql~ buffer also supports bookmark, i.e., you can set a bookmark by calling ~bookmark-set~. For convenience, the transient also has a shortcut for that (~b~).
+The transient is available in the org-roam buffer as well, which allows you to start a query from the results in the org-roam buffer. You also can view the results in an agenda-like buffer (~S~). When entering a query in any interactive function of org-roam-ql, it also has completion-at-point. ~org-roam-ql~ buffers support bookmarks (set with ~bookmark-set~). For convenience, the transient has a shortcut for that (~b~).
 
-[[images/demo6.gif]]
+[[images/demo8.gif]]
 
 * Installation/Setup
 ~org-roam-ql~ can be installed from [[https://melpa.org/#/org-roam-ql][MELPA]] or with other package management tools like [[https://framagit.org/steckerhalter/quelpa][quelpa]] and [[https://github.com/radian-software/straight.el][straight]]
@@ -55,11 +55,14 @@ Example configuration:
 
 * Usage
 ** Commands/functions
-- =org-roam-ql-search (SOURCE-OR-QUERY &optional TITLE SORT-FN PREVIEW-FN)= :: This is an *interactive* command that creates a ~org-roam-ql~ buffer with the nodes of the corresponding [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] with ~TITLE~. An ~org-roam-ql~ buffer is functionally similar to the ~org-roam-buffer~, but allows displaying any list of nodes ([[#screen-shots][see screen-shots above]]). When called interactively, it will prompt for the ~SOURCE-OR-QUERY~ and ~TITLE~. Note that when entering queries interactively either in ~org-roam-ql-search~ or in the transient, you can get completion-at-point with ~tab~.
+- =org-roam-ql-search (SOURCE-OR-QUERY &optional TITLE FILTER SORT-FN PREVIEW-FN)= :: This is an *interactive* command that creates a ~org-roam-ql~ buffer with the nodes of the corresponding [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] with ~TITLE~. ~FILTER~ is an additional [[#valid-values-for-source-or-query][query]] which further filters the nodes displayed. An ~org-roam-ql~ buffer is functionally similar to the ~org-roam-buffer~, but allows displaying any list of nodes ([[#screen-shots][see screen-shots above]]). When called interactively, it will prompt for the ~SOURCE-OR-QUERY~ and ~TITLE~. Note that when entering queries interactively either in ~org-roam-ql-search~ or in the transient, you can get completion-at-point with ~tab~.
 
    ~SORT-FN~ is used for sorting the results. It can be a string name of a registered sort function or a predicate function that can be used to sort the nodes (should take two nodes as input and return a non-nil value if the first node should be before the second). By default the following sort function are registered:  ~file-mtime~, ~file-atime~, ~deadline~, ~scheduled~, ~point~, ~level~, ~file-title~, ~file~ and ~title~. Each corresponds to the respective slot of an org-roam-node. It is possible to register new sort functions with ~org-roam-ql-register-sort-fn~. These registered functions will also appear as options for completion in the transient.
 
   ~PREVIEW-FN~ is a function used to generate the preview content on the ~org-roam-ql-mode~ buffer. See [[#custom-preview-function-for-org-roam-ql-buffer][Custom preview function for org-roam-ql buffer]] for more information on what this value can be.  If ~PREVIEW-FN~ is nil, the value of ~org-roam-ql-preview-function~ will be used. If it is non-nil, this argument will be set as the buffer local value for  ~org-roam-ql-preview-function~ in the corresponding ~org-roam-ql-mode~ buffer.
+
+- org-roam-ql-search-backlinks (SOURCE-OR-QUERY &optional TITLE FILTER SORT-FN PREVIEW-FN) :: This is similar to ~org-roam-ql-search~, but displays nodes that have a backlink to any of the nodes [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] resolves to. You can switch between the results of calling ~org-roam-ql-search~ and ~org-roam-ql-search-backlinks~ with ~k~ in the transient dispatch.
+
 - =org-roam-ql-nodes (SOURCE-OR-QUERY)= :: Given a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] , return a list of nodes.
 - ~org-roam-ql-agenda-block (QUERY)~ :: Meant to be used in ~org-agenda-custom-commands~ as a user-defined function. Insert items from processing ~QUERY~ (which is a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]]) into current buffer. QUERY is the `match' item in the custom command form. Currently this doesn't respect agenda restrict. Example:
   #+begin_src emacs-lisp
@@ -92,7 +95,7 @@ Example configuration:
     #+end_src
     In the above example, the result would contain any nodes whose todo state is =TODO=, have tags "tag1" and "tag2" and are in the org-roam buffer.
     The following are predicates available by default in org-roam-ql:
-  - ~or (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)~ :: Tests if a node matches/contained-in any of the ~SOURCE-OR-QUERY~'s. 
+  - ~or (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)~ :: Tests if a node matches/contained-in any of the ~SOURCE-OR-QUERY~'s.
   - ~and (SOURCE-OR-QUERY1 SOURCE-OR-QUERY2 ...)~ :: Similar to ~or~, but should satisfy all predicates or contained in all the results of ~SOURCE-OR-QUERY~'s.
   - ~not (SOURCE-OR-QUERY)~ :: Tests if a node doesn't match the result or not contained in the result of ~SOURCE-OR-QUERY~.
   - ~file (MATCH &optional EXACT USE-REGEXP)~ :: Test if nodes file name matches ~MATCH~. If ~EXACT~ is non-nil, the file slot should be an exact match to ~MATCH~. By default, this uses sql LIKE, but if ~USE-REGEXP~ is non-nil, then ~MATCH~ will be treated as a regex and regex matching will be used. Note the slot ~file~ of an org-roam-node would contain the absolute path.
@@ -133,7 +136,7 @@ Example configuration:
   - ~file-mtime-is-after (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes ~file-mtime~ is after ~TIME-STRING~.
   - ~file-mtime-is-before (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes ~file-mtime~ is before ~TIME-STRING~.
 ** Adding new predicates
-There are two ways to add a new predicate to org-roam-ql: 
+There are two ways to add a new predicate to org-roam-ql:
 - ~org-roam-ql-defpred (NAME DOCSTRING EXTRACTION-FUNCTION COMPARISON-FUNCTION)~ :: Creates a predicate that can be used as ~SOURCE-OR-QUERY~. For example, for a predicate defined as follows:
   #+begin_src emacs-lisp
   (org-roam-ql-defpred sample "A sample predicate" extraction-function comparison-function)
