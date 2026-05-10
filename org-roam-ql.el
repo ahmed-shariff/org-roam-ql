@@ -48,8 +48,7 @@ function that returns a query."
   :group 'org-roam-ql
   :type '(choice function sexp))
 
-(defcustom org-roam-ql-buffer-postrender-functions
-  org-roam-buffer-postrender-functions
+(defcustom org-roam-ql-buffer-postrender-functions (list)
   "Functions to run after a section of a `org-roam-ql-mode' buffer is
 rendered.  Each function accepts no arguments, and is run with the
 `org-roam-ql-mode' buffer as the current buffer."
@@ -59,6 +58,16 @@ rendered.  Each function accepts no arguments, and is run with the
 (defcustom org-roam-ql-preview-function #'org-roam-ql-preview-default-function
   "The preview function used to generate the content of a nodes
 preview in `org-roam-ql-mode' buffer.
+
+Before calling this, the point will be set to `org-roam-node-point'.
+Will be called with two arguments: (1) The corresponding node, and (2)
+the source-or-query of the corresponding buffer. See
+`org-roam-ql-nodes' for what the value of source-or-query can be."
+  :group 'org-roam-ql
+  :type 'function)
+
+(defcustom org-roam-ql-heading-function #'org-roam-ql-heading-default-function
+  "The function used to generate the heading of a node in `org-roam-ql-mode' buffer.
 
 Before calling this, the point will be set to `org-roam-node-point'.
 Will be called with two arguments: (1) The corresponding node, and (2)
@@ -1136,8 +1145,7 @@ all SECTIONS. "
             (magit-insert-heading "Results:")
             (dolist (previewing-node nodes)
               (magit-insert-section section (org-roam-node-section)
-                (magit-insert-heading (propertize (org-roam-node-title previewing-node)
-                                                  'font-lock-face 'org-roam-title))
+                (magit-insert-heading (funcall org-roam-ql-heading-function previewing-node source-or-query))
                 (oset section node previewing-node)
                 (oset section keymap 'org-roam-ql--node-map)
                 (magit-insert-section section (org-roam-preview-section)
@@ -1985,10 +1993,18 @@ Can be used in the minibuffer or when writting querries."
     (_ org-roam-ql-default-org-roam-buffer-query)))
 
 (defun org-roam-ql-preview-default-function (_ _)
-  "The deafult value for `org-roam-ql-preview-fn'.
+  "The deafult value for `org-roam-ql-preview-function'.
 
 Simple wrapper `org-roam-preview-function'."
   (funcall org-roam-preview-function))
+
+(defun org-roam-ql-heading-default-function (node _)
+  "The deafult value for `org-roam-ql-heading-function'.
+
+Returns the title of NODE propertized with org-roam-title."
+  (propertize (org-roam-node-title node)
+              'font-lock-face 'org-roam-title))
+
 
 (defun org-roam-ql--check-if-roam-buffer ()
   "Check if the buffer is a org-roam buffer but not a org-roam-ql buffer."
