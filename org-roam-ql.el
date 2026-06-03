@@ -1134,7 +1134,8 @@ all SECTIONS. "
                                                    (-map #'org-roam-node-id (org-roam-ql-nodes source-or-query))))
                          (--map (let ((node (org-roam-node-from-id (car it))))
                                   (setf (org-roam-node-point node) (cadr it))
-                                  node)))))
+                                  node))
+                         (seq-sort (and sort-fn (org-roam-ql--get-sort-fn sort-fn))))))
                      (if filter-node-ids
                          (--filter (member (org-roam-node-id it) filter-node-ids) it)
                        it))))
