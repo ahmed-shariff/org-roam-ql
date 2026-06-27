@@ -64,22 +64,22 @@ Example configuration:
 - org-roam-ql-search-backlinks (SOURCE-OR-QUERY &optional TITLE FILTER SORT-FN PREVIEW-FN) :: This is similar to ~org-roam-ql-search~, but displays nodes that have a backlink to any of the nodes [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] resolves to. You can switch between the results of calling ~org-roam-ql-search~ and ~org-roam-ql-search-backlinks~ with ~k~ in the transient dispatch.
 
 - =org-roam-ql-nodes (SOURCE-OR-QUERY)= :: Given a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] , return a list of nodes.
-- ~org-roam-ql-agenda-block (QUERY)~ :: Meant to be used in ~org-agenda-custom-commands~ as a user-defined function. Insert items from processing ~QUERY~ (which is a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]]) into current buffer. QUERY is the `match' item in the custom command form. Currently this doesn't respect agenda restrict. Example:
+- ~org-roam-ql-agenda-block (QUERY)~ :: Meant to be used in ~org-agenda-custom-commands~ as a user-defined function. Insert items from processing ~QUERY~ (which is a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]]) into the current buffer. QUERY is the `match' item in the custom command form. Currently this doesn't respect agenda restrictions. Example:
   #+begin_src emacs-lisp
     (setq org-agenda-custom-commands
           ("cr" "Node a" org-roam-ql-agenda-block '(title "Node a")))
   #+end_src
-- ~org-roam-ql-nodes-files (SOURCE-OR-QUERY)~ :: Given a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]] , returns a list of files of the nodes. Can be used in ~org-agenda-custom-commands~. Example:
+- ~org-roam-ql-nodes-files (SOURCE-OR-QUERY)~ :: Given a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]], returns a list of files for the nodes. Can be used in ~org-agenda-custom-commands~. Example:
   #+begin_src emacs-lisp
     (setq org-agenda-custom-commands
           ("cr" "todo nodes" todo "TODO" ((org-agenda-files (org-roam-ql-nodes-files '(title "Node"))))))
   #+end_src
 - ~org-roam-ql-add-saved-query (NAME DOCSTRING QUERY)~ :: Stores valid [[#valid-values-for-source-or-query][QUERY]] with ~NAME~ and ~DOCSTRING~. The ~NAME~ can be used as a query in place of any other ~SOURCE-OR-QUERY~. ~NAME~ can be a string or a symbol.
-- ~org-roam-ql-register-dblock-column~ :: Register a new column to use with dblock.  When ~IDENTIFIER~ is seen in ~:columns~ of the org-roam-ql dblock (see [[#org-dynamic-block][Org dynamic block]]), FN will be called with one parameter, a /org-roam-node/.
+- ~org-roam-ql-register-dblock-column~ :: Register a new column to use with dblock.  When ~IDENTIFIER~ is seen in ~:columns~ of the org-roam-ql dblock (see [[#org-dynamic-block][Org dynamic block]]), ~FN~ will be called with one parameter, an /org-roam-node/.
 - org-roam-backlinks-section-with-ql-filter :: Same as ~org-roam-backlinks-section~, but will respect a filter in a ~org-roam~ buffer. See [[#filtering-org-roam-buffers][Filtering org-roam buffers]].
 - org-roam-reflinks-section-with-ql-filter :: Same as ~org-roam-reflinks-section~, but will respect a filter in a ~org-roam~ buffer. See [[#filtering-org-roam-buffers][Filtering org-roam buffers]].
 ** Valid values for ~SOURCE-OR-QUERY~
-- A list of ~org-roam-nodes~ :: This should self explanatory.
+- A list of ~org-roam-nodes~ :: This should be self-explanatory.
 - A list of parameters that can be passed to ~org-roam-db-query~ :: It should be a list of the form ~(QUERY ARG1 ARG2...)~. The result of calling ~org-roam-db-query~ with these parameters should return a list of records where the first element is the ID of a corresponding node. For example:
   #+begin_src emacs-lisp
   (org-roam-ql-nodes '([:select [id] :from nodes :where (= todo \"TODO\")]))
@@ -124,17 +124,17 @@ Example configuration:
   - ~tags (TAG1 TAG2 ...)~ :: Tests if the tags of a node have TAG1, TAG2, etc.
   - ~refs (MATCH &optional EXACT USE-REGEXP)~ :: Similar to ~file~, tests the nodes refs slot.
   - ~backlink-to (SOURCE-OR-QUERY &key (TYPE "id") (COMBINE :or))~ :: Tests if the node has a backlink to any of the nodes from resolving ~SOURCE-OR-QUERY~. ~TYPE~ specifies the link type. If ~TYPE~ is nil, it will match to all types of links. ~COMBINE~ can be :and or :or. If ~COMBINE~ is ~:and~, return only nodes that have backward links to all results of ~SOURCE-OR-QUERY~; if ~:or~, return nodes that have backward links to any of them. For example, the query ~(backlink-to (title "Node") :type nil :combine :and)~ will match to all types of backlinks and return nodes that have backlinks to all the nodes ~(title "Node")~ resolve to.
-  - ~backlink-from (SOURCE-OR-QUERY &key (TYPE "id") (COMBINE :or))~ :: Similar to ~backlink-to~, tests if there are any backlinks from (aka forwardlinks) the resulting nodes from ~SOURCE-OR-QUERY~.
+  - ~backlink-from (SOURCE-OR-QUERY &key (TYPE "id") (COMBINE :or))~ :: Similar to ~backlink-to~, tests if there are any backlinks from (aka forward links) the resulting nodes from ~SOURCE-OR-QUERY~.
   - ~in-buffer (BUFFER-NAME)~ :: This is similar to passing a buffer-name as ~SOURCE-OR-QUERY~. Tests if a node is in the org-roam buffer named ~BUFFER-NAME~.
   - ~nodes-list (NODES-LIST)~ :: This is similar to passing a list of nodes as ~SOURCE-OR-QUERY~. Tests if a node is in the ~NODES-LIST~.
   - ~function (FUNC)~ :: This is similar to passing a function as ~SOURCE-OR-QUERY~. Tests if the node is in the result of executing the function ~FUNC~.
   - ~funcall (FUNC)~ :: Tests a node with the function ~FUNC~, which takes an org-roam node as parameter. Test passes if the function returns non-nil.
-  - ~file-atime (COMPARISON TIME-STRING)~ :: Same as ~scheduled~, tests the ~deadline~ of a node.
-  - ~file-atime-is-after (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes ~file-atime~ is after ~TIME-STRING~.
-  - ~file-atime-is-before (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes ~file-atime~ is before ~TIME-STRING~.
-  - ~file-mtime (COMPARISON TIME-STRING)~ :: Same as ~scheduled~, tests the ~deadline~ of a node.
-  - ~file-mtime-is-after (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes ~file-mtime~ is after ~TIME-STRING~.
-  - ~file-mtime-is-before (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes ~file-mtime~ is before ~TIME-STRING~.
+  - ~file-atime (COMPARISON TIME-STRING)~ :: Same as ~scheduled~, tests the ~file-atime~ of a node.
+  - ~file-atime-is-after (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes where ~file-atime~ is after ~TIME-STRING~.
+  - ~file-atime-is-before (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes where ~file-atime~ is before ~TIME-STRING~.
+  - ~file-mtime (COMPARISON TIME-STRING)~ :: Same as ~scheduled~, tests the ~file-mtime~ of a node.
+  - ~file-mtime-is-after (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes where ~file-mtime~ is after ~TIME-STRING~.
+  - ~file-mtime-is-before (TIME-STRING)~ :: ~TIME-STRING~ is the same as ~scheduled~. This filters for nodes where ~file-mtime~ is before ~TIME-STRING~.
 ** Adding new predicates
 There are two ways to add a new predicate to org-roam-ql:
 - ~org-roam-ql-defpred (NAME DOCSTRING EXTRACTION-FUNCTION COMPARISON-FUNCTION)~ :: Creates a predicate that can be used as ~SOURCE-OR-QUERY~. For example, for a predicate defined as follows:
@@ -154,7 +154,7 @@ There are two ways to add a new predicate to org-roam-ql:
 
   The ~EXTRACTION-FUNCTION~ takes an org-roam-node and returns a value that will be passed as the first parameter to ~COMPARISON-FUNCTION~. The remainder of the parameters when calling the predicate is passed as remaining parameters to ~COMPARISON-FUNCTION~. When the ~COMPARISON-FUNCTION~ returns a non-nil value, it will be included in the result.
 
-- ~org-roam-ql-defexpansion (NAME DOCSTRING EXPANSION-FUNCTION)~ :: Adds an ~EXPANSION-FUNCTION~ which will be identified by ~NAME~ in a org-roam-ql query. The ~EXPANSION-FUNCTION~ should take the parameters passed in the query and return values that can be passed to ~org-roam-nodes~.
+- ~org-roam-ql-defexpansion (NAME DOCSTRING EXPANSION-FUNCTION)~ :: Adds an ~EXPANSION-FUNCTION~ which will be identified by ~NAME~ in an org-roam-ql query. The ~EXPANSION-FUNCTION~ should take the parameters passed in the query and return values that can be passed to ~org-roam-ql-nodes~.
 
 ** Adding a sorting function
 - ~org-roam-ql-register-sort-fn (FUNCTION-NAME SORT-FUNCTION)~ :: Registers a sort function which can be used with ~org-roam-ql-nodes~. ~FUNCTION-NAME~ is the string name used to refer to this function with. ~SORT-FUNCTION~ is a function that takes two org-roam-nodes and return a truth value, which is used to sort, i.e., if non-nil, the first node would be before the second node passed to the function.  Uses `seq-sort'.  If a sort-function with the given name already exists, it would be overwritten.
@@ -174,7 +174,7 @@ Similar to ~org-ql~, ~org-roam-ql~ also provides a dynamic block. The header par
     - A slot name of ~org-roam-node~. For any function/accessor with a name of the form ~org-roam-node-<name>~, which takes an ~org-roam-node~ as a parameter, ~<name>~ can also be used as ~SYM~. For example, if there is a function named ~org-roam-node-short-title~, ~short-title~ can be used as a column name (~SYM~), this will result in a column with the title ~short-title~ where the content of each row is the result of calling the respective function.
     - The identifier used to register a function using ~org-roam-ql-register-dblock-column~.
   - ~(SYM NAME)~ - A list where the first element is a ~SYM~ (see above) and the second element should be a string NAME. In this case, the NAME will be used as the column title as opposed to ~SYM~.
-  - ~((SYM [NAME]) ARG1 ARG2...)~ - A list where the first element is similar to the above ~(SYM NAME)~ pattern. However, here ~NAME~ is optional. If ~NAME~ is not provided, ~SYM~ will be used as the column title. The corresponding function for ~SYM~ will be called with the remainder of the elements in the list (i.e., ~ARG1~, ~ARG2~, ect.) as arguments after the node. That is, if the corresponding function is ~FN~, it will be called invoked with ~(apply FN NODE '(ARG1 ARG2 ...))~.
+  - ~((SYM [NAME]) ARG1 ARG2...)~ - A list where the first element is similar to the above ~(SYM NAME)~ pattern. However, here ~NAME~ is optional. If ~NAME~ is not provided, ~SYM~ will be used as the column title. The corresponding function for ~SYM~ will be called with the remainder of the elements in the list (i.e., ~ARG1~, ~ARG2~, etc.) as arguments after the node. That is, if the corresponding function is ~FN~, it will be called with ~(apply FN NODE '(ARG1 ARG2 ...))~.
 - ~:sort~ - Name of a registered sort functions. See [[#commandsfunctions][ ~org-roam-ql-search~ ]] for more info on the values for sort functions.
 - ~:take~ (optional) - If a positive integer N, take the first N elements, if a negative -N, take the last N nodes.
 - ~:no-link~ (optional) - If a non-nil value is set, the first column containing the links will be dropped.
@@ -213,8 +213,8 @@ A few other example of dynamic blocks:
 
 ** Custom preview function for org-roam-ql buffer
 
-~org-roam-ql~ buffers visualizes the node itself. Which is unlike ~org-roam~ buffers, which visualizes relationships (like ~backlinks~ or ~refs~). To allow better customization, ~org-roam-ql~ has the following customizable variables. These are mostly similar to the ~org-roam~ counterparts:
-- ~org-roam-ql-preview-function~ :: This differs from the ~org-roam~ counterpart. The preview function used to generate the content of a nodes preview in ~org-roam-ql-mode~ buffer. Before calling this, the point will be set to ~org-roam-node-point~. Will be called with two arguments: (1) The corresponding node, and (2) the source-or-query of the corresponding buffer. See [[#valid-values-for-source-or-query][Valid values for SOURCE-OR-QUERY]] for what the value of source-or-query can be. By default, it calls the ~org-roam-preview-function~. Note that this can be set local to the buffer and will be used to generate the preview when the buffer is refreshed. The value set for this variable also can be overridden by passing it as a parameter to ~org-roam-ql-search~ when called programatically - in this case, the preview function passed as an argument is set as the buffer local value for this variable.
+~org-roam-ql~ buffers visualize the node itself. This is unlike ~org-roam~ buffers, which visualize relationships (like ~backlinks~ or ~refs~). To allow better customization, ~org-roam-ql~ has the following customizable variables. These are mostly similar to the ~org-roam~ counterparts:
+- ~org-roam-ql-preview-function~ :: This differs from the ~org-roam~ counterpart. The preview function used to generate the content of a node preview in an ~org-roam-ql-mode~ buffer. Before calling this, the point will be set to ~org-roam-node-point~. It will be called with two arguments: (1) the corresponding node, and (2) the source-or-query of the corresponding buffer. See [[#valid-values-for-source-or-query][Valid values for SOURCE-OR-QUERY]] for what the value of source-or-query can be. By default, it calls ~org-roam-preview-function~. Note that this can be set locally to the buffer and will be used to generate the preview when the buffer is refreshed. The value set for this variable can also be overridden by passing it as a parameter to ~org-roam-ql-search~ when called programmatically; in this case, the preview function passed as an argument is set as the buffer-local value for this variable.
 - ~org-roam-ql-heading-function~ :: The function used to generate the heading of a node in `org-roam-ql-mode' buffer. Similar to ~org-roam-ql-preview-function~ above, the point will be set to the point of the node and will be called with two parameters: (1) the node, and (2) the source-or-query.
 - ~org-roam-ql-buffer-postrender-functions~ :: Functions to run after a section of a ~org-roam-ql-mode~ buffer is rendered. Each function accepts no arguments, and is run with the ~org-roam-ql-mode~ buffer as the current buffer. By default, it is set to the value of ~org-roam-buffer-postrender-functions~.
 - ~org-roam-ql-preview-postprocess-functions~ :: A list of functions to postprocess the preview content. This is the same as ~org-roam-preview-postprocess-functions~, and the default value is set to this. Each function takes a single argument, the string for the preview content, and returns the post-processed string. The functions are applied in order of appearance in the list.
@@ -229,7 +229,7 @@ org-roam-ql comes with two alternate functions that can be used with ~org-roam-m
           org-roam-reflinks-section-with-ql-filter))
 #+end_src
 
-When these sections are configured in ~org-roam-mode-sections~, using ~F~ in ~org-roam-ql-buffer-dispatch~ (bound to ~v~ in ~org-roam~ buffers) would allow specifying a org-roam-ql query which will be used to filter the backlinks/reflinks displayed in the respective sections. After setting a filter, refresh the buffer for it take effect.
+When these sections are configured in ~org-roam-mode-sections~, using ~F~ in ~org-roam-ql-buffer-dispatch~ (bound to ~v~ in ~org-roam~ buffers) lets you specify an org-roam-ql query that will be used to filter the backlinks/reflinks displayed in the respective sections. After setting a filter, refresh the buffer for it to take effect.
 
 * Working with org-ql
 Optionally, ~org-roam-ql~ results can be visualized with [[https://github.com/alphapapa/org-ql][org-ql]], available through the extension ~org-roam-ql-ql~ (naming things is hard!!). This also can be installed from [[https://melpa.org/#/org-roam-ql-ql][MELPA]] or with other package management tools like [[https://framagit.org/steckerhalter/quelpa][quelpa]] and [[https://github.com/radian-software/straight.el][straight]].
@@ -248,7 +248,7 @@ Optionally, ~org-roam-ql~ results can be visualized with [[https://github.com/al
     (org-roam-ql-ql-init))
 #+end_src
 
-Note that org-ql works only with org entries, i.e., `heading nodes`. Hence, if there are any file nodes in the result, they will not be displayed. To be clear about that, when org-roam-ql results are displayed in an org-ql-view buffer, a warning is added to the end mentioning how many file nodes were there in the result. If the extension is loaded, you may view the org-roam-ql results with ~Q~ from the org-roam-ql transient. An org-ql-view can be viewed in an org-roam-like buffer with ~R~ from the org-ql-view transient.
+Note that org-ql works only with org entries, i.e., `heading nodes`. Hence, if there are any file nodes in the result, they will not be displayed. To make that clear, when org-roam-ql results are displayed in an org-ql-view buffer, a warning is added to the end mentioning how many file nodes were in the result. If the extension is loaded, you may view the org-roam-ql results with ~Q~ from the org-roam-ql transient. An org-ql-view can be viewed in an org-roam-like buffer with ~R~ from the org-ql-view transient.
 
 [[images/demo5.gif]]
 

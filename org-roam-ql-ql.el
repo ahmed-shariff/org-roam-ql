@@ -1,4 +1,4 @@
-;;; org-roam-ql-ql.el --- Intgrating org-roam and org-ql -*- lexical-binding: t -*-
+;;; org-roam-ql-ql.el --- Integrating org-roam and org-ql -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2025 Shariff AM Faleel
 
@@ -22,7 +22,7 @@
 
 ;;; Commentary:
 
-;; This pacakge provides an interface to query an org-roam databases
+;; This package provides an interface to query an org-roam database
 ;; and display it.
 
 ;;; code:
@@ -78,7 +78,7 @@ See `org-super-agenda' for SUPER-GROUPS."
 ;; *****************************************************************************
 
 (org-ql-defpred org-roam-query (query)
-  "To be used with the org-roam-ql. Checks if a node is a result of a passed query."
+  "Used with `org-roam-ql'. Checks whether a node is the result of a query."
   ;; FIXME: Adding body because of Warning: Unused lexical argument `query'
   :body (cl-assert query)
   :preambles ((`(,predicate-names . ,query)
@@ -91,7 +91,7 @@ See `org-super-agenda' for SUPER-GROUPS."
                      :query t))))
 
 (defun org-roam-ql-ql--get-roam-queries (query)
-  "Recursively traverse and get the org-roam-query's from a org-ql QUERY."
+  "Recursively traverse QUERY and extract the org-roam queries from it."
   (if (listp query)
       (if (equal (car query) 'org-roam-query)
           (list query)
@@ -136,7 +136,7 @@ parameters were ever passed"
 ;; *****************************************************************************
 ;;;###autoload
 (defun org-roam-ql-ql-buffer-from-roam-buffer ()
-  "Convert a roam buffer to org-ql buffer."
+  "Convert a roam buffer to an org-ql buffer."
   (interactive)
   (when (or (derived-mode-p 'org-agenda-mode) (derived-mode-p 'org-roam-mode))
     (let* ((b (buffer-name (current-buffer)))
@@ -148,7 +148,7 @@ parameters were ever passed"
 
 ;;;###autoload
 (defun org-roam-ql-ql-roam-buffer-from-agenda-buffer ()
-  "Convert a agenda reusult to a roam-buffer."
+  "Convert an agenda result to a roam buffer."
   (interactive)
   (unless org-ql-view-buffers-files
     (user-error "Not an Org QL View buffer"))
@@ -161,7 +161,7 @@ parameters were ever passed"
 
 ;;;###autoload
 (defun org-roam-ql-ql-init ()
-  "Integrate `org-roam-ql' into `org-ql'."
+  "Integrate `org-roam-ql' with `org-ql'."
   (advice-add 'org-ql-view-refresh :around #'org-roam-ql-ql--refresh)
 
   (transient-append-suffix

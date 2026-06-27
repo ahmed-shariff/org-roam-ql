@@ -43,20 +43,20 @@
 
 (defcustom org-roam-ql-default-org-roam-buffer-query
   #'org-roam-ql--default-query-for-roam-buffer
-  "The query to use when org-roam-buffer is extended.  Can also be a
+  "The query to use when an org-roam buffer is extended.  Can also be a
 function that returns a query."
   :group 'org-roam-ql
   :type '(choice function sexp))
 
 (defcustom org-roam-ql-buffer-postrender-functions (list)
-  "Functions to run after a section of a `org-roam-ql-mode' buffer is
+  "Functions to run after a section of an `org-roam-ql-mode' buffer is
 rendered.  Each function accepts no arguments, and is run with the
 `org-roam-ql-mode' buffer as the current buffer."
   :group 'org-roam-ql
   :type 'hook)
 
 (defcustom org-roam-ql-preview-function #'org-roam-ql-preview-default-function
-  "The preview function used to generate the content of a nodes
+  "The preview function used to generate the content of a node's
 preview in `org-roam-ql-mode' buffer.
 
 Before calling this, the point will be set to `org-roam-node-point'.
@@ -70,7 +70,7 @@ the source-or-query of the corresponding buffer. See
   "The function used to generate the heading of a node in `org-roam-ql-mode' buffer.
 
 Before calling this, the point will be set to `org-roam-node-point'.
-Will be called with two arguments: (1) The corresponding node, and (2)
+Will be called with two arguments: (1) the corresponding node, and (2)
 the source-or-query of the corresponding buffer. See
 `org-roam-ql-nodes' for what the value of source-or-query can be."
   :group 'org-roam-ql
@@ -104,7 +104,7 @@ applied in order of appearance in the list."
 (defvar-local org-roam-ql-buffer-filter nil "Filter that will be applied to org-roam section.
 
 This is expected to be a valid `org-roam-ql' query or nil.")
-(defvar-local org-roam-ql--buffer-displayed-filter nil "Filter that produced the resutls in the buffer.")
+(defvar-local org-roam-ql--buffer-displayed-filter nil "Filter that produced the results in the buffer.")
 (defvar-local org-roam-ql-buffer-kind nil
   "The type of query. It can be 'nodes or 'backlinks.")
 (defvar-local org-roam-ql--buffer-displayed-kind nil "The kind which produced the results in the buffer.")
@@ -134,7 +134,7 @@ SOURCE-OR-QUERY can be one of the following:
   called with the list or parameters as: (org-roam-db-query QUERY ARG1
   ARG2 ARG3...).  The first element in each row in the result from the
   query is expected to have the ID of a corresponding node, which will
-  be conerted to a org-roam-node.  QUERY can be a complete query.  If
+  be converted to an org-roam-node.  QUERY can be a complete query.  If
   the query is going to be of the form [:select [id] :from nodes
   :where (= todo \"TODO\")], you can omit the part till after
   :where i.e., pass only [(= todo \"TODO\")] and the rest will get
@@ -341,7 +341,7 @@ The nodes are considerered equal when they have the same id."
   (s-equals-p (org-roam-node-id node1) (org-roam-node-id node2)))
 
 (defun org-roam-ql--expand-query (query)
-  "Expand a org-roam-ql QUERY."
+  "Expand an org-roam-ql QUERY."
   ;; FIXME: two nodes are not equal? using this -compare-fn as workaround
   (let ((-compare-fn #'org-roam-ql--compare-nodes))
     (if (and (listp query) (member (car query) '(or and not)))
@@ -1397,7 +1397,7 @@ If there are entries that do not have an ID, it will signal an error"
 ;; *****************************************************************************
 ;;;###autoload
 (defun org-roam-ql-agenda-buffer-from-roam-buffer ()
-  "Convert a roam buffer to agenda buffer."
+  "Convert a roam buffer to an agenda buffer."
   (interactive)
   (if (derived-mode-p 'org-roam-mode)
       (let ((title (org-roam-ql--get-formatted-title org-roam-ql-buffer-title nil "from roam buffer")))
@@ -1413,7 +1413,7 @@ If there are entries that do not have an ID, it will signal an error"
     (user-error "Not in a org-roam-ql agenda buffer")))
 
 (defun org-roam-ql-roam-buffer-from-agenda-buffer ()
-  "Convert a agenda-buffer reusult to a roam-buffer."
+  "Convert an agenda-buffer result to a roam buffer."
   (interactive)
   (org-roam-ql-search (if org-roam-ql--buffer-displayed-query
                           org-roam-ql--buffer-displayed-query
@@ -1576,7 +1576,7 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
 ;; *****************************************************************************
 ;; org-roam-ql transient
 ;; *****************************************************************************
-;; Copying alot it from org-ql-view and magit-transient
+;; Copying a lot from org-ql-view and magit-transient
 
 (defclass org-roam-ql--variable (transient-variable)
   ((default-value :initarg :default-value)))
@@ -1958,7 +1958,7 @@ See `org-roam-ql-nodes' for more information on QUERY.  Intended to be
 used as a user-defined function in `org-agenda-custom-commands'.
 QUERY is the `match' item in the custom command form.  Currently this
 doesn't respect agenda restrict."
-  ;; Copying alot from org-ql-search-block
+  ;; Copying a lot from org-ql-search-block
   (let (narrow-p old-beg old-end strings)
     (if-let* ((nodes (org-roam-ql-nodes query)))
         (progn
@@ -2010,7 +2010,7 @@ Returns the title of NODE propertized with org-roam-title."
               'font-lock-face 'org-roam-title))
 
 (defun org-roam-ql--check-if-roam-buffer ()
-  "Check if the buffer is a org-roam buffer but not a org-roam-ql buffer."
+  "Check if the buffer is an org-roam buffer but not an org-roam-ql buffer."
   (and (derived-mode-p 'org-roam-mode) (not (derived-mode-p 'org-roam-ql-mode))))
 
 ;;;###autoload

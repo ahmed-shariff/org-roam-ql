@@ -1,4 +1,4 @@
-;;; org-roam-ql.el --- Tests for org-roam-ql -*- lexical-binding: t -*-
+;;; test-org-roam-ql.el --- Tests for org-roam-ql -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2025 Shariff AM Faleel
 
@@ -20,7 +20,7 @@
 
 ;;; Commentary:
 
-;; Setup sandbox directory (named sandbox) with: `make sandbox=sandbox v=vvv init'
+;; Set up the sandbox directory (named sandbox) with: `make sandbox=sandbox v=vvv init'
 ;; Run tests with: `make sandbox=sandbox quick`
 
 ;;; Code:
