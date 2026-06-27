@@ -1368,7 +1368,7 @@ list.  If NODE is nil, return an empty string."
                   org-roam-ql-buffer-query org-roam-ql--buffer-displayed-query
                   org-roam-ql-buffer-filter org-roam-ql--buffer-displayed-filter)))
     (org-roam-ql--render-agenda-buffer org-roam-ql--buffer-displayed-query
-                                       title
+                                       org-roam-ql-buffer-title
                                        (buffer-name)
                                        org-roam-ql-buffer-sort)))
 
