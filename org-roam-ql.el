@@ -1118,27 +1118,30 @@ all SECTIONS. "
       (let* ((-compare-fn #'org-roam-ql--compare-nodes)
              (filter-node-ids (and filter-source-or-query
                                    (-map #'org-roam-node-id (org-roam-ql-nodes filter-source-or-query))))
-             (nodes (-->
-                     (pcase kind
-                       ;; The default of nil is to have backward compatibility with current bookmarks.
-                       ((or 'nodes 'nil) (org-roam-ql-nodes source-or-query sort-fn))
-                       ('backlinks
-                        (->>
-                         (org-roam-db-query [:select [source pos properties]
-                                                     :from links
-                                                     :where (in dest $v1)
-                                                     ;; KLUDGE: include? parametrize?
-                                                     ;; :and (= type "id")
-                                                     ]
-                                            (apply #'vector
-                                                   (-map #'org-roam-node-id (org-roam-ql-nodes source-or-query))))
-                         (--map (let ((node (org-roam-node-from-id (car it))))
-                                  (setf (org-roam-node-point node) (cadr it))
-                                  node))
-                         (seq-sort (and sort-fn (org-roam-ql--get-sort-fn sort-fn))))))
-                     (if filter-node-ids
-                         (--filter (member (org-roam-node-id it) filter-node-ids) it)
-                       it))))
+             (nodes (if (and filter-source-or-query (null filter-node-ids))
+                        (prog1 nil
+                          (message "Filter resolved to empty list."))
+                      (-->
+                       (pcase kind
+                         ;; The default of nil is to have backward compatibility with current bookmarks.
+                         ((or 'nodes 'nil) (org-roam-ql-nodes source-or-query sort-fn))
+                         ('backlinks
+                          (->>
+                           (org-roam-db-query [:select [source pos properties]
+                                                       :from links
+                                                       :where (in dest $v1)
+                                                       ;; KLUDGE: include? parametrize?
+                                                       ;; :and (= type "id")
+                                                       ]
+                                              (apply #'vector
+                                                     (-map #'org-roam-node-id (org-roam-ql-nodes source-or-query))))
+                           (--map (let ((node (org-roam-node-from-id (car it))))
+                                    (setf (org-roam-node-point node) (cadr it))
+                                    node))
+                           (seq-sort (and sort-fn (org-roam-ql--get-sort-fn sort-fn))))))
+                       (if filter-node-ids
+                           (--filter (member (org-roam-node-id it) filter-node-ids) it)
+                         it)))))
         (magit-insert-section section (org-roam)
           (magit-insert-heading)
           (magit-insert-section section (org-roam-nodes)
