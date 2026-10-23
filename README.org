@@ -67,12 +67,12 @@ Example configuration:
 - ~org-roam-ql-agenda-block (QUERY)~ :: Meant to be used in ~org-agenda-custom-commands~ as a user-defined function. Insert items from processing ~QUERY~ (which is a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]]) into the current buffer. QUERY is the `match' item in the custom command form. Currently this doesn't respect agenda restrictions. Example:
   #+begin_src emacs-lisp
     (setq org-agenda-custom-commands
-          ("cr" "Node a" org-roam-ql-agenda-block '(title "Node a")))
+          '(("cr" "Node a" org-roam-ql-agenda-block '(title "Node a"))))
   #+end_src
 - ~org-roam-ql-nodes-files (SOURCE-OR-QUERY)~ :: Given a [[#valid-values-for-source-or-query][ ~SOURCE-OR-QUERY~ ]], returns a list of files for the nodes. Can be used in ~org-agenda-custom-commands~. Example:
   #+begin_src emacs-lisp
     (setq org-agenda-custom-commands
-          ("cr" "todo nodes" todo "TODO" ((org-agenda-files (org-roam-ql-nodes-files '(title "Node"))))))
+          '(("cr" "todo nodes" todo "TODO" ((org-agenda-files (org-roam-ql-nodes-files '(title "Node")))))))
   #+end_src
 - ~org-roam-ql-add-saved-query (NAME DOCSTRING QUERY)~ :: Stores valid [[#valid-values-for-source-or-query][QUERY]] with ~NAME~ and ~DOCSTRING~. The ~NAME~ can be used as a query in place of any other ~SOURCE-OR-QUERY~. ~NAME~ can be a string or a symbol.
 - ~org-roam-ql-register-dblock-column~ :: Register a new column to use with dblock.  When ~IDENTIFIER~ is seen in ~:columns~ of the org-roam-ql dblock (see [[#org-dynamic-block][Org dynamic block]]), ~FN~ will be called with one parameter, an /org-roam-node/.
