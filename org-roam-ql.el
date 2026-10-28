@@ -381,27 +381,30 @@ the COMPARISON-FUNCTION."
 
 ;;;###autoload
 (defun org-roam-ql-search (source-or-query &optional title filter sort-fn preview-fn)
-  "Get nodes that match SOURCE-OR-QUERY and display in org-roam-ql
-buffer.  See `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be.
-FILTER is an additional query similar to SOURCE-OR-QUERY which can be
-applied to the results of SOURCE-OR-QUERY.  TITLE is a title to
-associate with the view.  Results will be displayed in a org-roam-ql
-buffer.  SORT-FN is used for sorting the results.  It can be a string
-name of a slot or a predicate function which can be used to sort the
-nodes.  See `org-roam-nodes' for more info on this.
+  "Display nodes for SOURCE-OR-QUERY in org-roam-ql buffer.
+See `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be.  FILTER is an
+additional query similar to SOURCE-OR-QUERY which can be applied to
+the results of SOURCE-OR-QUERY.  TITLE is a title to associate with
+the view.  Results will be displayed in a org-roam-ql buffer.  SORT-FN
+is used for sorting the results.  It can be a string name of a slot or
+a predicate function which can be used to sort the nodes.  See
+`org-roam-nodes' for more info on this.
 
 PREVIEW-FN is a function used to generate the preview content on the
-`org-roam-ql-mode' buffer. See `org-roam-ql-preview-function' for what
-the arguments can be.  If PREVIEW-FN is nil, the value of
-`org-roam-ql-preview-function' will be used. If it is non-nil, this
+`org-roam-ql-mode' buffer.  See `org-roam-ql-preview-function' for
+what the arguments can be.  If PREVIEW-FN is nil, the value of
+`org-roam-ql-preview-function' will be used.  If it is non-nil, this
 argument will be set as the buffer local value for
 `org-roam-ql-preview-function' in the corresponding `org-roam-ql-mode'
-buffer"
-  (interactive (list (let ((query (org-roam-ql--read-query)))
-                       (if (vectorp query)
-                           (list query)
-                         query))
-                     (read-string "Title: ")))
+buffer.
+
+When called interactivly will prompt for SOURCE-OR-QUERY and
+TITLE.  When called interactive with prefix will also prompt for
+FILTER."
+  (interactive (list (org-roam-ql--read-query)
+                     (read-string "Title: ")
+                     (when current-prefix-arg
+                       (org-roam-ql--read-query "Filter Query: "))))
   (org-roam-ql--render-roam-buffer 'nodes
                                    source-or-query
                                    filter
@@ -413,28 +416,30 @@ buffer"
 
 ;;;###autoload
 (defun org-roam-ql-search-backlinks (source-or-query &optional title filter sort-fn preview-fn)
-  "Get nodes that match have backlinks to SOURCE-OR-QUERY and display
-in org-roam-ql buffer.  See `org-roam-ql-nodes' for what
-SOURCE-OR-QUERY can be.  FILTER is an additional query similar to
-SOURCE-OR-QUERY which can be applied to the results, i.e., backlinks
-to SOURCE-OR-QUERY.  TITLE is a title to associate with the view.
-Results will be displayed in a org-roam-ql buffer.  SORT-FN is used
-for sorting the results.  It can be a string name of a slot or a
-predicate function which can be used to sort the nodes.  See
-`org-roam-nodes' for more info on this.
+  "Display backlinks to SOURCE-OR-QUERY in an org-roam-ql buffer.
+See `org-roam-ql-nodes' for what SOURCE-OR-QUERY can be.  FILTER is an
+additional query similar to SOURCE-OR-QUERY which can be applied to
+the results, i.e., backlinks to SOURCE-OR-QUERY.  TITLE is a title to
+associate with the view.  Results will be displayed in a org-roam-ql
+buffer.  SORT-FN is used for sorting the results.  It can be a string
+name of a slot or a predicate function which can be used to sort the
+nodes.  See `org-roam-nodes' for more info on this.
 
 PREVIEW-FN is a function used to generate the preview content on the
-`org-roam-ql-mode' buffer. See `org-roam-ql-preview-function' for what
-the arguments can be.  If PREVIEW-FN is nil, the value of
-`org-roam-ql-preview-function' will be used. If it is non-nil, this
+`org-roam-ql-mode' buffer.  See `org-roam-ql-preview-function' for
+what the arguments can be.  If PREVIEW-FN is nil, the value of
+`org-roam-ql-preview-function' will be used.  If it is non-nil, this
 argument will be set as the buffer local value for
 `org-roam-ql-preview-function' in the corresponding `org-roam-ql-mode'
-buffer"
-  (interactive (list (let ((query (org-roam-ql--read-query)))
-                       (if (vectorp query)
-                           (list query)
-                         query))
-                     (read-string "Title: ")))
+buffer.
+
+When called interactivly will prompt for SOURCE-OR-QUERY and
+TITLE.  When called interactive with prefix will also prompt for
+FILTER."
+  (interactive (list (org-roam-ql--read-query)
+                     (read-string "Title: ")
+                     (when current-prefix-arg
+                       (org-roam-ql--read-query "Filter Query: "))))
   (org-roam-ql--render-roam-buffer 'backlinks
                                    source-or-query
                                    filter
@@ -525,8 +530,9 @@ This would be either an `org-agenda' buffer or a `org-roam' like buffer."
     (set-keymap-parent m minibuffer-local-map)
     m))
 
-(defun org-roam-ql--read-query (&optional initial-input)
+(cl-defun org-roam-ql--read-query (&optional (prompt "Query: ") initial-input)
   "Read query from minibuffer.
+PROMPT and INITIAL-INPUT are used in `read-from-minibuffer'.
 Sets the history as well."
   ;; Copied from `simple.el' `read--expression'
   (minibuffer-with-setup-hook
@@ -535,13 +541,16 @@ Sets the history as well."
         (set-syntax-table emacs-lisp-mode-syntax-table)
         (add-hook 'completion-at-point-functions
                   #'org-roam-ql--completion-at-point nil t))
-    (let ((query (read-from-minibuffer "Query: " initial-input org-roam-ql--read-query-map nil
-                                       'org-roam-ql--search-query-history)))
+    (let* ((query (read-from-minibuffer prompt initial-input org-roam-ql--read-query-map nil
+                                        'org-roam-ql--search-query-history))
+           (query-s-exp (read query)))
       (setf org-roam-ql--search-query-history (delete-dups
                                                (append
                                                 org-roam-ql--search-query-history
                                                 (list query))))
-      (read query))))
+      (if (vectorp query-s-exp)
+          (list query-s-exp)
+        query-s-exp))))
 
 (defvar org-roam-ql--valid-prev-chars-for-cap nil)
 
@@ -1768,8 +1777,10 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
                          (format "[%s nodes]" (length value))
                        (format "%S" value)))
   :reader (lambda (&rest _)
-            (org-roam-ql--read-query (when org-roam-ql-buffer-query
-                                       (format "%S" org-roam-ql-buffer-query)))))
+            (org-roam-ql--read-query
+             "Query: "
+             (when org-roam-ql-buffer-query
+               (format "%S" org-roam-ql-buffer-query)))))
 
 (transient-define-infix org-roam-ql-view--transient-sort ()
   :class 'org-roam-ql--variable--sexp
@@ -1822,8 +1833,10 @@ Same as `org-roam-reflinks-section', but will take both node or a query."
                   org-roam-ql-buffer-query
                 (eq org-roam-ql-buffer-in 'in-buffer)))
   :reader (lambda (&rest _)
-            (org-roam-ql--read-query (when org-roam-ql-buffer-filter
-                                       (format "%S" org-roam-ql-buffer-filter)))))
+            (org-roam-ql--read-query
+             "Filter Query: "
+             (when org-roam-ql-buffer-filter
+               (format "%S" org-roam-ql-buffer-filter)))))
 
 ;; *****************************************************************************
 ;; org dynamic block
