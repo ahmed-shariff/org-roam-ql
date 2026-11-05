@@ -20,8 +20,8 @@
 
 ;;; Commentary:
 
-;; Set up the sandbox directory (named sandbox) with: `make sandbox=sandbox v=vvv init'
-;; Run tests with: `make sandbox=sandbox quick`
+;; Install test dependencies from the repository root: `eask install-deps --dev'
+;; Run tests with: `eask test buttercup'.
 
 ;;; Code:
 
