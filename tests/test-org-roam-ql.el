@@ -176,6 +176,47 @@
         (with-current-buffer agenda-buffer-name
           (org-roam-ql-roam-buffer-from-agenda-buffer))
         (expect (-map #'org-roam-node-id (org-roam-ql--nodes-from-roam-buffer (get-buffer second-roam-buffer-name))) :to-have-same-items-as query-result-ids)))
+    (describe "with preview suppression and postprocessing"
+      :var ((buffer-name "preview-postprocess-test-buffer"))
+      (after-each
+        (when (get-buffer buffer-name)
+          (kill-buffer buffer-name)))
+      (it "omits nil previews without calling postprocessors"
+        (let ((org-roam-ql-preview-postprocess-functions
+               (list (lambda (_) (error "Unexpected postprocessor call")))))
+          (org-roam-ql--render-roam-buffer
+           'nodes query nil "preview test" buffer-name nil (lambda (_node _query) nil))
+          (expect (org-roam-ql--nodes-from-roam-buffer (get-buffer buffer-name))
+                  :to-equal nil)))
+      (it "keeps sections when a postprocessor returns nil and skips the rest"
+        (let ((org-roam-ql-preview-postprocess-functions
+               (list (lambda (content)
+                       (expect content :to-equal "preview")
+                       nil)
+                     (lambda (_) (error "Unexpected postprocessor call")))))
+          (org-roam-ql--render-roam-buffer
+           'nodes query nil "preview test" buffer-name nil (lambda (_node _query) "preview"))
+          (expect (-map #'org-roam-node-id
+                        (org-roam-ql--nodes-from-roam-buffer (get-buffer buffer-name)))
+                  :to-have-same-items-as query-result-ids)
+          (expect (with-current-buffer buffer-name
+                    (goto-char (point-min))
+                    (search-forward "preview" nil t))
+                  :to-equal nil)))
+      (it "passes empty strings through the postprocessor chain"
+        (let ((org-roam-ql-preview-postprocess-functions
+               (list (lambda (content)
+                       (expect content :to-equal "")
+                       "processed preview"))))
+          (org-roam-ql--render-roam-buffer
+           'nodes query nil "preview test" buffer-name nil
+           (lambda (_node source-or-query)
+             (expect source-or-query :to-equal query)
+             ""))
+          (expect (with-current-buffer buffer-name
+                    (goto-char (point-min))
+                    (count-matches "processed preview"))
+                  :to-equal (length query-result)))))
     (describe "with custom preview function"
       :var ((result-buffer (window-buffer
                             (org-roam-ql-search query "test-title"

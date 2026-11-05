@@ -62,7 +62,11 @@ preview in `org-roam-ql-mode' buffer.
 Before calling this, the point will be set to `org-roam-node-point'.
 Will be called with two arguments: (1) The corresponding node, and (2)
 the source-or-query of the corresponding buffer. See
-`org-roam-ql-nodes' for what the value of source-or-query can be."
+`org-roam-ql-nodes' for what the value of source-or-query can be.
+
+Return a string, or nil to omit the node and its heading.  An empty
+string still displays the heading.  Postprocessors cannot omit the
+node; see `org-roam-ql-preview-postprocess-functions'."
   :group 'org-roam-ql
   :type 'function)
 
@@ -79,10 +83,14 @@ the source-or-query of the corresponding buffer. See
 (defcustom org-roam-ql-preview-postprocess-functions org-roam-preview-postprocess-functions
   "A list of functions to postprocess the preview content.
 
-This is the same as `org-roam-preview-postprocess-functions'.
+Defaults to `org-roam-preview-postprocess-functions'.
 Each function takes a single argument, the string for the preview
-content, and returns the post-processed string. The functions are
-applied in order of appearance in the list."
+content, and returns the post-processed string.  The functions are
+applied in order of appearance in the list, only while the current
+content is a string.  If a function returns nil, remaining functions
+are skipped and the section is displayed with an empty preview.
+If the preview function itself returns nil, the node is omitted
+and no postprocessors are called."
   :group 'org-roam-ql
   :type 'hook)
 
@@ -1102,7 +1110,9 @@ TITLE is the title, BUFFER-NAME is the name for the buffer.
 See `org-roam-ql-nodes' for SORT-FN. Note that this is applied to the
 nodes being displayed in the buffer.
 If PREVIEW-FN is non-nil, it will be set as the buffer local value for
-`org-roam-ql-preview-function'.
+`org-roam-ql-preview-function'.  A nil preview omits the node and its
+heading.  A nil postprocessor result instead keeps the section with
+an empty preview; see `org-roam-ql-preview-postprocess-functions'.
 PRE-RENDER-FN, if non-nil, will be called before rendering all
 SECTIONS.  POST-RENDER-FN, if non-nil, will be called after rendering
 all SECTIONS. "
@@ -1150,36 +1160,35 @@ all SECTIONS. "
                        (if filter-node-ids
                            (--filter (member (org-roam-node-id it) filter-node-ids) it)
                          it)))))
+        (setq preview-fn (if preview-fn
+                             (setq-local org-roam-ql-preview-function preview-fn)
+                           org-roam-ql-preview-function))
         (magit-insert-section section (org-roam)
           (magit-insert-heading)
           (magit-insert-section section (org-roam-nodes)
             ;; TODO: Add summary of filter to heading
             (magit-insert-heading "Results:")
             (dolist (previewing-node nodes)
-              (magit-insert-section section (org-roam-node-section)
-                (magit-insert-heading (funcall org-roam-ql-heading-function previewing-node source-or-query))
-                (oset section node previewing-node)
-                (oset section keymap 'org-roam-ql--node-map)
-                (magit-insert-section section (org-roam-preview-section)
-                  (oset section keymap 'org-roam-ql--preview-map)
-                  ;; respecting buffer local value
-                  (let ((preview-fn (if preview-fn
-                                        (setq-local org-roam-ql-preview-function preview-fn)
-                                      org-roam-ql-preview-function))
-                        (query org-roam-ql-buffer-query))
-                    (insert (org-roam-fontify-like-in-org-mode
-                             (save-excursion
-                               (org-roam-with-temp-buffer (org-roam-node-file previewing-node)
-                                 (org-with-wide-buffer
-                                  (goto-char (org-roam-node-point previewing-node))
-                                  (let ((s (funcall preview-fn previewing-node query)))
-                                    (dolist (fn org-roam-ql-preview-postprocess-functions)
-                                      (setq s (funcall fn s)))
-                                    s)))))
-                            "\n"))
-                  (oset section file (org-roam-node-file previewing-node))
-                  (oset section point (org-roam-node-point previewing-node))
-                  (insert ?\n)))
+              (when-let* ((content
+                           (save-excursion
+                             (org-roam-with-temp-buffer (org-roam-node-file previewing-node)
+                               (org-with-wide-buffer
+                                (goto-char (org-roam-node-point previewing-node))
+                                (when-let* ((s (funcall preview-fn previewing-node source-or-query)))
+                                  (dolist (fn org-roam-ql-preview-postprocess-functions)
+                                    (when (stringp s)
+                                      (setq s (funcall fn s))))
+                                  (or s "")))))))
+                (magit-insert-section section (org-roam-node-section)
+                  (magit-insert-heading (funcall org-roam-ql-heading-function previewing-node source-or-query))
+                  (oset section node previewing-node)
+                  (oset section keymap 'org-roam-ql--node-map)
+                  (magit-insert-section section (org-roam-preview-section)
+                    (oset section keymap 'org-roam-ql--preview-map)
+                    (insert (org-roam-fontify-like-in-org-mode content) "\n")
+                    (oset section file (org-roam-node-file previewing-node))
+                    (oset section point (org-roam-node-point previewing-node))
+                    (insert ?\n))))
               (insert ?\n))
             (magit-insert-child-count section))))
       (when post-render-fn
