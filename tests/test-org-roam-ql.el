@@ -217,6 +217,83 @@
                     (goto-char (point-min))
                     (count-matches "processed preview"))
                   :to-equal (length query-result)))))
+    (describe "with render hooks"
+      :var ((buffer-name "render-hooks-test-buffer")
+            (org-roam-ql-preview-postprocess-functions nil))
+      (after-each
+        (when (get-buffer buffer-name)
+          (kill-buffer buffer-name)))
+      (it "initializes preview and query before prerender and runs hooks on refresh"
+        (let* ((events nil)
+               (preview (lambda (_node _query) "hook test preview"))
+               (org-roam-ql-buffer-prerender-functions
+                (list (lambda ()
+                        (expect (buffer-name) :to-equal buffer-name)
+                        (expect org-roam-ql-buffer-query :to-equal query)
+                        (expect org-roam-ql-preview-function :to-be preview)
+                        (expect (buffer-string) :to-equal "")
+                        (push 'pre events))))
+               (org-roam-ql-buffer-postrender-functions
+                (list (lambda ()
+                        (expect (buffer-name) :to-equal buffer-name)
+                        (expect (save-excursion
+                                  (goto-char (point-min))
+                                  (count-matches "hook test preview"))
+                                :to-equal (length query-result))
+                        (push 'post events)))))
+          (org-roam-ql--render-roam-buffer
+           'nodes query nil "hook test" buffer-name nil preview)
+          (with-current-buffer buffer-name
+            (org-roam-ql-refresh-buffer))
+          (expect (reverse events) :to-equal '(pre post pre post))))
+      (it "uses a buffer-local prerender hook's preview override on render and refresh"
+        (let* ((replacement (lambda (_node _query) "replacement preview"))
+               (org-roam-ql-buffer-prerender-functions nil)
+               (org-roam-ql-buffer-postrender-functions nil)
+               (hook-calls 0)
+               (org-roam-ql-mode-hook
+                (list (lambda ()
+                        (when (equal (buffer-name) buffer-name)
+                          (add-hook 'org-roam-ql-buffer-prerender-functions
+                                    (lambda ()
+                                      (setq hook-calls (1+ hook-calls))
+                                      (setq-local org-roam-ql-preview-function replacement))
+                                    nil t))))))
+          (org-roam-ql--render-roam-buffer
+           'nodes query nil "hook test" buffer-name nil
+           (lambda (_node _query) (error "Original preview should not run")))
+          (with-current-buffer buffer-name
+            (expect hook-calls :to-equal 1)
+            (expect org-roam-ql-preview-function :to-be replacement)
+            (expect (save-excursion
+                      (goto-char (point-min))
+                      (count-matches "replacement preview"))
+                    :to-equal (length query-result))
+            (org-roam-ql-refresh-buffer)
+            (expect hook-calls :to-equal 2)
+            (expect org-roam-ql-preview-function :to-be replacement)
+            (expect (save-excursion
+                      (goto-char (point-min))
+                      (count-matches "replacement preview"))
+                    :to-equal (length query-result)))))
+      (it "saves the preview and runs both hooks for empty results and refresh"
+        (let* ((events nil)
+               (preview (lambda (_node _query) (error "No nodes to preview")))
+               (org-roam-ql-buffer-prerender-functions
+                (list (lambda ()
+                        (expect org-roam-ql-preview-function :to-be preview)
+                        (push 'pre events))))
+               (org-roam-ql-buffer-postrender-functions
+                (list (lambda () (push 'post events)))))
+          (org-roam-ql--render-roam-buffer
+           'nodes (lambda () nil) nil "empty hook test" buffer-name nil preview)
+          (with-current-buffer buffer-name
+            (expect org-roam-ql-preview-function :to-be preview)
+            (org-roam-ql-refresh-buffer)
+            (expect org-roam-ql-preview-function :to-be preview)
+            (expect (org-roam-ql--nodes-from-roam-buffer (current-buffer))
+                    :to-equal nil))
+          (expect (reverse events) :to-equal '(pre post pre post)))))
     (describe "with custom preview function"
       :var ((result-buffer (window-buffer
                             (org-roam-ql-search query "test-title"

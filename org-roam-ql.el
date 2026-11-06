@@ -48,6 +48,15 @@ function that returns a query."
   :group 'org-roam-ql
   :type '(choice function sexp))
 
+(defcustom org-roam-ql-buffer-prerender-functions (list)
+  "Functions to run before rendering an `org-roam-ql-mode' buffer.
+Run after initializing buffer-local render state, including
+`org-roam-ql-preview-function', and before resolving the query.
+Each function accepts no arguments and runs with the results buffer
+as the current buffer, on both initial rendering and refresh."
+  :group 'org-roam-ql
+  :type 'hook)
+
 (defcustom org-roam-ql-buffer-postrender-functions (list)
   "Functions to run after a section of an `org-roam-ql-mode' buffer is
 rendered.  Each function accepts no arguments, and is run with the
@@ -1089,7 +1098,7 @@ Similar to `org-roam-mode', but doesn't default to the
                                        org-roam-ql-preview-function))))
 
 (defun org-roam-ql--render-roam-buffer (kind source-or-query filter-source-or-query title buffer-name
-                                        &optional sort-fn preview-fn pre-render-fn post-render-fn)
+                                        &optional sort-fn preview-fn)
   "Render an org-roam-ql buffer.
 KIND dictates how SOURCE-OR-QUERY is processed, where the point is
 set when the preview-function is called. KIND can be one of the
@@ -1113,9 +1122,9 @@ If PREVIEW-FN is non-nil, it will be set as the buffer local value for
 `org-roam-ql-preview-function'.  A nil preview omits the node and its
 heading.  A nil postprocessor result instead keeps the section with
 an empty preview; see `org-roam-ql-preview-postprocess-functions'.
-PRE-RENDER-FN, if non-nil, will be called before rendering all
-SECTIONS.  POST-RENDER-FN, if non-nil, will be called after rendering
-all SECTIONS. "
+Run `org-roam-ql-buffer-prerender-functions' after initializing
+buffer-local render state and before resolving the query.  Run
+`org-roam-ql-buffer-postrender-functions' after rendering results."
   ;; copied  from `org-roam-buffer-render-contents'
   (with-current-buffer (get-buffer-create buffer-name)
     (let ((inhibit-read-only t))
@@ -1132,8 +1141,10 @@ all SECTIONS. "
             org-roam-ql-buffer-title title
             org-roam-ql-buffer-sort sort-fn
             org-roam-ql-buffer-in 'org-roam-db)
-      (when pre-render-fn
-        (funcall pre-render-fn))
+      (when preview-fn
+        (setq-local org-roam-ql-preview-function preview-fn))
+      (run-hooks 'org-roam-ql-buffer-prerender-functions)
+      (setq preview-fn org-roam-ql-preview-function)
       (let* ((filter-node-ids (and filter-source-or-query
                                    (-map #'org-roam-node-id (org-roam-ql-nodes filter-source-or-query))))
              (nodes (if (and filter-source-or-query (null filter-node-ids))
@@ -1160,9 +1171,6 @@ all SECTIONS. "
                        (if filter-node-ids
                            (--filter (member (org-roam-node-id it) filter-node-ids) it)
                          it)))))
-        (setq preview-fn (if preview-fn
-                             (setq-local org-roam-ql-preview-function preview-fn)
-                           org-roam-ql-preview-function))
         (magit-insert-section section (org-roam)
           (magit-insert-heading)
           (magit-insert-section section (org-roam-nodes)
@@ -1191,8 +1199,6 @@ all SECTIONS. "
                     (insert ?\n))))
               (insert ?\n))
             (magit-insert-child-count section))))
-      (when post-render-fn
-        (funcall post-render-fn))
       (run-hooks 'org-roam-ql-buffer-postrender-functions)
       (goto-char 0))
     (display-buffer (current-buffer))))
